@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react"
 import { playwright } from "@vitest/browser-playwright"
 import { defineConfig } from "vitest/config"
 
+import { optimizeDepsInclude } from "./optimizeDeps.js"
+
 /**
  * Component tests run in a real headless chromium, driven through
  * `@vitest/browser-playwright` — the same vitest browser mode
@@ -62,48 +64,17 @@ export default defineConfig({
     setupFiles: ["./vitest.setup.ts"],
   },
   /**
-   * This list is load-bearing, not tidiness.
+   * The list itself lives in `./optimizeDeps.js`, and the reason it
+   * is a separate file is the CI check that now guards it:
+   * `charcuterie-check-optimize-deps` runs AFTER the suite in a plain
+   * Node process, which cannot load this TypeScript config — so the
+   * array has to be importable on its own.
    *
-   * Vite discovers dependencies lazily. Left to itself it starts
-   * a re-optimisation part-way through a run and reloads the
-   * page under the tests, which throws away React's
-   * compiler-runtime cache and surfaces as a `useMemoCache` null
-   * crash. It is invisible locally — `node_modules/.vite` is
-   * warm after the first run — and reproduces on every CI run,
-   * which has no cache at all.
-   *
-   * Now that `browser.enabled` is true this list is load-bearing
-   * on every cold CI run, not merely pre-declared.
-   *
-   * Source of truth is THIS package's own `_metadata.json`, written
-   * under `packages/web/node_modules/.vite/vitest/<hash>/deps/`
-   * after a cold run — not mux-magic's copy filtered by hand, which
-   * is how the four entries below went missing. Note the cache lives
-   * under `packages/web/`, not the repo root; clearing the wrong one
-   * gives a warm run that passes and proves nothing.
-   *
-   * Each SUBPATH is its own entry: `@charcuterie/logic` would not
-   * cover `/query`. mux-magic lost this exact race on CI (16 tests,
-   * `Failed to fetch dynamically imported module: …?v=…`) after the
-   * fleet query adoption added an unlisted subpath here too.
+   * That file carries the full explanation of why the list is
+   * load-bearing. The short version: Vite discovers dependencies
+   * lazily, an undeclared one re-optimises mid-run and reloads the
+   * page under the tests, and it is a race that passes until it
+   * doesn't. This repo was silently short four entries.
    */
-  optimizeDeps: {
-    include: [
-      "@charcuterie/logic/query",
-      "@charcuterie/tokens",
-      "@charcuterie/ui",
-      "@tanstack/react-query",
-      "@testing-library/jest-dom/vitest",
-      "@testing-library/react",
-      "@testing-library/user-event",
-      // From Vitest itself rather than app source, but a top-level
-      // entry in `_metadata.json` all the same.
-      "expect-type",
-      "react",
-      "react-dom",
-      "react-dom/client",
-      "react/jsx-dev-runtime",
-      "react/jsx-runtime",
-    ],
-  },
+  optimizeDeps: { include: [...optimizeDepsInclude] },
 })
