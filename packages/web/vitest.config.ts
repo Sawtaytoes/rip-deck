@@ -76,5 +76,5 @@ export default defineConfig({
    * page under the tests, and it is a race that passes until it
    * doesn't. This repo was silently short four entries.
    */
-  optimizeDeps: { include: optimizeDepsInclude },
+  optimizeDeps: { include: [...optimizeDepsInclude] },
 })
