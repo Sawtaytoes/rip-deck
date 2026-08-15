@@ -61,6 +61,11 @@ export default tseslint.config(
           // hard parse error rather than a lint result.
           allowDefaultProject: [
             "packages/*/vitest.config.ts",
+            // The declaration beside `optimizeDeps.js`. That list is
+            // plain JS so `charcuterie-check-optimize-deps` can read it
+            // from a plain Node process; this `.d.ts` is what keeps the
+            // Vitest config's import of it typed.
+            "packages/*/optimizeDeps.d.ts",
           ],
         },
         tsconfigRootDir: import.meta.dirname,

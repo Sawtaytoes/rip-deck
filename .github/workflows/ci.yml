@@ -56,6 +56,26 @@ jobs:
         # watch mode forever.
         run: npx vitest run
 
+      - name: Check optimizeDeps.include parity
+        # AFTER the tests, deliberately: Vite's optimizer writes its
+        # metadata as it discovers, so before a run there is nothing to
+        # compare and mid-run the picture is incomplete.
+        #
+        # This guards a race rather than a determinate break. An
+        # undeclared dependency gets discovered part-way through a run,
+        # which re-optimises and reloads the page under the tests —
+        # surfacing as a `useMemoCache` null crash or `Failed to fetch
+        # dynamically imported module`, neither of which names the
+        # missing package. An incomplete list therefore PASSES until it
+        # doesn't, which is exactly how this repo went four entries
+        # short without anyone noticing.
+        #
+        # The cache lives beside the package, not at the repo root.
+        working-directory: packages/web
+        run: >-
+          npx charcuterie-check-optimize-deps ./optimizeDeps.js
+          --cache-dir node_modules/.vite
+
   # Build the runtime image and push it to GHCR; TrueNAS pulls it from
   # there and force-pulls `:latest` on `midclt call app.redeploy rip-deck`
   # (mirrors castkit's docker-deploy). Skipped on pull_request.
