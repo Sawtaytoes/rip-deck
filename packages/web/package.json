@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@charcuterie/storybook-config": "^0.2.2",
+    "@charcuterie/vitest-config": "^1.1.0",
     "@storybook/addon-a11y": "^10.5.5",
     "@storybook/addon-docs": "^10.5.5",
     "@storybook/react-vite": "^10.5.5",
