@@ -1,0 +1,126 @@
+@import "tailwindcss";
+
+/* Colours, the type ramp, radii, motion — and the density axis.
+   `theme.css` publishes `--color-*`, `--text-*`, `--radius-*` and
+   friends into Tailwind's own namespaces, so `bg-surface-raised`
+   and `text-sm` are OURS and answer to `[data-scheme]` /
+   `[data-variant]` / `[data-density]` on `<html>`. */
+@import "@charcuterie/tokens/theme.css";
+
+/* The `@font-face` declarations for the three self-hosted faces —
+   Baloo 2 (`--font-display`), Outfit (`--font-sans`) and Victor Mono
+   (`--font-mono`). A SEPARATE entry point from `theme.css` on purpose,
+   so importing tokens does not force a font download — but without this
+   line `--font-sans: Outfit, …` names a face the browser never loads
+   and silently degrades to `system-ui`. (Dank Mono, wired below, still
+   wins `--font-mono`; this restores the sans + display faces.) */
+@import "@charcuterie/tokens/fonts.css";
+
+/* The looping affordances the components need — the indeterminate
+   sweep among them. Switched off under `prefers-reduced-motion`. */
+@import "@charcuterie/ui/styles.css";
+
+/* NOT optional, and it fails **silently** without a line here.
+   Tailwind v4 scans SOURCE TEXT for complete class strings and does
+   not scan dependencies by default, so every `@charcuterie/ui`
+   component would render unstyled with no error and no failing
+   test. The path reaches the repo root's `node_modules` because
+   that is where a hoisting linker puts the dependency. */
+@source "../../../../node_modules/@charcuterie/ui/dist";
+
+/* The palette that used to live here is gone. `:root` set
+   `color-scheme: dark` and `body` hardcoded `#0f1115` / `#e6e6e6`
+   — the same shape as mux-magic's 993 `*-slate-*` utilities and the
+   same reason neither app could have a light mode: a hardcoded hex
+   is a decision no attribute can revisit. The scheme is an
+   attribute now (`app.tsx`), and the two colours are
+   `bg-surface-base` / `text-content-primary` on `<body>`. */
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+}
+
+/* The bay-card query container, named once so both halves of the
+   contract live in one place.
+
+   `BayGrid` puts `@container/bay` on every grid cell, which is
+   Tailwind's own utility for exactly these two declarations. This
+   rule is the written-down version of the same thing: the card
+   inside a cell is measured against ITS CELL, not the window, so
+   a card in the third of three columns knows it is 400px wide
+   while the monitor is 1600. The card owns what it does with
+   that; the shell owns only the box.
+
+     container name : bay
+     container type : inline-size
+     narrow density : @max-md/bay:  — under 28rem / 448px
+     full density   : @md/bay:      — 28rem / 448px and up */
+
+/* The indeterminate sweep moved to `@charcuterie/ui`.
+
+   `<ProgressBar isIndeterminate>` renders it now, and that
+   component's own docstring cites THIS bay's AACS/BD+ preamble as
+   the case it was designed for — "Scanning CD-ROM devices",
+   "Decrypting" and "Processing BD+ code" each running a full
+   0 -> max against the same counter the copy later uses, measured
+   at ~25s on a real Blu-ray, none of it progress through the disc.
+
+   Two things the shared one does that the 30 lines deleted here did
+   not: it animates `inset-inline-start`, so the sweep runs the
+   other way in RTL for free; and its reduced-motion fallback
+   hatches the whole track rather than parking the highlight at one
+   end. */
+
+/* Dank Mono — the owner's editor font, preferred over the shipped
+   Victor Mono. It is a LICENSED font that must never enter this repo,
+   so no woff2 lives here: in production the daemon serves the three
+   faces from `/fonts/*`, which a read-only bind mount off the NAS
+   supplies at container start (deploy/docker-compose.yaml mounts the
+   licensed Web-PS build onto `packages/web/dist/fonts`). See
+   charcuterie docs/decisions/2026-08-05-dank-mono-reaches-the-fleet-by-bind-mount.md.
+
+   `local("Dank Mono")` is tried first, so a machine with the font
+   installed (the owner's Windows boxes, `yarn dev`) never fetches it;
+   everywhere else — a fresh checkout, CI, a dev server without the
+   mount — the `url()` 404s harmlessly and the stack degrades to Victor
+   Mono, never to the system default. */
+@font-face {
+  font-family: "Dank Mono";
+  src:
+    local("Dank Mono"),
+    url("/fonts/DankMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Dank Mono";
+  src:
+    local("Dank Mono Italic"),
+    local("Dank Mono"),
+    url("/fonts/DankMono-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Dank Mono";
+  src:
+    local("Dank Mono"),
+    url("/fonts/DankMono-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Unlayered on purpose: `@charcuterie/tokens/theme.css` sets
+   `--font-mono` inside a Tailwind `@layer`, and an unlayered `:root`
+   rule beats every layer — so this wins with no `!important` and the
+   `font-mono` utility resolves to Dank Mono everywhere. Victor Mono
+   stays in the stack as the ligature fallback. */
+:root {
+  --font-mono:
+    "Dank Mono", "Victor Mono", ui-monospace,
+    SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}

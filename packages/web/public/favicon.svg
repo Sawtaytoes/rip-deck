@@ -1,0 +1,9 @@
+<!-- A disc on the dark the app already paints (#0f1115), so the tab
+     icon does not flash white. Drawn rather than emoji: the page
+     title bar is the one place 🗜️ renders as a different glyph on
+     every platform. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="6" fill="#0f1115" />
+  <circle cx="16" cy="16" r="10" fill="none" stroke="#38bdf8" stroke-width="3" />
+  <circle cx="16" cy="16" r="3" fill="#0f1115" stroke="#38bdf8" stroke-width="2" />
+</svg>

@@ -1,0 +1,24 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "noEmit": true,
+    // No "node" here, deliberately. This package is the only
+    // one in the repo that ships to a browser, and leaving the
+    // node types out is what makes an accidental `node:fs`
+    // import in a component a typecheck failure rather than a
+    // blank page. It is also why `@rip-deck/web` depends on
+    // `@rip-deck/contracts` but NOT on `@rip-deck/daemon`: the
+    // daemon's `mqtt/config.ts` type-imports `client.ts`, which
+    // reads a file, and pulling that into this program would
+    // drag `node:fs` across the boundary.
+    "types": ["vite/client", "@testing-library/jest-dom"]
+  },
+  // `vitest.config.ts` is deliberately absent: the root eslint
+  // config lists `packages/*/vitest.config.ts` under
+  // `allowDefaultProject`, and a file cannot be in both.
+  "include": ["src", "vite.config.ts", "vitest.setup.ts"]
+}

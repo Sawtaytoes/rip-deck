@@ -1,0 +1,41 @@
+# Rip-Deck — example docker-compose deployment.
+#
+# Rip-Deck needs `device_cgroup_rules` for the optical drives: the
+# tower is powered independently, so a fixed device list refuses to
+# start when the tower is off. See
+# docs/decisions/2026-07-28-rip-deck-is-a-truenas-custom-compose-app.md
+#
+# Adjust the volume host paths and the two `__FROM_ROOT_ENV__`
+# placeholders (broker password, OMDb API key) for your environment;
+# supply them from your own secret store — never commit real values.
+services:
+  rip-deck:
+    image: ghcr.io/sawtaytoes/rip-deck:latest
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - "3007:3007"
+    # Block(11) = sr optical, char(21) = SCSI generic. `rmw` on a
+    # wildcard minor because /dev/srN reshuffles on every USB
+    # re-enumeration and the tower powers on/off under the service.
+    device_cgroup_rules:
+      - "b 11:* rmw"
+      - "c 21:* rmw"
+    volumes:
+      - /dev:/dev
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /run/udev:/run/udev:ro
+      - /media/Disc-Rips:/media/Disc-Rips
+      - /srv/rip-deck/makemkv:/config
+      - /srv/rip-deck/state:/var/lib/rip-deck
+    environment:
+      # Per-rip isolation spawns this same image, device-scoped, over
+      # the mounted docker socket — so it must be the registry ref.
+      # `:latest` matches the long-running container; the redeploy
+      # force-pull leaves the freshest build on the host for the spawn.
+      RIP_DECK_RIP_ISOLATION_IMAGE: ghcr.io/sawtaytoes/rip-deck:latest
+      RIP_DECK_RIP_ISOLATION_ARGS: "-v /media/Disc-Rips:/media/Disc-Rips -v /srv/rip-deck/makemkv:/config"
+      RIP_DECK_MQTT_URL: mqtts://example.com:8883
+      RIP_DECK_MQTT_USERNAME: rip-deck
+      RIP_DECK_MQTT_PASSWORD: __FROM_ROOT_ENV__
+      RIP_DECK_OMDB_API_KEY: __FROM_ROOT_ENV__

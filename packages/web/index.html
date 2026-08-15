@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<!-- The Charcuterie axes on `<html>`.
+     `data-variant` is omitted deliberately: `daylight` is the
+     default and `:root` carries it, so naming it here would be a
+     second place to change if the fleet ever moves.
+
+     `data-scheme` is NO LONGER pinned here. The default now follows
+     the OS (`prefers-color-scheme`) and remembers the operator's
+     pick, via Charcuterie's switcher in the header — so the
+     attribute is set by the inline first-paint script below before
+     the browser paints, not written into this tag. The header's
+     one button cycles light → dark → system.
+     ([decision](docs/decisions/2026-08-03-first-paint-follows-the-os-scheme.md))
+
+     `data-density="comfortable"` says the default out loud because
+     the kiosk value is the interesting one: `compact` fits nine
+     bays on a laptop and `kiosk` scales every control past a 44px
+     touch target with no prop changes anywhere. -->
+<html
+  lang="en"
+  data-density="comfortable"
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- The PRODUCT, one word and camel-cased, the way the
+         Homepage tile already spells it. Lowercase `rip-deck` is
+         the repo, the CLI, the Docker image, the npm scopes, the
+         MQTT topic base and the HA entity ids — all identifiers,
+         none of them prose. A tab title is prose. -->
+    <title>Rip-Deck</title>
+    <!-- Both, on purpose. The SVG is what a modern browser uses and
+         stays sharp on a hi-dpi tab; `favicon.ico` is the path a
+         browser requests when nothing tells it otherwise, and its
+         404 was the only console error on the live page. Vite
+         copies `public/` into `dist/`, which the daemon serves, and
+         `webAssets.ts` already maps both extensions. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate icon" href="/favicon.ico" />
+    <!-- First paint, before ANY stylesheet parses, and now the page
+         FOLLOWS THE OS rather than pinning dark.
+
+         A static `data-scheme` + a single-hex `var()` fallback was
+         enough while the scheme was a constant. It is not enough the
+         moment the scheme is dynamic (persisted, or `system`): two
+         things must happen before the browser paints, and only an
+         inline `<head>` script runs that early —
+
+           1. `<html data-scheme>` must be set from the resolved
+              choice, so `variables.css` selects the right block; and
+           2. the fallback hex must BRANCH on the resolved scheme, not
+              sit pinned to one — a dark-default fallback flashes on a
+              light-resolved load otherwise. This is exactly the
+              pinned-canvas bug the old `#131822` fallback risked, now
+              impossible because the value is chosen per scheme.
+
+         **The `var()` around the hex is still load-bearing.** An
+         inline `<style>` (and the `<style>` this script appends) is
+         UNLAYERED, and unlayered author CSS beats every `@layer` —
+         Tailwind v4 emits utilities into `@layer utilities`. So a
+         flat `background-color: #131822` would outrank
+         `bg-surface-base` on `<body>` and pin the canvas forever.
+         Written as a FALLBACK the hex applies only while
+         `--color-surface-base` is undefined — the one pre-stylesheet
+         instant this exists for — and the token takes over the moment
+         the bundle lands.
+
+         The script reads the SAME `localStorage` key
+         (`charcuterie-scheme`) the runtime `localStoragePersistence`
+         uses, and reproduces `createColorScheme`'s resolution rule,
+         so the pre-paint attribute and the hydrated React state
+         always agree — no flash of the wrong theme on reload.
+
+         This is `@charcuterie/tokens`' `buildFirstPaintScript(daylight)`
+         output verbatim, PASTED not linked because a `<link>`/bundle
+         is exactly the round-trip this exists to beat.
+         `firstPaintColour.test.ts` asserts the library's own string,
+         so `index.html` and the generator can never drift. See
+         `2026-07-31-tokens-ships-the-first-paint-snippet.md` and
+         `docs/decisions/2026-08-03-first-paint-follows-the-os-scheme.md`. -->
+<script>
+  (function () {
+    var KEY = "charcuterie-scheme";
+    var stored;
+    try {
+      stored = window.localStorage.getItem(KEY);
+    } catch (error) {
+      stored = null;
+    }
+    var isDark = stored === "dark" ||
+      ((stored === null || stored === "system") &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches);
+    var scheme = isDark ? "dark" : "light";
+    document.documentElement.setAttribute("data-scheme", scheme);
+    var background = isDark ? "#131822" : "#F5F7FA";
+    var style = document.createElement("style");
+    style.textContent =
+      "html,body{background-color:var(--color-surface-base," +
+      background +
+      ");color-scheme:" + scheme + "}";
+    document.head.appendChild(style);
+  })();
+</script>
+  </head>
+  <body class="bg-surface-base text-content-primary">
+    <div id="root"></div>
+    <script type="module" src="/src/app.tsx"></script>
+  </body>
+</html>

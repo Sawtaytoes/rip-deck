@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+.git
+.yarn/install-state.gz
+__screenshots__
+coverage
+dist
+build
+*.log
+.env
+.env.*
+
+# Agent fan-out worktrees are full checkouts of this repo, and
+# .claude/settings.local.json is machine-local. Neither belongs in
+# a build context -- Stage 7 ran ten of them at once.
+.claude

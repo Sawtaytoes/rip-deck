@@ -1,0 +1,7 @@
+{
+  "extends": "@charcuterie/tsconfig/base",
+  "compilerOptions": {
+    "allowJs": false,
+    "allowImportingTsExtensions": true
+  }
+}

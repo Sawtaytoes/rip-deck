@@ -1,0 +1,39 @@
+{
+  "name": "rip-deck",
+  "license": "MIT",
+  "private": true,
+  "packageManager": "yarn@4.14.1",
+  "version": "1.2.9",
+  "workspaces": [
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "rip-deck": "tsx packages/daemon/src/cli.ts",
+    "dev": "tsx watch packages/daemon/src/main.ts",
+    "build:daemon": "node scripts/build-daemon.mjs",
+    "lint:biome": "biome check --write --unsafe",
+    "lint:eslint": "eslint . --fix",
+    "lint": "yarn lint:biome && yarn lint:eslint",
+    "install-playwright-browser": "yarn playwright install chromium --with-deps",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit && yarn workspaces foreach -Ap run typecheck"
+  },
+  "dependencies": {
+    "@rip-deck/contracts": "workspace:*",
+    "@rip-deck/daemon": "workspace:*"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.2",
+    "@charcuterie/tsconfig": "^1.0.0",
+    "@types/node": "^26.1.0",
+    "@vitest/eslint-plugin": "^1.6.20",
+    "esbuild": "^0.28.1",
+    "eslint": "^10.6.0",
+    "playwright": "^1.61.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.62.1",
+    "vitest": "^4.1.9"
+  }
+}

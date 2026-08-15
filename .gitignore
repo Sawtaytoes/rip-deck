@@ -1,0 +1,32 @@
+node_modules/
+# Also the symlink form: agent worktrees symlink node_modules from
+# the primary checkout, and `node_modules/` (a dir rule) misses it.
+node_modules
+dist/
+# Storybook build output. The composed `example.com`
+# container builds each ref with `-o` OUTSIDE the repo, so this is
+# only ever a local `build-storybook` artefact — never committed.
+storybook-static/
+build/
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+.pnp.*
+*.log
+# Captured robot-mode output IS a test fixture, not a stray log.
+# Without this negation `git add` silently skips it — which it did
+# once, pushing a green-locally / red-in-CI commit whose tests
+# referenced a file that had never left the machine.
+!**/__fixtures__/*.log
+.env
+.env.*
+!.env.example
+__screenshots__/
+coverage/
+.DS_Store
+.claude/settings.local.json
+# Agent fan-out worktrees live INSIDE the repo, never beside it.
+# Seven `rip-deck-wt-*` directories at the Repos root read as seven
+# separate repos, which is how they were mistaken for exactly that.
+# Matches gallery-downloader and mux-magic.
+.claude/worktrees/
