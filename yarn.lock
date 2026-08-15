@@ -292,28 +292,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@charcuterie/logic@npm:1.2.0":
-  version: 1.2.0
-  resolution: "@charcuterie/logic@npm:1.2.0"
-  peerDependencies:
-    "@preact/signals-core": ">=1.8"
-    jotai: ">=2"
-    preact: ">=10.11"
-    react: ">=18"
-  peerDependenciesMeta:
-    "@preact/signals-core":
-      optional: true
-    jotai:
-      optional: true
-    preact:
-      optional: true
-    react:
-      optional: true
-  checksum: 10c0/27ff8b7b0fabae05ecb386ca898861b466c0c0e94500d822988ae9389261513e14775ef075ad62fc8ae64698db31991d19ce99768b877f9131e73848db7ed3ab
-  languageName: node
-  linkType: hard
-
-"@charcuterie/logic@npm:^2.0.0":
+"@charcuterie/logic@npm:2.0.0, @charcuterie/logic@npm:^2.0.0":
   version: 2.0.0
   resolution: "@charcuterie/logic@npm:2.0.0"
   peerDependencies:
@@ -383,11 +362,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@charcuterie/ui@npm:^2.11.0":
-  version: 2.11.0
-  resolution: "@charcuterie/ui@npm:2.11.0"
+"@charcuterie/ui@npm:^2.15.1":
+  version: 2.15.1
+  resolution: "@charcuterie/ui@npm:2.15.1"
   dependencies:
-    "@charcuterie/logic": "npm:1.2.0"
+    "@charcuterie/logic": "npm:2.0.0"
     "@charcuterie/tokens": "npm:1.5.0"
     "@floating-ui/react": "npm:^0.27.20"
     "@tanstack/react-virtual": "npm:^3.13.12"
@@ -398,7 +377,7 @@ __metadata:
   peerDependenciesMeta:
     react-router:
       optional: true
-  checksum: 10c0/29eb536a7de143a07c8a51450963ed3bc55e109650490df9a79d014b19206f65e7f2ef9b6237bf96141d0f5ba39e8c6006a675539bf94980ed78f1388989734a
+  checksum: 10c0/1c1ef05341e9703016a44a2118bcb072800db831962ad332fb326265d3605d1d178f944096d2768ae10811d04e0e6df790968fa55d59e90a3ca2432fbe503bc0
   languageName: node
   linkType: hard
 
@@ -1266,7 +1245,7 @@ __metadata:
     "@charcuterie/logic": "npm:^2.0.0"
     "@charcuterie/storybook-config": "npm:^0.2.2"
     "@charcuterie/tokens": "npm:^1.5.0"
-    "@charcuterie/ui": "npm:^2.11.0"
+    "@charcuterie/ui": "npm:^2.15.1"
     "@rip-deck/contracts": "workspace:*"
     "@storybook/addon-a11y": "npm:^10.5.5"
     "@storybook/addon-docs": "npm:^10.5.5"

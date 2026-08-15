@@ -73,18 +73,32 @@ export default defineConfig({
    * which has no cache at all.
    *
    * Now that `browser.enabled` is true this list is load-bearing
-   * on every cold CI run, not merely pre-declared. Source of
-   * truth for the entries is mux-magic's copy, filtered to what
-   * this package actually depends on (no react-compiler runtime,
-   * dnd-kit, jotai or router — rip-deck's tree has none of
-   * those).
+   * on every cold CI run, not merely pre-declared.
+   *
+   * Source of truth is THIS package's own `_metadata.json`, written
+   * under `packages/web/node_modules/.vite/vitest/<hash>/deps/`
+   * after a cold run — not mux-magic's copy filtered by hand, which
+   * is how the four entries below went missing. Note the cache lives
+   * under `packages/web/`, not the repo root; clearing the wrong one
+   * gives a warm run that passes and proves nothing.
+   *
+   * Each SUBPATH is its own entry: `@charcuterie/logic` would not
+   * cover `/query`. mux-magic lost this exact race on CI (16 tests,
+   * `Failed to fetch dynamically imported module: …?v=…`) after the
+   * fleet query adoption added an unlisted subpath here too.
    */
   optimizeDeps: {
     include: [
+      "@charcuterie/logic/query",
+      "@charcuterie/tokens",
+      "@charcuterie/ui",
       "@tanstack/react-query",
       "@testing-library/jest-dom/vitest",
       "@testing-library/react",
       "@testing-library/user-event",
+      // From Vitest itself rather than app source, but a top-level
+      // entry in `_metadata.json` all the same.
+      "expect-type",
       "react",
       "react-dom",
       "react-dom/client",
