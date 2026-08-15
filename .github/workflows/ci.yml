@@ -55,3 +55,56 @@ jobs:
         # `vitest run`, not the repo's bare `vitest`, which would sit in
         # watch mode forever.
         run: npx vitest run
+
+  # Build the runtime image and push it to GHCR; TrueNAS pulls it from
+  # there and force-pulls `:latest` on `midclt call app.redeploy rip-deck`
+  # (mirrors castkit's docker-deploy). Skipped on pull_request.
+  #
+  # ⚠️ The image contains MakeMKV (proprietary, GuinpinSoft EULA) via the
+  # jlesage base. The GHCR package starts PRIVATE; making it public
+  # redistributes those binaries — a deliberate, separate step.
+  #
+  # ⚠️ This image bakes `config/drives.json`, which is the EXAMPLE slot
+  # map in this public repo. A real deployment must mount its own
+  # `drives.json` over `/app/config/drives.json` (or set
+  # RIP_DECK_DRIVES_CONFIG to a mounted path) or every bay resolves to
+  # "UNKNOWN DRIVE".
+  docker-deploy:
+    needs: [check]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # rip-deck keeps its own semver image tag alongside the fleet's
+      # moving `:latest`; `package.json` version is the source of truth.
+      - name: Read version
+        id: meta
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # One `docker build` produces BOTH the long-running container and
+      # the per-rip isolation container.
+      - name: Build image
+        run: |
+          docker build \
+            -t ghcr.io/sawtaytoes/rip-deck:latest \
+            -t ghcr.io/sawtaytoes/rip-deck:${{ github.sha }} \
+            -t ghcr.io/sawtaytoes/rip-deck:${{ steps.meta.outputs.version }} \
+            .
+
+      - name: Push image
+        run: |
+          docker push ghcr.io/sawtaytoes/rip-deck:latest
+          docker push ghcr.io/sawtaytoes/rip-deck:${{ github.sha }}
+          docker push ghcr.io/sawtaytoes/rip-deck:${{ steps.meta.outputs.version }}
