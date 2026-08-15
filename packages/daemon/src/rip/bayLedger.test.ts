@@ -47,8 +47,7 @@ const observation = (
   ...input,
 })
 
-const DESTINATION_PATH =
-  "/media/Disc-Rips/[BACKUP] TROY"
+const DESTINATION_PATH = "/media/Disc-Rips/[BACKUP] TROY"
 
 const JOB_UUID = "3f2b1c8e-0d4a-4f7b-9c1e-6a5d2b8f0e11"
 

@@ -954,8 +954,7 @@ export type WatcherConfig = {
 export const createWatcherConfig = (
   env: Record<string, string | undefined>,
 ): WatcherConfig => ({
-  destinationRoot:
-    env.RIP_DECK_DEST ?? "/media/Disc-Rips",
+  destinationRoot: env.RIP_DECK_DEST ?? "/media/Disc-Rips",
   innerDestinationRoot: env.RIP_DECK_DEST_INNER,
   stateDir: env.RIP_DECK_STATE_DIR ?? "/var/lib/rip-deck",
   registryPath:

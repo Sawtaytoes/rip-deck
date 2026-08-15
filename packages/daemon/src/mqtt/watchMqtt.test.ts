@@ -797,8 +797,7 @@ describe("createWatchMqtt", () => {
       title: null,
       disc_name: "TROY",
       is_adopted: true,
-      destination_path:
-        "/media/Disc-Rips/TROY",
+      destination_path: "/media/Disc-Rips/TROY",
     })
   })
 

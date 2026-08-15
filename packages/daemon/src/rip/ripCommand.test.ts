@@ -205,7 +205,11 @@ describe("resolving whether a rip is isolated", () => {
       }),
     ).toEqual({
       image: "rip-deck:0.1.0",
-      dockerArgs: ["ssh", "root@tower.example.com", "docker"],
+      dockerArgs: [
+        "ssh",
+        "root@tower.example.com",
+        "docker",
+      ],
       extraArgs: ["-v", "/a:/a", "-v", "/b:/config"],
     })
   })
@@ -221,10 +225,7 @@ describe("running one rip in its own container", () => {
   const isolation: RipIsolation = {
     image: "rip-deck:0.1.0",
     dockerArgs: ["docker"],
-    extraArgs: [
-      "-v",
-      "/media/Disc-Rips:/media/Disc-Rips",
-    ],
+    extraArgs: ["-v", "/media/Disc-Rips:/media/Disc-Rips"],
   }
 
   const command = buildIsolatedMakemkvCommand({

@@ -95,9 +95,7 @@ describe("the ARM-viewer projection", () => {
     expect(rip.label).toBe("Ivanhoe")
     expect(rip.drive).toBe("/dev/sr7")
     expect(rip.drive_name).toBe("02 - Pioneer BDR-211M")
-    expect(rip.path).toBe(
-      "/media/Disc-Rips/Ivanhoe",
-    )
+    expect(rip.path).toBe("/media/Disc-Rips/Ivanhoe")
     expect(rip.percent).toBe(43.1)
     expect(rip.stage).toBe("Saving file 3 of 78")
     expect(rip.active).toBe(true)

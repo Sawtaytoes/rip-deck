@@ -79,8 +79,7 @@ export const buildBayView = (
       verdict: verdict.kind,
       updated_at: 0,
     },
-    state_topic:
-      "rip-deck/tower/drive/usb_2_1_1_2_4_4_7",
+    state_topic: "rip-deck/tower/drive/usb_2_1_1_2_4_4_7",
     alert: null,
     alert_topic:
       "rip-deck/tower/drive/usb_2_1_1_2_4_4_7/alert",

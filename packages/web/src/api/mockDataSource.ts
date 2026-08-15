@@ -470,9 +470,7 @@ const projectBay = (
     label: isAdopted ? null : title,
     drive: devPath,
     // Null for an adopted bay, like `towerFeed.buildJob`.
-    path: isAdopted
-      ? null
-      : `/media/Disc-Rips/${title}`,
+    path: isAdopted ? null : `/media/Disc-Rips/${title}`,
     percent,
     // Absent vs null again, for the same reason as the ETA
     // below: a scenario setting both labels to NULL is saying

@@ -705,8 +705,7 @@ describe("the feed", () => {
           isAdopted: true,
           latchedAtMs: NOW_MS - 7_200_000,
           discName: "TROY - DIRECTOR'S CUT",
-          destinationPath:
-            "/media/Disc-Rips/[BACKUP] TROY",
+          destinationPath: "/media/Disc-Rips/[BACKUP] TROY",
           outcome: outcome(
             "completed",
             "/media/Disc-Rips/[BACKUP] TROY",
@@ -1326,8 +1325,7 @@ describe("the watcher, feeding the store", () => {
       is_holding_finished_disc: true,
       is_adopted: true,
       disc_name: "TROY 7",
-      destination_path:
-        "/media/Disc-Rips/[BACKUP] TROY 7",
+      destination_path: "/media/Disc-Rips/[BACKUP] TROY 7",
     })
     // Nothing has moved this drawer, so the ⏏ toggle opens.
     expect(view.bays[6].last_tray_command).toBeNull()
@@ -1415,8 +1413,7 @@ describe("the fed store, served", () => {
           latchedAtMs: NOW_MS - 7_200_000,
           sizeSectors: 48_000_000,
           discName: "TROY - THEATRICAL CUT",
-          destinationPath:
-            "/media/Disc-Rips/[BACKUP] TROY",
+          destinationPath: "/media/Disc-Rips/[BACKUP] TROY",
           outcome: outcome(
             "completed",
             "/media/Disc-Rips/[BACKUP] TROY",
@@ -1446,9 +1443,7 @@ describe("the fed store, served", () => {
 
     expect(rip.label).toBe("TROY - THEATRICAL CUT")
     expect(rip.volume_label).toBe("TROY - THEATRICAL CUT")
-    expect(rip.path).toBe(
-      "/media/Disc-Rips/[BACKUP] TROY",
-    )
+    expect(rip.path).toBe("/media/Disc-Rips/[BACKUP] TROY")
     // The bay label is still there, as the DRIVE's name. The
     // bug was the disc borrowing it.
     expect(rip.drive_name).toBe("02 - Pioneer BDR-211M")

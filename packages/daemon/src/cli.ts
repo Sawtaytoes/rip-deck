@@ -274,8 +274,7 @@ const runParse = async () => {
 }
 
 const DESTINATION_ROOT =
-  process.env.RIP_DECK_DEST ??
-  "/media/Disc-Rips"
+  process.env.RIP_DECK_DEST ?? "/media/Disc-Rips"
 
 const STATE_DIR =
   process.env.RIP_DECK_STATE_DIR ?? "/var/lib/rip-deck"
