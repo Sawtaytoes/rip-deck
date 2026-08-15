@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    env:
+      # yarn is vendored at .yarn/releases and pinned by `yarnPath`,
+      # so corepack has nothing to fetch. This only guarantees it can
+      # never stop and ask.
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+
+      - name: Install
+        # --immutable so a lockfile that disagrees with package.json
+        # fails here instead of resolving to something no one ran.
+        run: corepack enable && yarn install --immutable
+
+      - name: Install Playwright chromium
+        # The web suite runs in vitest browser mode, which needs a real
+        # chromium plus its system libraries. `--with-deps` pulls the OS
+        # packages; chromium only, no firefox/webkit.
+        run: yarn install-playwright-browser
+
+      - name: Typecheck
+        # Both halves are needed. The root tsconfig excludes `packages`,
+        # so a bare `tsc --noEmit` at the root checks exactly one file
+        # and would sail past any error in the daemon or the contracts.
+        run: |
+          npx tsc --noEmit
+          yarn workspaces foreach -Ap run typecheck
+
+      - name: Lint — formatting and syntax
+        # `check .`, not the repo's `lint:biome` (which passes
+        # --write --unsafe and would have CI rewriting the tree).
+        run: npx biome check .
+
+      - name: Lint — type-aware
+        # Same reason the biome step drops --write: `lint:eslint` --fix.
+        run: npx eslint .
+
+      - name: Tests
+        # `vitest run`, not the repo's bare `vitest`, which would sit in
+        # watch mode forever.
+        run: npx vitest run
