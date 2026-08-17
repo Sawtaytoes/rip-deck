@@ -17,7 +17,7 @@
   "dependencies": {
     "@charcuterie/logic": "^2.0.0",
     "@charcuterie/tokens": "^1.5.0",
-    "@charcuterie/ui": "^2.15.1",
+    "@charcuterie/ui": "^2.17.0",
     "@rip-deck/contracts": "workspace:*",
     "@tanstack/react-query": "^5.100.9",
     "react": "^19.2.6",
