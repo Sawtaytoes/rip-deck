@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { describe, expect, it, vi } from "vitest"
 import { DEFAULT_TOPIC_CONFIG } from "../mqtt/topics.ts"
 import type { TrayCommandResponsePayload } from "../rip/trayCommand.ts"
@@ -9,6 +10,7 @@ import {
   type ApiResponse,
   type ApiRouter,
   createApiRouter,
+  SERVER_PATHNAMES,
 } from "./router.ts"
 import {
   createBaySnapshot,
@@ -911,4 +913,129 @@ describe("GET /logs", () => {
 
     expect(response.status).toBe(405)
   })
+})
+
+/**
+ * The list the SPA fallback consults, and the thing that keeps it honest.
+ *
+ * The fallback widened on 2026-08-16 so the dashboard's client router could
+ * own deep links. A widened fallback's characteristic failure is silently
+ * swallowing a route the SERVER owns: the path used to answer JSON, it now
+ * answers 200 + HTML, and every status-code-only check calls that green.
+ * A sibling app in the fleet hit exactly this — a top-level `/version` its
+ * own frontend polled started returning `index.html`, and the frontend read
+ * the unparseable body as "server unreachable, reload".
+ *
+ * So the surface is declared once, in `SERVER_PATHNAMES`, and these tests
+ * fail when the dispatch chain and that list drift apart.
+ */
+describe("the server's own surface", () => {
+  const routerSource = readFileSync(
+    new URL("./router.ts", import.meta.url),
+    "utf8",
+  )
+
+  it("compares pathnames against constants, never inline literals", () => {
+    // An inline `pathname === "/version"` is invisible to the test below,
+    // which is the whole way this drifts. Route through a constant so the
+    // next reader has one obvious place to declare it.
+    const inlineComparisons = [
+      ...routerSource.matchAll(/pathname === "([^"]+)"/g),
+    ].map((match) => match[1])
+
+    expect(inlineComparisons).toEqual([])
+  })
+
+  it("declares every pathname the dispatch chain matches on", () => {
+    // Fails when a new top-level route is added and NOT declared in
+    // `SERVER_PATHNAMES` — add it there, and the fallback stops
+    // swallowing it.
+    const comparedNames = new Set(
+      [
+        ...routerSource.matchAll(
+          /pathname === ([A-Z][A-Z0-9_]*)/g,
+        ),
+        ...routerSource.matchAll(
+          /([A-Z][A-Z0-9_]*)\.includes\(pathname\)/g,
+        ),
+      ].map((match) => match[1]),
+    )
+
+    // The dashboard's own index, which is the client's by definition.
+    comparedNames.delete("INDEX_PATHNAMES")
+    // The declaration list itself, consulted by `isServerRoutePathname`.
+    comparedNames.delete("SERVER_PATHNAMES")
+
+    expect([...comparedNames].sort()).toEqual([
+      "FIXTURES_PATHNAME",
+      "HEALTH_PATHNAMES",
+      "JSON_PATHNAME",
+      "LOGS_PATHNAME",
+      "TRAY_PATHNAME",
+      "UNIMPLEMENTED_ACTION_PATHS",
+    ])
+  })
+
+  it.each(SERVER_PATHNAMES)(
+    "answers %s itself rather than handing it to the client router",
+    async (pathname) => {
+      // Awaited rather than `handleSync`d, because `/logs` and
+      // `/api/tray` are the two paths allowed to be async and this
+      // list covers the whole surface. What is being pinned is the
+      // content type, not the blocking rule — `handleSync` guards
+      // that everywhere else.
+      const response = await buildRouter(
+        buildWebAssets(),
+      ).handle({
+        method: "GET",
+        url: pathname,
+      })
+
+      expect(response.contentType).not.toContain(
+        "text/html",
+      )
+    },
+  )
+
+  /**
+   * The prefix boundary, which bites from both sides.
+   *
+   * `startsWith("/api/")` alone lets bare `/api` through to the extension
+   * test, which sees no dot and serves the dashboard — 200 HTML where a
+   * JSON 404 stood before the router. `startsWith("/api")` alone
+   * over-matches and eats `/apiary`, a perfectly good client route.
+   */
+  it.each(["/api", "/assets"])(
+    "404s in JSON for bare %s — the namespace includes its own root",
+    (pathname) => {
+      const response = handleSync(
+        buildRouter(buildWebAssets()),
+        {
+          method: "GET",
+          url: pathname,
+        },
+      )
+
+      expect(response.status).toBe(404)
+      expect(response.contentType).toBe(
+        "application/json; charset=utf-8",
+      )
+    },
+  )
+
+  it.each(["/apiary", "/assetsomething"])(
+    "still serves the dashboard for %s — the prefix must not over-match",
+    (pathname) => {
+      const response = handleSync(
+        buildRouter(buildWebAssets()),
+        {
+          method: "GET",
+          url: pathname,
+        },
+      )
+
+      expect(response.status).toBe(200)
+      expect(response.contentType).toContain("text/html")
+    },
+  )
 })

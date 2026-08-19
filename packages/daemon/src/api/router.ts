@@ -114,6 +114,15 @@ export type ApiResponse = {
 /** The one write endpoint. See `trayEndpoint.ts`. */
 const TRAY_PATHNAME = "/api/tray"
 
+/** The tower snapshot the dashboard polls. */
+const JSON_PATHNAME = "/json"
+
+/** The fixture names `?fake=` accepts. */
+const FIXTURES_PATHNAME = "/fixtures"
+
+/** The robot-mode log tail behind the logs modal. */
+const LOGS_PATHNAME = "/logs"
+
 /**
  * Liveness, under both spellings.
  *
@@ -162,14 +171,67 @@ const UNIMPLEMENTED_ACTION_PATHS = [
 const INDEX_PATHNAMES = ["/", WEB_INDEX_PATHNAME]
 
 /**
- * Path prefixes the client router may never claim.
+ * Every exact pathname this server answers itself.
  *
- * `/api/` is the API's own namespace and `/assets/` is Vite's
- * build output; the dashboard routes under neither, so excluding
- * them loses nothing and keeps both answering the way the client
- * that asked expects.
+ * Built from the same constants the dispatch chain matches on, so
+ * the two cannot drift: add a route above and it is covered here
+ * automatically, provided it is added as a constant rather than
+ * as an inline string. `router.test.ts` asserts this list and the
+ * dispatch chain agree.
  */
-const RESERVED_PREFIXES = ["/api/", HASHED_PREFIX]
+export const SERVER_PATHNAMES = [
+  JSON_PATHNAME,
+  FIXTURES_PATHNAME,
+  LOGS_PATHNAME,
+  TRAY_PATHNAME,
+  ...HEALTH_PATHNAMES,
+  ...UNIMPLEMENTED_ACTION_PATHS,
+]
+
+/**
+ * Namespaces the server owns whole, bare segment included.
+ *
+ * `/api` is the API's and `/assets` is Vite's content-hashed
+ * output. Stored WITHOUT the trailing slash and matched as
+ * "equals, or starts with the slash", because both boundaries
+ * bite:
+ *
+ * - `startsWith("/api/")` alone lets bare `/api` fall through to
+ *   the extension test, which sees no dot and serves the
+ *   dashboard — 200 HTML where the API answered a JSON 404
+ *   before the router existed.
+ * - `startsWith("/api")` alone over-matches and would swallow a
+ *   real client route like `/apiary`.
+ */
+const SERVER_PREFIXES = [
+  "/api",
+  HASHED_PREFIX.replace(/\/$/, ""),
+]
+
+/**
+ * Is this path the SERVER's rather than the client router's?
+ *
+ * The fallback consults this instead of testing prefixes inline,
+ * so a new top-level route has one obvious place to be declared.
+ * Everything the dispatch chain matches above the fallback is
+ * here, which matters for the paths it does NOT match: a typo or
+ * an endpoint that has not shipped under a namespace the server
+ * owns still wants the JSON 404 its caller can act on, rather
+ * than a page it will fail to parse.
+ *
+ * This is the same failure the extension test guards, one client
+ * along: `GET /api/rips` answering 200 + HTML every day until
+ * that endpoint ships is a JSON client being handed a document,
+ * exactly as a moved bundle hash is the browser's script loader
+ * being handed one.
+ */
+const isServerRoutePathname = (pathname: string): boolean =>
+  SERVER_PATHNAMES.includes(pathname) ||
+  SERVER_PREFIXES.some(
+    (prefix) =>
+      pathname === prefix ||
+      pathname.startsWith(`${prefix}/`),
+  )
 
 /**
  * Does this path belong to the dashboard's client router?
@@ -182,50 +244,34 @@ const RESERVED_PREFIXES = ["/api/", HASHED_PREFIX]
  * said what to do when one arrived: widen the fallback HERE, keeping every API
  * path above it.
  *
- * **Extension-less only, and that is the whole guard.** A path with a dot in its
- * last segment is asking for a FILE, so a missing `/assets/index-abc123.js` must
- * stay a 404 the browser reports — never 200 + HTML, which the browser would try
- * to execute as JavaScript and fail on in a way that says nothing about the real
- * problem. Every API path is matched above this point, so a mistyped `/jsonn`
- * now renders the dashboard instead of returning a JSON 404; that is the price
- * of a client router, and it is the same trade every other app in the fleet
- * makes.
+ * Two guards, in order:
+ *
+ * 1. **The server's own paths and namespaces win outright** —
+ *    `isServerRoutePathname`. Anything the server owns keeps
+ *    answering as the caller that asked expects, whether or not
+ *    that exact path exists yet.
+ * 2. **Extension-less only, for everything else.** A path with a
+ *    dot in its last segment is asking for a FILE, so a missing
+ *    `/assets/index-abc123.js` stays a 404 the browser reports —
+ *    never 200 + HTML, which the browser would try to execute as
+ *    JavaScript and fail on in a way that says nothing about the
+ *    real problem.
+ *
+ * The residual cost is a mistyped `/jsonn` rendering the
+ * dashboard instead of returning a JSON 404. That is the price of
+ * a client router, and it is the same trade every other app in
+ * the fleet makes.
+ *
+ * A real file still wins over both — `readAsset` is consulted
+ * before this function is, so every asset that exists is served
+ * as itself.
  */
 const isClientRoutePathname = (
   pathname: string,
 ): boolean => {
   if (INDEX_PATHNAMES.includes(pathname)) return true
 
-  // Reserved namespaces beat the extension test, because the dot
-  // alone does not cover either of them.
-  //
-  // `/api/` is the API's, and every path in it that EXISTS is
-  // matched above; the ones that do not are typos and unshipped
-  // endpoints, and both want the JSON 404 an API client can act
-  // on rather than a page. Without this, `GET /api/rips` answers
-  // 200 + HTML until the day that endpoint ships, which is the
-  // same "parses as the wrong thing entirely" failure the dot
-  // guard exists to prevent, just with a JSON client instead of
-  // the browser's script loader.
-  //
-  // `/assets/` is Vite's content-hashed output, so nothing under
-  // it is ever a route. The dot covers the real filenames there
-  // because Vite always emits an extension — this makes that a
-  // rule rather than a coincidence, so a missing bundle 404s on
-  // the strength of WHERE it is and not just what it is called.
-  //
-  // Neither costs a client route: the dashboard's table is `/`
-  // plus a catch-all, and it routes nothing under either prefix.
-  // A real file still wins over both — `readAsset` is consulted
-  // before this function is, so every asset that exists is served
-  // as itself.
-  if (
-    RESERVED_PREFIXES.some((prefix) =>
-      pathname.startsWith(prefix),
-    )
-  ) {
-    return false
-  }
+  if (isServerRoutePathname(pathname)) return false
 
   const lastSegment = pathname.slice(
     pathname.lastIndexOf("/") + 1,
@@ -482,7 +528,7 @@ export const createApiRouter = ({
     const { pathname } = parsed
     const nowMs = readNowMs()
 
-    if (pathname === "/json") {
+    if (pathname === JSON_PATHNAME) {
       if (method !== "GET") {
         return jsonResponse({
           status: 405,
@@ -521,7 +567,10 @@ export const createApiRouter = ({
       })
     }
 
-    if (pathname === "/fixtures" && method === "GET") {
+    if (
+      pathname === FIXTURES_PATHNAME &&
+      method === "GET"
+    ) {
       return jsonResponse({
         status: 200,
         payload: { fixtures: FIXTURE_NAMES },
@@ -561,7 +610,7 @@ export const createApiRouter = ({
       })
     }
 
-    if (pathname === "/logs") {
+    if (pathname === LOGS_PATHNAME) {
       if (method !== "GET" && method !== "HEAD") {
         return jsonResponse({
           status: 405,
