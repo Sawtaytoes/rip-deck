@@ -315,7 +315,19 @@ describe("the rest of the surface", () => {
     expect(body.msg).toContain("cmd/drive")
   })
 
-  it("404s in JSON, never in HTML", () => {
+  /**
+   * This used to assert that `/nope` was a JSON 404. It is the dashboard now:
+   * the app gained a client router on 2026-08-16, and `router.ts` said what to
+   * do when one arrived — widen the index fallback, keeping the API paths above
+   * it. An extension-less path is a deep link rather than a typo from here on.
+   *
+   * The half worth keeping is the OTHER half, and it is the reason the widened
+   * rule is extension-less-only: a missing bundle must still fail as a 404 the
+   * browser reports. Answer `/assets/index-abc123.js` with 200 + HTML and the
+   * browser tries to execute HTML as JavaScript, which fails in a way that says
+   * nothing at all about the real problem.
+   */
+  it("serves the dashboard for an extension-less path — it is a client route", () => {
     const response = handleSync(
       buildRouter(buildWebAssets()),
       {
@@ -324,9 +336,71 @@ describe("the rest of the surface", () => {
       },
     )
 
+    expect(response.status).toBe(200)
+    expect(response.contentType).toContain("text/html")
+  })
+
+  it("404s in JSON, never in HTML, for a path that names a FILE", () => {
+    const response = handleSync(
+      buildRouter(buildWebAssets()),
+      {
+        method: "GET",
+        url: "/assets/index-deadbeef.js",
+      },
+    )
+
     expect(response.status).toBe(404)
     expect(response.contentType).toBe(
       "application/json; charset=utf-8",
+    )
+  })
+
+  /**
+   * The extension test alone would hand these to the client router, and
+   * both are namespaces the dashboard does not route in.
+   *
+   * `/api/` matters most: every API path that EXISTS is matched above the
+   * fallback, so what lands here is a typo or an endpoint that has not
+   * shipped, and a JSON client wants the 404 it can act on rather than a
+   * page it will fail to parse. `/assets/` makes "a missing bundle 404s"
+   * true because of WHERE it is, not merely because Vite happens to put an
+   * extension on every file it emits.
+   */
+  it.each([
+    "/api/unknown",
+    "/api/tray/open",
+    "/api/",
+    "/assets/no-extension",
+  ])(
+    "404s in JSON for %s — a reserved namespace is never a client route",
+    (url) => {
+      const response = handleSync(
+        buildRouter(buildWebAssets()),
+        {
+          method: "GET",
+          url,
+        },
+      )
+
+      expect(response.status).toBe(404)
+      expect(response.contentType).toBe(
+        "application/json; charset=utf-8",
+      )
+    },
+  )
+
+  it("still serves a real asset under a reserved prefix", () => {
+    const response = handleSync(
+      buildRouter(buildWebAssets()),
+      {
+        method: "GET",
+        url: "/assets/index-abc123.js",
+      },
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.contentType).toContain(
+      "text/javascript",
     )
   })
 })
