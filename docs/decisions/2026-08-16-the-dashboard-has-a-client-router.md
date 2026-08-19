@@ -22,9 +22,10 @@ explained why:
 > no client-side router […] **If a router is ever added, widen the fallback HERE and keep
 > the API paths above it.**
 
-That is now done, on the narrowest rule that works: **a path under a reserved namespace
-(`/api/`, `/assets/`) is never a client route; otherwise any extension-less path serves
-the dashboard, and a path whose last segment contains a dot does not.**
+That is now done, on the narrowest rule that works: **a path the server owns — any of
+`SERVER_PATHNAMES`, or anything under the `/api` or `/assets` namespace including the
+bare segment — is never a client route; otherwise any extension-less path serves the
+dashboard, and a path whose last segment contains a dot does not.**
 
 ## Why extension-less, and not "anything that isn't an API path"
 
@@ -54,6 +55,51 @@ stops being the only thing standing between a moved hash and an HTML response.
 Neither exclusion costs a client route — the table is `/` plus a catch-all, and the
 dashboard routes nothing under either prefix — and a real file still wins over both,
 because `readAsset` is consulted before the router test runs.
+
+### The boundary is "equals, or starts with a slash", and both halves bite
+
+The prefixes are stored **without** a trailing slash and matched as
+`pathname === prefix || pathname.startsWith(prefix + "/")`, because each naive form is
+wrong in its own direction:
+
+- `startsWith("/api/")` alone lets **bare `/api`** fall through to the extension test,
+  which sees no dot and serves the dashboard — 200 HTML where a JSON 404 stood before
+  the router. This shipped in the first cut of this change and was caught in review.
+- `startsWith("/api")` alone **over-matches**, swallowing a perfectly good client route
+  like `/apiary`.
+
+### `isServerRoutePathname` is where a new route gets declared
+
+The fallback consults a predicate rather than testing prefixes inline, and the predicate
+reads `SERVER_PATHNAMES`, which is built from the same constants the dispatch chain
+matches on. `router.test.ts` fails if the two drift: one test forbids comparing
+`pathname` against an inline string literal, another pins the exact set of constants the
+chain compares against. Adding a top-level route without declaring it fails the second.
+
+That guard exists because a sibling app in the fleet hit the failure it prevents — a
+top-level `/version` its own frontend polled began returning `index.html` once the
+fallback widened, and the frontend read the unparseable body as "server unreachable,
+reload now".
+
+## Navigation: there is none yet, and that is why there are no `<Link>`s
+
+The fleet decision also asks for **real `<Link>` / `<a href>` navigation**, and a sibling
+PR in this batch quietly skipped that item while satisfying the other three. Audited here
+on 2026-08-19 rather than assumed: the dashboard renders **27 controls and zero anchors**,
+and **ctrl+clicking every one of them opens no tab and changes no URL**.
+
+Every control is an action or a setting — tray commands, `Tower off`, the column-count
+radios, the `drive info` disclosures, per-bay `Cancel`, and the card overlay that opens
+the log modal. None of them goes anywhere, because there is nowhere to go: the table is
+one route.
+
+So item 4 is **vacuously satisfied, not skipped**. The moment a second view exists — a
+per-bay log at `/bay/:slot/log` is the obvious candidate, since that overlay is already
+card-shaped — it must be a `<Link>`, not the `<button>` the overlay is today.
+`@charcuterie/ui@2.17.0` (which this repo is on) ships `ButtonLink` and a `/react-router`
+adapter for exactly that, wired with `<RouterLinkProvider link={ReactRouterLink}>` at the
+root. Ctrl+click and middle-click are the tests that tell the two apart; a screenshot
+cannot.
 
 ## Consequences
 
@@ -92,6 +138,9 @@ Chromium at 1440 x 900:
 | `GET /assets/no-extension` | **404 `application/json`** — reserved |
 | `GET /api/unknown` | **404 `application/json`** — reserved |
 | `GET /api/tray/open` | **404 `application/json`** — reserved |
+| `GET /api`, `GET /assets` (bare) | **404 `application/json`** — the namespace includes its root |
+| `GET /apiary`, `GET /assetsomething` | 200 `text/html` — the prefix must not over-match |
+| `GET /stop`, `/close`, `/hide`, `/unhide` | 501 `application/json` — unchanged |
 | `GET /api/tray` | 405 `application/json` — POST only, as before |
 | `GET /json`, `/health`, `/fixtures` | 200 `application/json` — API unaffected |
 | `GET /eject` | 501 `application/json` — unchanged |
