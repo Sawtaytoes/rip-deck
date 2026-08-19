@@ -17,6 +17,7 @@ import {
 } from "./trayEndpoint.ts"
 import {
   EMPTY_WEB_ASSETS,
+  HASHED_PREFIX,
   WEB_INDEX_PATHNAME,
   type WebAsset,
   type WebAssets,
@@ -161,6 +162,16 @@ const UNIMPLEMENTED_ACTION_PATHS = [
 const INDEX_PATHNAMES = ["/", WEB_INDEX_PATHNAME]
 
 /**
+ * Path prefixes the client router may never claim.
+ *
+ * `/api/` is the API's own namespace and `/assets/` is Vite's
+ * build output; the dashboard routes under neither, so excluding
+ * them loses nothing and keeps both answering the way the client
+ * that asked expects.
+ */
+const RESERVED_PREFIXES = ["/api/", HASHED_PREFIX]
+
+/**
  * Does this path belong to the dashboard's client router?
  *
  * The previous rule was "these two paths and nothing else", because the app had
@@ -184,6 +195,37 @@ const isClientRoutePathname = (
   pathname: string,
 ): boolean => {
   if (INDEX_PATHNAMES.includes(pathname)) return true
+
+  // Reserved namespaces beat the extension test, because the dot
+  // alone does not cover either of them.
+  //
+  // `/api/` is the API's, and every path in it that EXISTS is
+  // matched above; the ones that do not are typos and unshipped
+  // endpoints, and both want the JSON 404 an API client can act
+  // on rather than a page. Without this, `GET /api/rips` answers
+  // 200 + HTML until the day that endpoint ships, which is the
+  // same "parses as the wrong thing entirely" failure the dot
+  // guard exists to prevent, just with a JSON client instead of
+  // the browser's script loader.
+  //
+  // `/assets/` is Vite's content-hashed output, so nothing under
+  // it is ever a route. The dot covers the real filenames there
+  // because Vite always emits an extension — this makes that a
+  // rule rather than a coincidence, so a missing bundle 404s on
+  // the strength of WHERE it is and not just what it is called.
+  //
+  // Neither costs a client route: the dashboard's table is `/`
+  // plus a catch-all, and it routes nothing under either prefix.
+  // A real file still wins over both — `readAsset` is consulted
+  // before this function is, so every asset that exists is served
+  // as itself.
+  if (
+    RESERVED_PREFIXES.some((prefix) =>
+      pathname.startsWith(prefix),
+    )
+  ) {
+    return false
+  }
 
   const lastSegment = pathname.slice(
     pathname.lastIndexOf("/") + 1,

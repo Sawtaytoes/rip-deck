@@ -354,6 +354,55 @@ describe("the rest of the surface", () => {
       "application/json; charset=utf-8",
     )
   })
+
+  /**
+   * The extension test alone would hand these to the client router, and
+   * both are namespaces the dashboard does not route in.
+   *
+   * `/api/` matters most: every API path that EXISTS is matched above the
+   * fallback, so what lands here is a typo or an endpoint that has not
+   * shipped, and a JSON client wants the 404 it can act on rather than a
+   * page it will fail to parse. `/assets/` makes "a missing bundle 404s"
+   * true because of WHERE it is, not merely because Vite happens to put an
+   * extension on every file it emits.
+   */
+  it.each([
+    "/api/unknown",
+    "/api/tray/open",
+    "/api/",
+    "/assets/no-extension",
+  ])(
+    "404s in JSON for %s — a reserved namespace is never a client route",
+    (url) => {
+      const response = handleSync(
+        buildRouter(buildWebAssets()),
+        {
+          method: "GET",
+          url,
+        },
+      )
+
+      expect(response.status).toBe(404)
+      expect(response.contentType).toBe(
+        "application/json; charset=utf-8",
+      )
+    },
+  )
+
+  it("still serves a real asset under a reserved prefix", () => {
+    const response = handleSync(
+      buildRouter(buildWebAssets()),
+      {
+        method: "GET",
+        url: "/assets/index-abc123.js",
+      },
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.contentType).toContain(
+      "text/javascript",
+    )
+  })
 })
 
 describe("the dashboard", () => {

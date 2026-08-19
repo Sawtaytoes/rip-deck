@@ -22,8 +22,9 @@ explained why:
 > no client-side router […] **If a router is ever added, widen the fallback HERE and keep
 > the API paths above it.**
 
-That is now done, on the narrowest rule that works: **any extension-less path that is not
-an API path serves the dashboard; a path whose last segment contains a dot does not.**
+That is now done, on the narrowest rule that works: **a path under a reserved namespace
+(`/api/`, `/assets/`) is never a client route; otherwise any extension-less path serves
+the dashboard, and a path whose last segment contains a dot does not.**
 
 ## Why extension-less, and not "anything that isn't an API path"
 
@@ -34,7 +35,25 @@ nothing to do with typos:
   fail as a 404 the browser reports. Answer it with 200 + HTML and the browser tries to
   execute HTML as JavaScript, and the error it raises says nothing about the actual
   problem. The dot is what tells those two cases apart.
-- Every API path is matched above this point, so the API is untouched either way.
+
+## Why two namespaces are excluded outright
+
+"Every API path is matched above this point" is true of the paths that **exist**, and
+that is not the same as leaving the API untouched. What reaches the fallback under
+`/api/` is a typo or an endpoint that has not shipped yet, and answering those with
+200 + HTML is the *same* failure the dot guard exists to prevent — a client that asked
+for structured data getting a document it cannot parse — with a JSON client in the
+browser's place. `GET /api/rips` answering 200 + HTML until the day that endpoint ships
+is a debugging trap, so `/api/` is excluded outright and keeps its JSON 404.
+
+`/assets/` is excluded for the matching reason: it is Vite's content-hashed output and
+routes nothing, so a missing bundle should 404 on the strength of **where** it is and
+not merely because Vite happens to put an extension on every file it emits. The dot
+stops being the only thing standing between a moved hash and an HTML response.
+
+Neither exclusion costs a client route — the table is `/` plus a catch-all, and the
+dashboard routes nothing under either prefix — and a real file still wins over both,
+because `readAsset` is consulted before the router test runs.
 
 ## Consequences
 
@@ -46,6 +65,9 @@ nothing to do with typos:
   than it was: one case pins that an extension-less path is a client route, the other
   pins that a path naming a FILE still returns a JSON 404. The second is the one that
   was actually protecting anything.
+- **The API's namespace is unchanged, not merely its existing paths.** `GET /api/anything`
+  answers exactly as it did before the router arrived, so no API client can be handed a
+  page it did not ask for.
 - A real file still wins over the router — `/index.html` is both an asset and an index
   path, and an asset that exists is served as itself.
 - `HEAD` behaves as before; `curl -I` on the daemon still answers.
@@ -55,15 +77,27 @@ nothing to do with typos:
 > "Points-Market, Board Game Picker, and QueuePilot, Rip-Deck, CastKit, Image-Viewer,
 > and the others need browser routing. I want them all the same" (owner, 2026-08-16)
 
-Verified 2026-08-16 against a running daemon on the built dashboard:
+Verified 2026-08-19 against a running daemon on the built dashboard, and driven in
+Chromium at 1440 x 900:
 
 | Request | Result |
 | --- | --- |
-| `GET /` | 200 `text/html` |
+| `GET /` | 200 `text/html` — the dashboard, 9 bays |
 | `GET /index.html` | 200 `text/html` |
 | `GET /nope` | 200 `text/html` — a client route |
 | `GET /bay/3` | 200 `text/html` — a client route |
+| `GET /settings/advanced` | 200 `text/html` — a client route |
+| `GET /assets/index-<hash>.js` (real) | 200 `text/javascript` |
 | `GET /assets/index-deadbeef.js` | **404 `application/json`** |
-| `GET /json` | 200 `application/json` — API unaffected |
+| `GET /assets/no-extension` | **404 `application/json`** — reserved |
+| `GET /api/unknown` | **404 `application/json`** — reserved |
+| `GET /api/tray/open` | **404 `application/json`** — reserved |
+| `GET /api/tray` | 405 `application/json` — POST only, as before |
+| `GET /json`, `/health`, `/fixtures` | 200 `application/json` — API unaffected |
+| `GET /eject` | 501 `application/json` — unchanged |
 
-`tsc`, `biome check`, `eslint` and 1,294 tests all pass.
+A cold load of `/bay/3` and an F5 on it both return 200 HTML and land on `/` via the
+catch-all `<Navigate replace>`, with the dashboard rendered and no console error but a
+pre-existing font 404 unrelated to routing.
+
+`tsc`, `biome check .`, `eslint .` and the daemon's 1,035 tests all pass.
