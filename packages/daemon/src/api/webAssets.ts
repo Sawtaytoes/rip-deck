@@ -58,7 +58,7 @@ const CONTENT_TYPES: Record<string, string> = {
 const UNKNOWN_CONTENT_TYPE = "application/octet-stream"
 
 /** Vite's content-hashed output directory, inside `dist/`. */
-const HASHED_PREFIX = "/assets/"
+export const HASHED_PREFIX = "/assets/"
 
 export const WEB_INDEX_PATHNAME = "/index.html"
 

@@ -17,6 +17,7 @@ import {
 } from "./trayEndpoint.ts"
 import {
   EMPTY_WEB_ASSETS,
+  HASHED_PREFIX,
   WEB_INDEX_PATHNAME,
   type WebAsset,
   type WebAssets,
@@ -156,18 +157,82 @@ const UNIMPLEMENTED_ACTION_PATHS = [
 ]
 
 /**
- * The paths the dashboard's HTML answers.
- *
- * Deliberately just these two, and NOT "every path that is not an
- * API path". The app has no client-side router — every bit of its
- * state is in the query string (`?fake=`) — so today an
- * extension-less path like `/bay/3` is a mistake, not a deep
- * link, and answering it with 200 + HTML would turn a mistyped
- * `/jsonn` into a page instead of the JSON 404 an API client can
- * act on. If a router is ever added, widen the fallback HERE and
- * keep the API paths above it.
+ * The paths the dashboard's HTML answers outright.
  */
 const INDEX_PATHNAMES = ["/", WEB_INDEX_PATHNAME]
+
+/**
+ * Path prefixes the client router may never claim.
+ *
+ * `/api/` is the API's own namespace and `/assets/` is Vite's
+ * build output; the dashboard routes under neither, so excluding
+ * them loses nothing and keeps both answering the way the client
+ * that asked expects.
+ */
+const RESERVED_PREFIXES = ["/api/", HASHED_PREFIX]
+
+/**
+ * Does this path belong to the dashboard's client router?
+ *
+ * The previous rule was "these two paths and nothing else", because the app had
+ * no client-side router — every bit of its state was in the query string
+ * (`?fake=`) — so an extension-less `/bay/3` was a mistake rather than a deep
+ * link. It has a router as of 2026-08-16 (fleet decision
+ * `2026-08-16-owned-web-apps-use-react-router-with-path-urls`), and that comment
+ * said what to do when one arrived: widen the fallback HERE, keeping every API
+ * path above it.
+ *
+ * **Extension-less only, and that is the whole guard.** A path with a dot in its
+ * last segment is asking for a FILE, so a missing `/assets/index-abc123.js` must
+ * stay a 404 the browser reports — never 200 + HTML, which the browser would try
+ * to execute as JavaScript and fail on in a way that says nothing about the real
+ * problem. Every API path is matched above this point, so a mistyped `/jsonn`
+ * now renders the dashboard instead of returning a JSON 404; that is the price
+ * of a client router, and it is the same trade every other app in the fleet
+ * makes.
+ */
+const isClientRoutePathname = (
+  pathname: string,
+): boolean => {
+  if (INDEX_PATHNAMES.includes(pathname)) return true
+
+  // Reserved namespaces beat the extension test, because the dot
+  // alone does not cover either of them.
+  //
+  // `/api/` is the API's, and every path in it that EXISTS is
+  // matched above; the ones that do not are typos and unshipped
+  // endpoints, and both want the JSON 404 an API client can act
+  // on rather than a page. Without this, `GET /api/rips` answers
+  // 200 + HTML until the day that endpoint ships, which is the
+  // same "parses as the wrong thing entirely" failure the dot
+  // guard exists to prevent, just with a JSON client instead of
+  // the browser's script loader.
+  //
+  // `/assets/` is Vite's content-hashed output, so nothing under
+  // it is ever a route. The dot covers the real filenames there
+  // because Vite always emits an extension — this makes that a
+  // rule rather than a coincidence, so a missing bundle 404s on
+  // the strength of WHERE it is and not just what it is called.
+  //
+  // Neither costs a client route: the dashboard's table is `/`
+  // plus a catch-all, and it routes nothing under either prefix.
+  // A real file still wins over both — `readAsset` is consulted
+  // before this function is, so every asset that exists is served
+  // as itself.
+  if (
+    RESERVED_PREFIXES.some((prefix) =>
+      pathname.startsWith(prefix),
+    )
+  ) {
+    return false
+  }
+
+  const lastSegment = pathname.slice(
+    pathname.lastIndexOf("/") + 1,
+  )
+
+  return !lastSegment.includes(".")
+}
 
 /**
  * What `GET /` says when the dashboard is not in this image.
@@ -535,15 +600,17 @@ export const createApiRouter = ({
     // not. `node:http` drops the body for a HEAD response by
     // itself, so returning the full asset here is correct.
     if (method === "GET" || method === "HEAD") {
-      const isIndexPath = INDEX_PATHNAMES.includes(pathname)
-
-      const asset = isIndexPath
-        ? webAssets.readIndexHtml()
-        : webAssets.readAsset({ pathname })
+      // A real file wins over the router: `/index.html` is both an asset and an
+      // index path, and an asset that EXISTS should be served as itself.
+      const asset =
+        webAssets.readAsset({ pathname }) ??
+        (isClientRoutePathname(pathname)
+          ? webAssets.readIndexHtml()
+          : null)
 
       if (asset !== null) return assetResponse(asset)
 
-      if (isIndexPath) {
+      if (isClientRoutePathname(pathname)) {
         return {
           status: 503,
           contentType: "text/plain; charset=utf-8",

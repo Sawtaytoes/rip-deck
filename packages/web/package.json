@@ -21,7 +21,8 @@
     "@rip-deck/contracts": "workspace:*",
     "@tanstack/react-query": "^5.100.9",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "react-router": "^8.3.0"
   },
   "devDependencies": {
     "@charcuterie/storybook-config": "^0.2.2",
