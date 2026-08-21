@@ -357,6 +357,7 @@ const buildBayState = (
   emptyObservationCount: 0,
   hasSettledEmpty: false,
   lastFinished: null,
+  isLoadedDismissed: false,
   updatedAtMs: NOW_MS,
   ...overrides,
 })

@@ -508,6 +508,33 @@ export type BayState = {
    * ([decision](docs/decisions/2026-07-31-power-cycle-holds-a-finished-disc-from-bay-memory.md)).
    */
   lastFinished: BayLedgerRecord | null
+  /**
+   * A human has SAID this bay's disc is out, and the drive has
+   * not agreed.
+   *
+   * Written only by the `clear_loaded` press ("Mark as taken
+   * out"), read only by `loadedDiscsNow`. It is the live-bay twin
+   * of a ledger phantom — **display-only, and it reaches no rip
+   * decision**: the latch, the fingerprint and the start counter
+   * are all untouched, so a disc that really is still in the tray
+   * is still held rather than re-ripped, and `open_trays` still
+   * offers to open the bay.
+   *
+   * ⚠️ **Without it the button does nothing on this rack.** These
+   * drives keep reporting their disc long after the tray opens
+   * ([decision](docs/decisions/2026-07-27-tray-memory-beats-disc-presence.md)),
+   * so a present bay's `sizeSectors` is not evidence the disc is
+   * there — and `clear_loaded` used to skip every present bay to
+   * avoid "claiming a disc anyone can see is gone".
+   *
+   * Cleared by every fold that changes which disc this bay is
+   * about — `start`, `rearm`, `quarantine`, and the outcome latch
+   * — so a dismissal can never silence the reminder for the NEXT
+   * disc. Persisted with the disc record it belongs to
+   * (`BayLedgerRecord.isLoadedDismissed`), so a deploy landing
+   * after the press does not bring the reminder back.
+   */
+  isLoadedDismissed: boolean
   updatedAtMs: number
 }
 
@@ -597,6 +624,10 @@ export const createBayState = (input: {
   hasSettledEmpty: false,
   // A fresh bay has finished nothing to remember.
   lastFinished: null,
+  // Nobody has said anything about a disc this bay does not yet
+  // have. `rearm` builds through here, which is what makes the
+  // dismissal die with the disc it was about.
+  isLoadedDismissed: false,
   updatedAtMs: input.atMs,
 })
 
@@ -782,6 +813,9 @@ export const applyBayDecision = (input: {
         // this disc — the bay will not be re-adopted while it is
         // starting/ripping, and a failure re-arms from scratch.
         hasSettledEmpty: true,
+        // A different disc, so whatever the operator said about
+        // the last one is spent.
+        isLoadedDismissed: false,
         updatedAtMs: atMs,
       }
 
@@ -839,8 +873,14 @@ export const applyBayDecision = (input: {
           destinationPath: bay.destinationPath,
           jobUuid: null,
           outcome,
+          isLoadedDismissed: false,
           updatedAtMs: atMs,
         },
+        // A bay the poll loop has just quarantined has something
+        // new to say about its disc, so it earns its place in the
+        // reminder again even if the last thing said about it was
+        // "taken out".
+        isLoadedDismissed: false,
         updatedAtMs: atMs,
       }
     }
@@ -915,6 +955,9 @@ export const applyBayOutcome = (input: {
         outcome: input.outcome,
         latchedAtMs: input.atMs,
         jobUuid: null,
+        // The disc left before anything could be done with it, so
+        // there is nothing left to have been dismissed.
+        isLoadedDismissed: false,
         updatedAtMs: input.atMs,
       }
     : {
@@ -944,8 +987,13 @@ export const applyBayOutcome = (input: {
           destinationPath: input.bay.destinationPath,
           jobUuid: input.bay.jobUuid,
           outcome: input.outcome,
+          isLoadedDismissed: false,
           updatedAtMs: input.atMs,
         },
+        // A freshly finished disc is a fresh chore. Anything the
+        // operator said about the bay before this latch was about
+        // an earlier disc.
+        isLoadedDismissed: false,
         updatedAtMs: input.atMs,
       }
 
@@ -1794,6 +1842,30 @@ export type WatcherHandlers = {
    * bays of nine.
    */
   onTickComplete?: () => void
+  /**
+   * The bay table changed, and NOT because a poll found
+   * something.
+   *
+   * `onTickComplete` says "the table now describes this poll";
+   * this says "the table changed between two polls" — an operator
+   * command that moved a drawer, or one that forgot a disc. Same
+   * meaning for a reader (`getBays()` is worth re-reading), and
+   * the reason it is a second handler is that it must not claim a
+   * poll happened: nothing was probed, so the sightings are
+   * exactly as old as they were and anything folded off presence
+   * would be folding the previous tick's.
+   *
+   * ⚠️ **Without it the ⏏ toggle points the wrong way for a whole
+   * tick.** `last_tray_command` is the only thing the toggle's
+   * direction stands on, `/json` carries it only through the
+   * roster `onTickComplete` republishes, and the dashboard
+   * refetches the instant its POST resolves — which is always
+   * BEFORE the next poll. So an Open trays press was followed by a
+   * ⏏ that still offered `open_bay`, and pressing it re-opened an
+   * already-open drawer: the owner, 2026-08-20, *"I clicked
+   * eject, and it should close it, but it's not."*
+   */
+  onBayTableChanged?: () => void
 }
 
 export type WatcherInput = {
@@ -2246,6 +2318,12 @@ export const startWatcher = (
     }))
 
     persistLedger()
+
+    // Synchronously, and before the command's response is built:
+    // the dashboard refetches `/json` the moment that response
+    // lands, and this is the memory the ⏏ toggle reads to decide
+    // which way it sends next.
+    handlers.onBayTableChanged?.()
   }
 
   /**
@@ -2882,7 +2960,15 @@ export const startWatcher = (
         slot: sighting?.slot ?? null,
         label: sighting?.label ?? bay.driveId,
         isDrivePresent: sighting?.isDrivePresent ?? false,
-        hasDisc: bay.sizeSectors !== null,
+        // ⚠️ The operator's word beats the drive's reading, and
+        // only here. `isLoadedDismissed` is the "Mark as taken
+        // out" press, and this summary is the ONE thing it
+        // changes — the bay stays latched, so nothing re-rips.
+        // It has to fold in at `hasDisc` rather than at
+        // `isLatched` because the latch is what holds the disc.
+        hasDisc:
+          bay.sizeSectors !== null &&
+          !bay.isLoadedDismissed,
         // The same latch `buildDriveDiscState` publishes as
         // `is_holding_finished_disc`, spelled out here rather
         // than imported from the MQTT layer, which this file
@@ -3049,15 +3135,29 @@ export const startWatcher = (
    *     is authoritative, so the next publish is a real all-clear
    *     and never a blind one withheld by `shouldPublishLoadedDiscs`.
    *  2. **Live bays kept only as loaded memory whose drive is off
-   *     the bus.** A PRESENT drive still holding its disc is left
-   *     alone — clearing must never claim a disc anyone can see is
-   *     gone; for those the honest path stays Open trays. A cleared
-   *     absent bay whose drive and disc later return is re-adopted
-   *     through the fail-closed startup path, which HOLDS rather
-   *     than re-rips.
+   *     the bus**, which are dropped outright. A cleared absent bay
+   *     whose drive and disc later return is re-adopted through the
+   *     fail-closed startup path, which HOLDS rather than re-rips.
+   *  3. **Present bays still reporting a finished disc**, which are
+   *     marked `isLoadedDismissed` rather than dropped. The bay
+   *     stays latched — deleting it would rebuild a fresh `idle`
+   *     bay that re-rips the disc it may still be holding — and the
+   *     flag takes it out of the reminder and nothing else.
    *
-   * `persistLedger` then writes the trimmed set through, so a
-   * restart reads the same all-clear this press asserted.
+   * ⚠️ **Point 3 is the fix for a button that did nothing.** It used
+   * to leave every present bay alone, on the reasoning that
+   * "clearing must never claim a disc anyone can see is gone; for
+   * those the honest path stays Open trays". Nobody can see it: these
+   * drives keep reporting their disc long after the tray opens
+   * ([decision](docs/decisions/2026-07-27-tray-memory-beats-disc-presence.md)),
+   * so with the tower ON — the normal case, since the reminder names
+   * Open trays — every disc was a present one, `cleared` came back 0,
+   * and the banner never moved no matter how many times it was
+   * pressed. The drive's reading was never evidence here; the human
+   * standing at the rack is.
+   *
+   * `persistLedger` then writes the trimmed and flagged set through,
+   * so a restart reads the same all-clear this press asserted.
    */
   const runClearLoaded = (params: {
     requestId: string | null
@@ -3077,13 +3177,33 @@ export const startWatcher = (
       const isLatched =
         bay.phase === "done" || bay.phase === "quarantined"
 
-      if (!isPresent && isLatched) {
-        bays.delete(driveId)
-        sightings.delete(driveId)
+      if (!isLatched) continue
+
+      if (isPresent) {
+        // Flagged, never deleted. A deleted bay comes back on the
+        // next tick as a fresh `idle` one, and a fresh idle bay
+        // with a finished disc still in it re-rips that disc —
+        // which is the whole reason the bay table outlives the
+        // drive.
+        bays.set(driveId, {
+          ...bay,
+          isLoadedDismissed: true,
+          updatedAtMs: deps.now(),
+        })
+
+        continue
       }
+
+      bays.delete(driveId)
+      sightings.delete(driveId)
     }
 
     persistLedger()
+
+    // The bay table changed outside the poll loop, so tell the
+    // readers rather than leaving `/json` describing the press
+    // before this one for up to a whole tick.
+    handlers.onBayTableChanged?.()
 
     // What actually fell off the reminder: everything before, minus
     // any present-and-loaded disc deliberately kept. A tower that is

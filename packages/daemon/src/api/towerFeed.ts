@@ -796,6 +796,17 @@ export const createTowerFeed = ({
         handlers.onTickComplete?.()
       },
 
+      // An operator command changed the bay table between two
+      // polls — a drawer moved, a reminder was cleared. Same
+      // roster read, and it must not wait for the next tick:
+      // the dashboard refetches `/json` the instant its POST
+      // resolves, and what it is refetching for is exactly what
+      // just changed.
+      onBayTableChanged: () => {
+        syncRoster()
+        handlers.onBayTableChanged?.()
+      },
+
       onNote: (message) => {
         handlers.onNote?.(message)
       },

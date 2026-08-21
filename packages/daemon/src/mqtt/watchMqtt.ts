@@ -636,6 +636,10 @@ export const createWatchMqtt = (
         // Same: the power-cycle memory is the poll loop's, not this
         // one-event stand-in's.
         lastFinished: null,
+        // The loaded-discs reminder is the watcher's fold too; a
+        // stand-in built from one event has had nothing said about
+        // it.
+        isLoadedDismissed: false,
         updatedAtMs: now(),
       },
       outcome: event.outcome,
@@ -664,6 +668,7 @@ export const createWatchMqtt = (
             emptyObservationCount: 0,
             hasSettledEmpty: false,
             lastFinished: null,
+            isLoadedDismissed: false,
             updatedAtMs: now(),
           },
           view,

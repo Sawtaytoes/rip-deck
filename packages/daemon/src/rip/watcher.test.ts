@@ -1096,6 +1096,7 @@ describe("startWatcher bay memory", () => {
                 kind: "completed",
                 detail: "/dest/[BACKUP] TROY",
               },
+              isLoadedDismissed: false,
               updatedAtMs: 1,
             },
           ],
@@ -1415,6 +1416,7 @@ describe("startWatcher loaded-discs memory", () => {
       kind: "completed" as const,
       detail: "/dest/[BACKUP] TROY",
     },
+    isLoadedDismissed: false,
     updatedAtMs: 1,
   }
 
@@ -1512,6 +1514,134 @@ describe("startWatcher loaded-discs memory", () => {
     expect(
       written[written.length - 1]?.records,
     ).toHaveLength(0)
+
+    await watcher.stop()
+  })
+
+  it("⚠️ clear_loaded clears a PRESENT bay whose drive still claims the disc", async () => {
+    // The defect: with the tower ON — the normal case, since the
+    // reminder itself says "Press Open trays" — every loaded disc
+    // is a PRESENT one, and `clear_loaded` used to leave those
+    // alone so as not to "claim a disc anyone can see is gone".
+    // Nobody can see it. These drives keep reporting their disc
+    // long after the tray opens, so the owner took the disc out,
+    // pressed Mark as taken out repeatedly, and the banner never
+    // moved.
+    const ripper = controllableRipper()
+
+    const watcher = startWatcher(
+      {
+        config: noopConfig,
+        governor: createGovernor({ maxConcurrentRips: 9 }),
+      },
+      watcherDeps({
+        // On the bus, and still reporting the finished disc.
+        probeDrives: async () => [
+          probedDrive({
+            driveId: SLOT_9,
+            kernelName: "sr0",
+            sizeSectors: BLURAY_SECTORS,
+          }),
+        ],
+        runBayRip: ripper.runBayRip,
+        readLedger: async () => ({
+          version: BAY_LEDGER_VERSION,
+          hasPriorState: true,
+          trayCommands: [],
+          records: [troyRecord],
+        }),
+      }),
+    )
+
+    await watcher.tickNow()
+
+    const before = watcher.getLoadedDiscs()
+
+    expect(before.count).toBe(1)
+    expect(before.isTowerOn).toBe(true)
+
+    const report = await watcher.runTrayCommand({
+      request: { kind: "clear_loaded" },
+    })
+
+    expect(report.is_accepted).toBe(true)
+    expect(report.message).toContain("1 disc")
+    expect(watcher.getLoadedDiscs().count).toBe(0)
+
+    // ⚠️ The safety half, and the reason this is a flag rather
+    // than a deleted bay: the disc may genuinely still be in
+    // there. The bay stays latched and the next poll — which
+    // still reads media — must not rip it.
+    await watcher.tickNow()
+
+    expect(ripper.started).toHaveLength(0)
+    expect(watcher.getBays()[0]?.phase).toBe("done")
+    expect(watcher.getLoadedDiscs().count).toBe(0)
+
+    await watcher.stop()
+  })
+
+  it("a new disc in a dismissed bay reminds again", async () => {
+    // The dismissal is about ONE disc. It dies with that disc, or
+    // it silences the reminder for every disc that follows.
+    const ripper = controllableRipper({
+      reportsRipStarted: true,
+    })
+
+    let sizeSectors: number | null = BLURAY_SECTORS
+
+    const watcher = startWatcher(
+      {
+        config: noopConfig,
+        governor: createGovernor({ maxConcurrentRips: 9 }),
+      },
+      watcherDeps({
+        probeDrives: async () =>
+          sizeSectors === null
+            ? [
+                probedDrive({
+                  driveId: SLOT_9,
+                  kernelName: "sr0",
+                  sizeSectors: 0,
+                }),
+              ]
+            : [
+                probedDrive({
+                  driveId: SLOT_9,
+                  kernelName: "sr0",
+                  sizeSectors,
+                }),
+              ],
+        runBayRip: ripper.runBayRip,
+        readLedger: async () => ({
+          version: BAY_LEDGER_VERSION,
+          hasPriorState: true,
+          trayCommands: [],
+          records: [troyRecord],
+        }),
+      }),
+    )
+
+    await watcher.tickNow()
+    await watcher.runTrayCommand({
+      request: { kind: "clear_loaded" },
+    })
+    expect(watcher.getLoadedDiscs().count).toBe(0)
+
+    // The drive finally agrees: the tray reads empty, the bay
+    // re-arms, and the dismissal goes with the disc it was about.
+    sizeSectors = null
+    await watcher.tickNow()
+    await watcher.tickNow()
+    await watcher.tickNow()
+
+    // Re-armed, so the dismissal died with the disc rather than
+    // outliving it — and the bay is ready to remind about the
+    // next one.
+    expect(watcher.getBays()[0]?.phase).toBe("idle")
+    expect(watcher.getBays()[0]?.isLoadedDismissed).toBe(
+      false,
+    )
 
     await watcher.stop()
   })
@@ -1824,6 +1954,7 @@ describe("startWatcher cold power-on", () => {
                 kind: "completed",
                 detail: "/dest/[BACKUP] TROY",
               },
+              isLoadedDismissed: false,
               updatedAtMs: 1,
             },
           ],
