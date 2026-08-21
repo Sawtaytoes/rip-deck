@@ -2982,12 +2982,20 @@ export const startWatcher = (
     })
 
     const phantoms = phantomLoadedBays({
-      records: (ledger?.records ?? []).map((record) => ({
-        driveId: record.driveId,
-        phase: record.phase,
-        discName: record.discName,
-        isRipped: record.outcome.kind === "completed",
-      })),
+      // ⚠️ A dismissed record is not a phantom. The dismissal has
+      // to survive the tower going dark, which is exactly when a
+      // bay stops being live and its ledger record starts
+      // speaking for it — so a disc the operator already took out
+      // would otherwise start reminding again the moment the rack
+      // was switched off, or on the next restart against it.
+      records: (ledger?.records ?? [])
+        .filter((record) => !record.isLoadedDismissed)
+        .map((record) => ({
+          driveId: record.driveId,
+          phase: record.phase,
+          discName: record.discName,
+          isRipped: record.outcome.kind === "completed",
+        })),
       // A live bay already speaks for its drive; the ledger phantom
       // for the same driveId would double-count it.
       liveDriveIds: new Set(bays.keys()),

@@ -1581,6 +1581,47 @@ describe("startWatcher loaded-discs memory", () => {
     await watcher.stop()
   })
 
+  it("⚠️ a dismissed record is not resurrected as a phantom", async () => {
+    // The gap a bay-only flag would leave. With the tower dark a
+    // restarted daemon builds NO bays, so the LEDGER RECORD is
+    // what speaks for the bay (`phantomLoadedBays`) — and
+    // switching the rack off is the very next thing the owner does
+    // after taking the discs out. Without the dismissal riding the
+    // record, the reminder he just cleared comes straight back on
+    // the next deploy.
+    const ripper = controllableRipper()
+
+    const watcher = startWatcher(
+      {
+        config: noopConfig,
+        governor: createGovernor({ maxConcurrentRips: 9 }),
+      },
+      watcherDeps({
+        // Tower off, exactly as `clear_loaded`'s own ledger test:
+        // no bay is built, so only the record can answer.
+        probeDrives: async () => [],
+        runBayRip: ripper.runBayRip,
+        readLedger: async () => ({
+          version: BAY_LEDGER_VERSION,
+          hasPriorState: true,
+          trayCommands: [],
+          records: [
+            { ...troyRecord, isLoadedDismissed: true },
+          ],
+        }),
+      }),
+    )
+
+    await watcher.tickNow()
+
+    expect(watcher.getLoadedDiscs().count).toBe(0)
+    // ⚠️ And still a REAL all-clear rather than a blind one, so a
+    // publish clears the retained reminder instead of withholding.
+    expect(watcher.getLoadedDiscs().isBlind).toBe(false)
+
+    await watcher.stop()
+  })
+
   it("a new disc in a dismissed bay reminds again", async () => {
     // The dismissal is about ONE disc. It dies with that disc, or
     // it silences the reminder for every disc that follows.
