@@ -766,6 +766,62 @@ describe("buildTrayCommandMessage", () => {
     expect(message).toContain("slots 8 and 9")
   })
 
+  it("refuses in the VERB of the command that ran", () => {
+    // Measured on the live tower 2026-08-20: a `close_trays`
+    // press with slot 2 mid-rip answered "Refused to OPEN slot 2",
+    // which is the one sentence Home Assistant speaks out loud.
+    // Every non-rip_bay, non-power_off command shared the open
+    // wording.
+    expect(
+      buildTrayCommandMessage({
+        request: { kind: "close_trays" },
+        results: [
+          result({
+            slot: 2,
+            resultKind: "refused_ripping",
+            detail: "REFUSED — this bay is ripping.",
+          }),
+        ],
+      }),
+    ).toBe("Refused to close slot 2: still ripping.")
+
+    expect(
+      buildTrayCommandMessage({
+        request: { kind: "open_trays" },
+        results: [
+          result({
+            slot: 2,
+            resultKind: "refused_ripping",
+            detail: "REFUSED — this bay is ripping.",
+          }),
+        ],
+      }),
+    ).toBe("Refused to open slot 2: still ripping.")
+  })
+
+  it("lists the opened drawers in slot order", () => {
+    // The list is what the operator walks the rack against, so it
+    // reads in rack order. Concatenating `opened` then
+    // `openedNotRipped` produced "slots 2, 1, 3, 4, 5, 6, 7, 8
+    // and 9" on the live tower: the single ripped bay sorted ahead
+    // of eight empty ones that were already in order. The
+    // never-ripped split is a separate sentence and keeps its own
+    // ordering.
+    const message = buildTrayCommandMessage({
+      request: { kind: "open_trays" },
+      results: [
+        result({ slot: 2, resultKind: "opened" }),
+        ...[1, 3, 4].map((slot) =>
+          result({ slot, resultKind: "opened_not_ripped" }),
+        ),
+      ],
+    })
+
+    expect(message).toContain(
+      "Opened 4 drives: slots 1, 2, 3 and 4.",
+    )
+  })
+
   it("reads as a plain open-all in fallback mode", () => {
     // ⚠️ Nine drawers opened because the tower had nothing
     // selective to do. "8 of those were never ripped" is news

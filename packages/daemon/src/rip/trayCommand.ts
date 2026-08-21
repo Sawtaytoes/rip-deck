@@ -920,8 +920,12 @@ export const buildTrayCommandMessage = (input: {
               refused.length === 1 ? "is" : "are"
             } still ripping. Cutting power now would lose ` +
             `${refused.length === 1 ? "it" : "them"}.`
-          : `Refused to open ${formatBayList(refused)}: still ` +
-            `ripping.`,
+          : `Refused to ${
+              input.request.kind === "close_trays" ||
+              input.request.kind === "close_bay"
+                ? "close"
+                : "open"
+            } ${formatBayList(refused)}: still ripping.`,
     )
   }
 
@@ -938,10 +942,23 @@ export const buildTrayCommandMessage = (input: {
   const openedTotal = opened.length + openedNotRipped.length
 
   if (openedTotal > 0) {
+    // Sorted by slot, NOT `opened` then `openedNotRipped`. The
+    // concatenation read "slots 2, 1, 3, 4, 5, 6, 7, 8 and 9" on
+    // the live tower, because the one ripped bay sorts ahead of
+    // eight empty ones that happen to be in order. The split is
+    // its own sentence below; this one is a list of drawers the
+    // operator is about to walk over to, so it reads in the order
+    // they are racked. A null slot keeps its label and sorts last.
+    const openedAll = [...opened, ...openedNotRipped].sort(
+      (left, right) =>
+        (left.slot ?? Number.MAX_SAFE_INTEGER) -
+        (right.slot ?? Number.MAX_SAFE_INTEGER),
+    )
+
     sentences.push(
       `Opened ${String(openedTotal)} ` +
         `${openedTotal === 1 ? "drive" : "drives"}: ` +
-        `${formatBayList([...opened, ...openedNotRipped])}.`,
+        `${formatBayList(openedAll)}.`,
     )
   }
 
