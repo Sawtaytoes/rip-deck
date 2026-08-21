@@ -65,6 +65,7 @@ const completedRecord = (
     kind: "completed",
     detail: DESTINATION_PATH,
   },
+  isLoadedDismissed: false,
   updatedAtMs: NOW_MS,
   ...input,
 })
@@ -626,6 +627,47 @@ describe("parseBayLedger", () => {
     )
 
     expect(parsed.records).toHaveLength(1)
+  })
+
+  it("reads a dismissal, and an absent one as not dismissed", () => {
+    // The reminder the operator already silenced must stay
+    // silenced across the deploy that lands ten minutes later —
+    // and a ledger written before the field existed must not read
+    // as "he said it was out", which would go quiet about a disc
+    // nobody has touched.
+    const withoutField: Partial<BayLedgerRecord> =
+      completedRecord()
+
+    delete withoutField.isLoadedDismissed
+
+    const parsed = parseBayLedger(
+      JSON.stringify({
+        version: BAY_LEDGER_VERSION,
+        records: [
+          withoutField,
+          completedRecord({
+            driveId: "usb-2-1.1.2.4.4.3",
+            isLoadedDismissed: true,
+          }),
+        ],
+      }),
+    )
+
+    expect(parsed.records[0].isLoadedDismissed).toBe(false)
+    expect(parsed.records[1].isLoadedDismissed).toBe(true)
+
+    // And it rides the adoption, so the bay comes back dismissed
+    // rather than reminding about a disc already taken out.
+    expect(
+      adoptBayAtStartup({
+        driveId: "usb-2-1.1.2.4.4.3",
+        record: parsed.records[1],
+        trayRecord: undefined,
+        hasPriorState: true,
+        observation: observation(),
+        atMs: NOW_MS,
+      }).isLoadedDismissed,
+    ).toBe(true)
   })
 
   it("keeps a v2 record written before discType existed", () => {

@@ -1103,6 +1103,7 @@ const heldLedger = {
       kind: "completed" as const,
       detail: `/media/Disc-Rips/[BACKUP] TROY ${String(slot)}`,
     },
+    isLoadedDismissed: false,
     updatedAtMs: NOW_MS - 7_200_000,
   })),
   trayCommands: [],
@@ -1233,6 +1234,60 @@ describe("the watcher, feeding the store", () => {
         nowMs: NOW_MS,
       }).bays[0].last_tray_command,
     ).toBeNull()
+
+    await watcher.stop()
+  })
+
+  it("⚠️ serves the new tray memory with NO tick in between", async () => {
+    // The defect, and it is a race rather than a wrong value:
+    // the roster only reached the store on `onTickComplete`, so
+    // for up to a whole poll `/json` described the tray memory
+    // from BEFORE the press. The dashboard refetches the instant
+    // its POST resolves — always inside that window — so the ⏏
+    // toggle kept offering `open_bay` on a drawer rip-deck had
+    // just opened, and pressing it opened an already-open tray:
+    // the owner, 2026-08-20, "I clicked eject, and it should
+    // close it, but it's not."
+    const { store, watcher } = startFedWatcher({
+      probeDrives: async () =>
+        nineBayTower({ isPoweredOn: true }),
+    })
+
+    await watcher.tickNow()
+
+    const report = await watcher.runTrayCommand({
+      request: {
+        kind: "open_bay",
+        target: { driveId: "2-1.1.2.7" },
+      },
+    })
+
+    expect(report.counts.opened).toBe(1)
+
+    // ⚠️ NO `tickNow()` here, deliberately. This is the state the
+    // browser reads a few milliseconds after the button press.
+    expect(
+      buildTowerView({
+        snapshot: store.readSnapshot(),
+        nowMs: NOW_MS,
+      }).bays[6].last_tray_command,
+    ).toBe("open_bay")
+
+    // And the second press closes, which is the whole of the
+    // toggle: same absence of a tick, opposite answer.
+    await watcher.runTrayCommand({
+      request: {
+        kind: "close_bay",
+        target: { driveId: "2-1.1.2.7" },
+      },
+    })
+
+    expect(
+      buildTowerView({
+        snapshot: store.readSnapshot(),
+        nowMs: NOW_MS,
+      }).bays[6].last_tray_command,
+    ).toBe("close_bay")
 
     await watcher.stop()
   })

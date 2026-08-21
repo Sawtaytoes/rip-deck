@@ -311,6 +311,7 @@ describe("publishDriveState", () => {
           emptyObservationCount: 0,
           hasSettledEmpty: false,
           lastFinished: null,
+          isLoadedDismissed: false,
           updatedAtMs: 900,
         },
         isDrivePresent: true,
