@@ -139,6 +139,17 @@ const drift = {
     "open_bay" | "close_bay"
   >(),
   /**
+   * Bays the operator has said he took the disc out of.
+   *
+   * The daemon's `BayState.isLoadedDismissed`, mirrored: a
+   * `clear_loaded` press drops a bay out of the reminder even
+   * though its drive still reports the disc, because on this
+   * hardware it reports it for as long as it stays powered
+   * ([decision](docs/decisions/2026-08-20-mark-as-taken-out-trusts-the-operator-over-the-drive.md)).
+   * Display-only here too — the bay's own card is untouched.
+   */
+  loadedDismissed: new Set<string>(),
+  /**
    * Which scenario the page last asked for.
    *
    * `runTrayCommand` has to know which bays exist before it can
@@ -156,6 +167,7 @@ export const resetMockDrift = (): void => {
   drift.quarantineCleared.clear()
   drift.trayOpened.clear()
   drift.lastTrayCommand.clear()
+  drift.loadedDismissed.clear()
   drift.fixture = DEFAULT_FIXTURE
 }
 
@@ -1395,6 +1407,7 @@ const buildMockLoadedDiscs = (
     .filter(
       (bay) =>
         bay.disc_size_sectors != null &&
+        !drift.loadedDismissed.has(bay.drive_id) &&
         (bay.is_quarantined ||
           LATCHED_MOCK_STATES.has(bay.state.state)),
     )
@@ -1702,17 +1715,26 @@ export const mockDataSource: RipDeckDataSource = {
 
     // ⚠️ Forgetting the loaded discs is its own path, exactly as
     // the daemon does: it moves no tray and reports through the
-    // message alone. This demo does not model the on-disk ledger,
-    // so the fake banner does not actually empty — what it proves
-    // is the button sends a plain `clear_loaded` the daemon owns
-    // and the report renders.
+    // message alone.
+    //
+    // The banner DOES empty here, including for bays whose drive
+    // is present and still reporting its disc — which is the
+    // whole of the fix, and what this demo used to get wrong in
+    // the same way the daemon did. The bay's own card is left
+    // exactly where it was, because the press is about the
+    // reminder and never about the rip.
     if (command === "clear_loaded") {
       const loaded = bays.filter(
         (bay) =>
           bay.disc_size_sectors != null &&
+          !drift.loadedDismissed.has(bay.drive_id) &&
           (bay.is_quarantined ||
             LATCHED_MOCK_STATES.has(bay.state.state)),
       )
+
+      for (const bay of loaded) {
+        drift.loadedDismissed.add(bay.drive_id)
+      }
 
       return delay(
         {

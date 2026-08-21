@@ -195,6 +195,40 @@ export type BayLedgerRecord = {
    */
   jobUuid: string | null
   outcome: BayOutcome
+  /**
+   * A human has SAID this disc is out, and the drive has not
+   * agreed.
+   *
+   * Set by the `clear_loaded` press ("Mark as taken out") and
+   * read by nothing except the loaded-discs summary — it is a
+   * DISPLAY fact, the live-bay twin of a ledger phantom, and it
+   * reaches no rip decision at all.
+   *
+   * ⚠️ **It exists because a present drive's media reading is not
+   * evidence on this rack.** These drives keep reporting their
+   * disc after the tray opens
+   * ([decision](docs/decisions/2026-07-27-tray-memory-beats-disc-presence.md)),
+   * so a bay whose disc is long gone can claim `hasMedia` for as
+   * long as it stays powered — and `clear_loaded` used to leave
+   * every PRESENT bay alone on the reasoning that "a disc anyone
+   * can see is gone must not be claimed gone". On this hardware
+   * nobody can see it, which made the button do nothing at all in
+   * the one state it is for.
+   *
+   * ## Why it lives on the DISC record and not beside the tray memory
+   *
+   * The opposite of `BayTrayRecord`'s argument, and for the same
+   * test: LIFETIME. This is a claim about the disc in a bay, so it
+   * must die exactly when that disc's record dies — the re-arm
+   * that follows the drive finally reading empty, or a new disc
+   * latching. A dismissal that outlived its disc would silence the
+   * reminder for the NEXT one.
+   *
+   * Absent in a ledger written before this field existed, and read
+   * as `false` — the honest default, which is "nobody has said
+   * anything about this disc".
+   */
+  isLoadedDismissed: boolean
   updatedAtMs: number
 }
 
@@ -297,6 +331,7 @@ export const toLedgerRecords = (
             destinationPath: bay.destinationPath,
             jobUuid: bay.jobUuid,
             outcome: bay.outcome,
+            isLoadedDismissed: bay.isLoadedDismissed,
             updatedAtMs: bay.updatedAtMs,
           },
         ]
@@ -375,6 +410,12 @@ export const ledgerFingerprint = (input: {
           String(record.destinationPath),
           String(record.jobUuid),
           record.outcome.kind,
+          // In it for the same reason the tray commands are: a
+          // dismissed bay has changed nothing else at all — same
+          // phase, same outcome, same disc — so without this the
+          // press would never reach the disk and a restart would
+          // bring the reminder back.
+          String(record.isLoadedDismissed),
         ].join(":"),
       )
       .sort()
@@ -479,6 +520,12 @@ const readLedgerRecord = (
       destinationPath: value.destinationPath ?? null,
       jobUuid: optionalStringField(value.jobUuid),
       outcome: value.outcome,
+      // `=== true` rather than a cast: absent (a ledger written
+      // before this field existed) and anything that is not the
+      // boolean both read as "nobody has said this disc is out",
+      // which is the reading that keeps reminding rather than the
+      // one that goes quiet.
+      isLoadedDismissed: value.isLoadedDismissed === true,
       updatedAtMs:
         typeof value.updatedAtMs === "number"
           ? value.updatedAtMs
@@ -692,6 +739,10 @@ export const adoptBayAtStartup = (input: {
     // Overridden by the matched branches below when there is a
     // finished disc to remember; an armed bay has finished nothing.
     lastFinished: null,
+    // Overridden by the matched branch below, which restores what
+    // the ledger recorded. Nothing else here has a disc for anyone
+    // to have dismissed.
+    isLoadedDismissed: false,
     updatedAtMs: input.atMs,
   }
 
@@ -749,6 +800,12 @@ export const adoptBayAtStartup = (input: {
       // reads still recognises it coming back — the in-memory
       // ledger this was read from is a frozen startup snapshot.
       lastFinished: input.record,
+      // Restored with the disc, because a deploy is exactly when
+      // this gets lost: the operator dismisses the reminder, an
+      // image lands ten minutes later, and a bay adopted with a
+      // still-reported disc would start reminding him about the
+      // disc he already took out.
+      isLoadedDismissed: input.record.isLoadedDismissed,
     }
   }
 
@@ -789,6 +846,7 @@ export const adoptBayAtStartup = (input: {
       destinationPath: null,
       jobUuid: null,
       outcome,
+      isLoadedDismissed: false,
       updatedAtMs: input.atMs,
     },
   }

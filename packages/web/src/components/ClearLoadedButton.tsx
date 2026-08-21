@@ -33,9 +33,25 @@ import { useTrayCommand } from "../hooks/useTrayCommand"
  * forgotten — and `useTrayCommand` refetches it, so the count
  * drops to zero and the whole banner (this button with it)
  * unmounts. **The reminder vanishing IS the confirmation.** The
- * only state worth rendering is the one where that did NOT happen:
- * the endpoint was unreachable, the banner is still here, and the
- * press needs to say why rather than look ignored.
+ * only states worth rendering are the ones where that did NOT
+ * happen, and there are two of them.
+ *
+ * ## Why the daemon's own answer is rendered too
+ *
+ * The second of those states, and it is the one that cost the
+ * owner an evening: the endpoint answered, `clear_loaded`
+ * forgot nothing, and this component threw the sentence away. So
+ * the banner stayed, the button looked dead, and he pressed it
+ * "a number of times" (2026-08-20) with the daemon patiently
+ * replying *"Nothing was loaded, so there was no reminder to
+ * clear"* into a variable nobody rendered.
+ *
+ * The daemon's bug is fixed — a present bay's disc can be
+ * dismissed now — but the silence was its own defect, and it is
+ * what made a wrong answer indistinguishable from a broken
+ * button. Being still mounted IS the test: a press that cleared
+ * anything takes this component down with the banner, so anything
+ * rendered here is by definition an answer that changed nothing.
  *
  * ## Why it rides `useTrayCommand`
  *
@@ -46,7 +62,8 @@ import { useTrayCommand } from "../hooks/useTrayCommand"
  * swallowed. `isBulkPending` guards the double-press.
  */
 export function ClearLoadedButton() {
-  const { run, isBulkPending, lastError } = useTrayCommand()
+  const { run, isBulkPending, lastError, lastReport } =
+    useTrayCommand()
 
   return (
     <div className="flex flex-col items-end gap-1">
@@ -66,6 +83,12 @@ export function ClearLoadedButton() {
       {lastError !== null && (
         <div className="rounded-md border border-intent-danger-border bg-intent-danger-surface px-2 py-1 text-sm text-intent-danger-content">
           could not clear the reminder: {lastError}
+        </div>
+      )}
+
+      {lastError === null && lastReport !== null && (
+        <div className="rounded-md border border-border-subtle bg-surface-raised px-2 py-1 text-sm text-content-secondary">
+          {lastReport.message}
         </div>
       )}
     </div>

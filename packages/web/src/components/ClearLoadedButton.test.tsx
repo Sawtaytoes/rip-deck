@@ -14,10 +14,11 @@ import { ClearLoadedButton } from "./ClearLoadedButton"
  *
  * ⚠️ What this pins is that the press is a plain `clear_loaded` the
  * daemon owns — never a decision this component makes about which
- * discs to forget — and that when the daemon cannot be reached, the
- * failure is SHOWN rather than swallowed. Success needs no
- * assertion here: a clear that lands makes the whole banner unmount,
- * which is the confirmation, and is `HostSection`'s to render.
+ * discs to forget — and that a press which changes nothing SAYS so,
+ * whether the endpoint was unreachable or the daemon simply
+ * answered "nothing to clear". Success needs no assertion here: a
+ * clear that lands makes the whole banner unmount, which is the
+ * confirmation, and is `HostSection`'s to render.
  */
 
 describe("ClearLoadedButton", () => {
@@ -45,6 +46,39 @@ describe("ClearLoadedButton", () => {
         driveId: undefined,
         name: undefined,
       })
+    })
+  })
+
+  it("⚠️ shows the daemon's answer when nothing was cleared", async () => {
+    // The silence that made a wrong answer look like a broken
+    // button: the daemon replied "nothing to clear", the banner
+    // stayed put, and this component rendered none of it — so the
+    // owner pressed it again, and again (2026-08-20).
+    renderWithProviders(
+      <ClearLoadedButton />,
+      createStubDataSource({
+        runTrayCommand: () =>
+          Promise.resolve(
+            buildTrayCommandReport({
+              command: "clear_loaded",
+              message:
+                "Nothing was loaded, so there was no " +
+                "reminder to clear.",
+            }),
+          ),
+      }),
+    )
+
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "🗑 Mark as taken out",
+      }),
+    )
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/no reminder to clear/),
+      ).toBeInTheDocument()
     })
   })
 
