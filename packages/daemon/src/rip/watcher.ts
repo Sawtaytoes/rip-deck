@@ -855,7 +855,25 @@ export const applyBayDecision = (input: {
   }
 }
 
-/** The ripper child actually started. `starting` -> `ripping`. */
+/**
+ * The ripper child actually started. `starting` -> `ripping`.
+ *
+ * ⚠️ **This is also the one moment the drawer's position can be
+ * known rather than remembered.** A drive cannot read a disc with
+ * its drawer out, so a bay that has started ripping is shut - and
+ * that is independent of `lastTrayCommand`, which is written only
+ * when rip-deck itself moved a tray and is otherwise blind.
+ *
+ * Without this the normal way to load a disc poisons the memory
+ * permanently: press ▲, put the disc in, push the drawer shut by
+ * hand. Nothing tells rip-deck the drawer moved, so
+ * `lastTrayCommand` reads `open_bay` through the whole rip and
+ * after it. `open_trays` folds exactly that field to decide
+ * whether every finished bay is already open, so one stale
+ * `open_bay` makes the fold say yes, collapses the escalation
+ * straight to `"all"`, and opens all nine drawers on the FIRST
+ * press instead of the finished one.
+ */
 export const applyRipStarted = (input: {
   bay: BayState
   atMs: number
@@ -864,6 +882,7 @@ export const applyRipStarted = (input: {
     ? {
         ...input.bay,
         phase: "ripping",
+        lastTrayCommand: "close_bay",
         updatedAtMs: input.atMs,
       }
     : input.bay
