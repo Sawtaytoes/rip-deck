@@ -601,7 +601,22 @@ const flush = async (): Promise<void> => {
 }
 
 /** A `runBayRip` whose every call is resolved by the test. */
-const controllableRipper = () => {
+const controllableRipper = (
+  options: {
+    /**
+     * Report `onRipStarted`, moving the bay `starting` ->
+     * `ripping` the way a real ripper does the instant its child
+     * begins reading.
+     *
+     * Opt-in rather than the default only because the existing
+     * suite pins the `starting` phase in six places; a rip on the
+     * real tower is in `starting` for an instant at most. Turn it
+     * on for anything that cares what a bay looks like AFTER it
+     * has genuinely ripped.
+     */
+    reportsRipStarted?: boolean
+  } = {},
+) => {
   const started: BayRipInput[] = []
   const resolvers = new Map<
     string,
@@ -612,6 +627,8 @@ const controllableRipper = () => {
     input: BayRipInput,
   ): Promise<BayOutcome> => {
     started.push(input)
+
+    if (options.reportsRipStarted) input.onRipStarted?.()
 
     return await new Promise<BayOutcome>((resolve) => {
       resolvers.set(input.driveId, resolve)
@@ -2186,6 +2203,91 @@ describe("startWatcher tray commands", () => {
       second.bays.find((b) => b.drive_id === SLOT_8)
         ?.result,
     ).toBe("opened_not_ripped")
+
+    await watcher.stop()
+  })
+
+  it("opens only the finished bay when the drawer memory says open but the disc ripped", async () => {
+    // The regression, measured on the live tower 2026-08-20:
+    // "Opened 9 drives" on the FIRST press, with a single finished
+    // disc in the rack and eight empty bays.
+    //
+    // `lastTrayCommand` is the only drawer knowledge there is, and
+    // it is written ONLY when rip-deck itself moves a tray - never
+    // when the operator pushes one shut by hand, which is how a
+    // disc gets loaded after pressing ▲. So a bay can carry
+    // `open_bay` into a rip and out the far side of it.
+    //
+    // `open_trays` folds that field to ask "is every finished bay
+    // already open?". Against the stale value it answered yes,
+    // widened the scope to `"all"`, and opened every empty drawer
+    // too. The tower proved the mechanism the other way round the
+    // same night: with the same bay's memory reading `close_bay`,
+    // the identical press opened slot 2 alone and skipped the
+    // other eight.
+    //
+    // `applyRipStarted` now records `close_bay`, because a drive
+    // cannot read a disc with its drawer hanging out.
+    const ripper = controllableRipper({
+      reportsRipStarted: true,
+    })
+    const tray = trayRecorder()
+    const SLOT_8 = "2-1.1.2.4.4.3"
+
+    const watcher = startWatcher(
+      {
+        config: noopConfig,
+        governor: createGovernor({ maxConcurrentRips: 9 }),
+      },
+      watcherDeps({
+        probeDrives: async () => [
+          probedDrive({
+            driveId: SLOT_9,
+            kernelName: "sr0",
+            sizeSectors: BLURAY_SECTORS,
+          }),
+          probedDrive({
+            driveId: SLOT_8,
+            kernelName: "sr1",
+            sizeSectors: EMPTY_TRAY_SECTORS,
+          }),
+        ],
+        runBayRip: ripper.runBayRip,
+        runTray: tray.runTray,
+        // The drawer rip-deck last opened, remembered across the
+        // disc going in. This is the state the live tower was in.
+        readLedger: async () => ({
+          version: BAY_LEDGER_VERSION,
+          hasPriorState: true,
+          records: [],
+          trayCommands: [
+            {
+              driveId: SLOT_9,
+              lastTrayCommand: "open_bay" as const,
+              updatedAtMs: 1,
+            },
+          ],
+        }),
+      }),
+    )
+
+    await watcher.tickNow()
+    ripper.finish(SLOT_9)
+    await flush()
+
+    tray.moved.length = 0
+
+    const first = await watcher.runTrayCommand({
+      request: { kind: "open_trays" },
+    })
+
+    // Only the finished bay. Slot 8 is empty and stays shut.
+    expect(tray.moved).toEqual([
+      { action: "open", devPath: "/dev/sr0" },
+    ])
+    expect(
+      first.bays.find((b) => b.drive_id === SLOT_8)?.result,
+    ).toBe("skipped_not_finished")
 
     await watcher.stop()
   })
