@@ -5,7 +5,10 @@ Date: 2026-08-14
 Type: naming / branding
 Supersedes: the "Prose / display / UI = `Rip Deck` (two words, title-cased)" row
 of [2026-07-28-rename-to-rip-deck.md](2026-07-28-rename-to-rip-deck.md)
-Superseded by: —
+Superseded by: the workspace record
+`agentic/docs/decisions/2026-08-23-display-names-are-spaced-words-the-hyphen-belongs-to-the-slug.md`
+— the display name is **Rip Deck**, with no hyphen. This file's rule is dead;
+its identifier list still stands.
 
 ## Decision
 

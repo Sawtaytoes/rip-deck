@@ -195,7 +195,7 @@ describe("spoken_message — what the speakers say", () => {
 
     expect(payload.result).toBe("fail")
     expect(payload.spoken_message).toBe(
-      "Slot 9 needs attention. Rip-Deck did not rip that disc.",
+      "Slot 9 needs attention. Rip Deck did not rip that disc.",
     )
   })
 
@@ -267,7 +267,7 @@ describe("spoken_message — what the speakers say", () => {
     })
 
     expect(payload.spoken_message).toBe(
-      "A disc needs attention. Rip-Deck did not rip it.",
+      "A disc needs attention. Rip Deck did not rip it.",
     )
     expect(payload.spoken_message).not.toContain("2-1.3")
   })

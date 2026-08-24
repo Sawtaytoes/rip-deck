@@ -67,8 +67,8 @@ describe("buildDiscoveryMessages", () => {
     for (const message of messages) {
       expect(message.payload.device).toEqual({
         identifiers: ["rip-deck_tower"],
-        name: "Rip-Deck",
-        manufacturer: "Rip-Deck",
+        name: "Rip Deck",
+        manufacturer: "Rip Deck",
         model: "USB Blu-ray rip tower",
       })
     }

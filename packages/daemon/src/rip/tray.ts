@@ -287,7 +287,7 @@ export const runTrayCommand = async (
       isTimedOut: false,
       exitCode: null,
       detail:
-        "this Rip-Deck image has no `eject` binary, so no tray " +
+        "this Rip Deck image has no `eject` binary, so no tray " +
         "could be moved. The Dockerfile installs it — the " +
         "image needs rebuilding and redeploying.",
     }

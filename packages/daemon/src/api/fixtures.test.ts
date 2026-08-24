@@ -176,7 +176,7 @@ describe("the fixture set", () => {
       expect(bay.is_announceable).toBe(false)
       expect(bay.alert?.evidence.join(" ")).toContain(
         "There was already a disc in this drive when " +
-          "Rip-Deck started",
+          "Rip Deck started",
       )
     }
   })
