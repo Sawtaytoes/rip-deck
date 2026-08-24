@@ -214,8 +214,8 @@ export type RipEventPayload = {
  * MQTT" is the house rule. **That reading was wrong and it
  * shipped a red box at the owner.** The rule is about
  * SERVICE-TO-SERVICE integration — don't build a bespoke HTTP
- * bridge so Home Assistant can poke Rip-Deck. Rip-Deck's own
- * dashboard calling Rip-Deck's own daemon, same origin, same port
+ * bridge so Home Assistant can poke Rip Deck. Rip Deck's own
+ * dashboard calling Rip Deck's own daemon, same origin, same port
  * that already serves `/json`, is one application talking to its
  * own backend; nothing else in the house gains a dependency.
  * (`docs/HANDOFF-stage7-ui-and-naming.md` §2.)

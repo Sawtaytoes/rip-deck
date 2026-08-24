@@ -67,7 +67,7 @@ const noop = () => {
 }
 
 const meta = {
-  title: "Rip-Deck/RipCard",
+  title: "Rip Deck/RipCard",
   component: RipCard,
   parameters: { layout: "padded" },
   // Two things the app gives this card that a bare render does not:

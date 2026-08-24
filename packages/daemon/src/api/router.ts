@@ -64,7 +64,7 @@ import {
  *
  * The house rule is *"services talk to each other over MQTT — not
  * new REST/shell bridges"*, and it governs service-to-service
- * integration. Rip-Deck's own dashboard calling Rip-Deck's own
+ * integration. Rip Deck's own dashboard calling Rip Deck's own
  * daemon is one application talking to its own backend on the
  * same origin. The reasoning, and the refusal it replaces, is in
  * `trayEndpoint.ts`. `cmd/drive` is unchanged and still the path
@@ -129,7 +129,7 @@ const LOGS_PATHNAME = "/logs"
  * `/health` is the name, because the owner asked what the `z`
  * was for and there is no good answer: `/healthz` is a
  * Kubernetes/Go convention chosen to avoid colliding with real
- * routes, and Rip-Deck is not on Kubernetes.
+ * routes, and Rip Deck is not on Kubernetes.
  *
  * `/healthz` stays as an alias rather than being renamed away,
  * and it is not free to break — the Homepage tile's `siteMonitor`
@@ -289,7 +289,7 @@ const isClientRoutePathname = (
  * entirely unaffected either way, so it must not fall over.
  */
 const DASHBOARD_NOT_BUILT_BODY = (root: string): string =>
-  "The Rip-Deck dashboard is not in this build.\n\n" +
+  "The Rip Deck dashboard is not in this build.\n\n" +
   `Nothing was found at ${root}, so \`packages/web\` was ` +
   "never built here.\n\n" +
   "Fix: rebuild the container image (its Dockerfile runs\n" +
@@ -631,7 +631,7 @@ export const createApiRouter = ({
           ok: false,
           msg:
             `${pathname} is the ARM viewer's URL and rip-deck ` +
-            "does not serve it. The tray commands Rip-Deck DOES " +
+            "does not serve it. The tray commands Rip Deck DOES " +
             "serve are at POST /api/tray (open_trays, " +
             "close_trays, open_bay, close_bay), and the same " +
             "commands go over MQTT at cmd/drive.",

@@ -99,7 +99,7 @@ export function Dashboard({
 
       {isError && !data && (
         <div className="text-intent-danger-content">
-          Rip-Deck unreachable
+          Rip Deck unreachable
           {error ? `: ${error.message}` : ""}
         </div>
       )}

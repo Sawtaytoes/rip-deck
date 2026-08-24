@@ -121,8 +121,8 @@ export const buildDiscoveryClearMessages = ({
 
 const buildDeviceBlock = (config: TopicConfig) => ({
   identifiers: [config.nodeId],
-  name: "Rip-Deck",
-  manufacturer: "Rip-Deck",
+  name: "Rip Deck",
+  manufacturer: "Rip Deck",
   model: "USB Blu-ray rip tower",
 })
 

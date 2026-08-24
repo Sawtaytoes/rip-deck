@@ -9,7 +9,7 @@ import { VerdictBadge } from "./VerdictBadge"
  * `ok` story to look at.
  */
 const meta = {
-  title: "Rip-Deck/VerdictBadge",
+  title: "Rip Deck/VerdictBadge",
   component: VerdictBadge,
   parameters: { layout: "padded" },
   args: {

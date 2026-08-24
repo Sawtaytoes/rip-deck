@@ -111,7 +111,7 @@ export function useBayActions() {
         !window.confirm(
           `${bayActionLabel(action)} on ${label}? ` +
             "The partial output is kept — cleanup is your " +
-            "decision, not Rip-Deck's.",
+            "decision, not Rip Deck's.",
         )
       ) {
         return

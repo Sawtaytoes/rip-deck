@@ -162,10 +162,10 @@ export const buildRipSpokenMessage = (input: {
 
   if (job.state === "needs_attention") {
     return bay === null
-      ? "A disc needs attention. Rip-Deck did not rip it."
+      ? "A disc needs attention. Rip Deck did not rip it."
       : `${
           bay.charAt(0).toUpperCase() + bay.slice(1)
-        } needs attention. Rip-Deck did not rip that disc.`
+        } needs attention. Rip Deck did not rip that disc.`
   }
 
   if (job.state !== "completed") {

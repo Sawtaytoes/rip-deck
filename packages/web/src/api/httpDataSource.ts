@@ -182,7 +182,7 @@ export const httpDataSource: RipDeckDataSource = {
       ok: false,
       msg:
         `${action} on ${driveId} has no transport yet — ` +
-        "Rip-Deck serves no endpoint for it and `cmd/drive` " +
+        "Rip Deck serves no endpoint for it and `cmd/drive` " +
         "takes only tray commands. To stop a rip, open the " +
         "bay's tray (⏏) or restart the daemon; nothing else " +
         "reaches a running job today.",
