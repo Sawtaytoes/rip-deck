@@ -66,6 +66,25 @@ yarn typecheck
 yarn lint
 ```
 
+> **`yarn test` needs a Playwright browser, and an agent container's is the wrong one.**
+> `packages/web` runs vitest in browser mode through `@vitest/browser-playwright`. An agent
+> container ships browsers for its **own** globally-installed Playwright at a root-owned
+> `/opt/pw-browsers` and points `PLAYWRIGHT_BROWSERS_PATH` there; this repo pins its own,
+> which wants a different chromium revision, and that directory is not writable. The run
+> dies before the first test, naming a build number that is not there.
+>
+> Install this repo's build somewhere writable and point the run at it — do not change the
+> repo to match the container, and do not conclude the UI cannot be tested:
+>
+> ```sh
+> PLAYWRIGHT_BROWSERS_PATH=/tmp/pw-browsers yarn playwright install chromium-headless-shell
+> PLAYWRIGHT_BROWSERS_PATH=/tmp/pw-browsers yarn test
+> ```
+>
+> `yarn install-playwright-browser` is for CI: it passes `--with-deps`, which needs root to
+> apt-install system libraries. `--dry-run` on the install prints the exact revision without
+> downloading.
+
 `rip` is deliberately bound to **one** slot; a comma-separated list is refused.
 That is not a cap on concurrency — `rip-deck watch` rips every inserted disc, up
 to all nine at once
