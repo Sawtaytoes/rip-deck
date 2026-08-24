@@ -369,7 +369,7 @@ describe("discs held at startup", () => {
         ?.evidence ?? []
 
     expect(evidence.join(" ")).toContain(
-      "There was already a disc in this drive when Rip-Deck " +
+      "There was already a disc in this drive when Rip Deck " +
         "started",
     )
     // ⚠️ NOT "open the tray and close it again" — that advice

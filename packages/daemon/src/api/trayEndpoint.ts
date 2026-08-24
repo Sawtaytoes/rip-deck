@@ -13,8 +13,8 @@ import {
  * The house rule is *"services talk to each other over MQTT — not
  * new REST/shell bridges"*, and it is about **service-to-service**
  * integration: nobody may build a bespoke HTTP bridge so Home
- * Assistant can poke rip-deck. Rip-Deck's own dashboard calling
- * Rip-Deck's own daemon is not two services — it is one
+ * Assistant can poke rip-deck. Rip Deck's own dashboard calling
+ * Rip Deck's own daemon is not two services — it is one
  * application's UI talking to its own backend, same origin, same
  * port that already serves `/json`. No bridge exists and nothing
  * else in the house gains a dependency.

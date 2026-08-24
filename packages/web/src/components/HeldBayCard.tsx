@@ -191,7 +191,7 @@ export function HeldBayCard({
           stops this card being mistaken for a failure. Nothing
           here went wrong; rip-deck declined to act on a guess. */}
       <div className="mt-1 text-sm text-intent-warning-content">
-        Nothing failed. Rip-Deck did not rip this disc, and
+        Nothing failed. Rip Deck did not rip this disc, and
         it is waiting on you.
       </div>
 

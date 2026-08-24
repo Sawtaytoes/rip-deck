@@ -89,8 +89,8 @@ const ALL_SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
  * phrases the card must show.
  */
 const UNKNOWN_AT_STARTUP_DETAIL =
-  "There was already a disc in this drive when Rip-Deck " +
-  "started, and Rip-Deck has no bay memory at all yet — so it " +
+  "There was already a disc in this drive when Rip Deck " +
+  "started, and Rip Deck has no bay memory at all yet — so it " +
   "cannot tell a fresh disc from one the last daemon already " +
   "ripped. Refusing to rip it again on a guess: a duplicate " +
   "90 GB backup costs hours and this costs a button press. " +

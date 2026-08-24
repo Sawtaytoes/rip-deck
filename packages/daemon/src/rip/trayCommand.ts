@@ -1351,7 +1351,7 @@ export const buildTrayCommandRejection = (input: {
   // listener can do something about; the dashboard and the log
   // carry the rest.
   spoken_message:
-    "Rip-Deck could not understand that command. Nothing was " +
+    "Rip Deck could not understand that command. Nothing was " +
     "touched.",
   started_at: input.atMs,
   finished_at: input.atMs,

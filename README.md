@@ -1,4 +1,4 @@
-# Rip-Deck
+# Rip Deck
 
 A concurrent optical-disc ripper for a multi-drive USB Blu-ray/DVD/CD tower.
 One long-running daemon watches every bay, rips each inserted disc — up to all
@@ -11,7 +11,7 @@ Built to replace [Automatic Ripping Machine](https://github.com/automatic-rippin
 on a nine-drive tower. The decision records under [`docs/decisions/`](docs/decisions/)
 are the design history — why each non-obvious choice was made, in ADR form.
 
-> **Naming.** The product is **Rip-Deck**; every identifier is the hyphenated
+> **Naming.** The product is **Rip Deck**; every identifier is the hyphenated
 > lowercase `rip-deck` — the binary (`rip-deck watch`), the image, the npm
 > scope (`@rip-deck/daemon`), and the MQTT topic base (`rip-deck/<host>/…`).
 > The MQTT base is a published contract.
@@ -73,7 +73,7 @@ to all nine at once
 
 ## Running it in Docker
 
-`makemkvcon`, `cyanrip`, and `node` all live in Rip-Deck's own image
+`makemkvcon`, `cyanrip`, and `node` all live in Rip Deck's own image
 ([decision](docs/decisions/2026-07-25-rip-deck-ships-its-own-makemkv.md)), so
 the daemon and the ripper share one filesystem view.
 

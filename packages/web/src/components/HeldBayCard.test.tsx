@@ -26,7 +26,7 @@ import { HeldBayCard } from "./HeldBayCard"
 
 const DETAIL =
   "There was already a disc in this drive when rip-deck " +
-  "started, and Rip-Deck has no bay memory at all yet."
+  "started, and Rip Deck has no bay memory at all yet."
 
 const noop = () => {
   // intentionally empty
