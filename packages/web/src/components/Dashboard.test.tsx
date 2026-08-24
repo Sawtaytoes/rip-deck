@@ -287,7 +287,7 @@ describe("discs held at startup", () => {
 
     expect(
       await screen.findByText(
-        /held · 3 discs Rip-Deck would not rip without asking/,
+        /held · 3 discs Rip Deck would not rip without asking/,
       ),
     ).toBeInTheDocument()
 
@@ -352,7 +352,7 @@ describe("discs held at startup", () => {
     showFixture("held-at-startup")
 
     await screen.findByText(
-      /held · 3 discs Rip-Deck would not rip without asking/,
+      /held · 3 discs Rip Deck would not rip without asking/,
     )
 
     expect(
@@ -455,7 +455,7 @@ describe("a failing daemon", () => {
     )
 
     expect(
-      await screen.findByText(/Rip-Deck unreachable/),
+      await screen.findByText(/Rip Deck unreachable/),
     ).toBeInTheDocument()
     // An unreachable daemon is NOT an empty rack, and must
     // never borrow the empty rack's calm wording.
@@ -566,18 +566,18 @@ describe("finished rips that nothing measured", () => {
 })
 
 /**
- * §1. The product is Rip-Deck; `rip-deck` is what you type.
+ * §1. The product is Rip Deck; `rip-deck` is what you type.
  *
  * The owner read the lowercase `<h1>` and asked whether the page
  * was showing him the Docker image name.
  */
 describe("what the page calls itself", () => {
-  it("is Rip-Deck, two words, title-cased", async () => {
+  it("is Rip Deck, two words, title-cased", async () => {
     showFixture("nine-rips")
 
     expect(
       await screen.findByRole("heading", {
-        name: /Rip-Deck/,
+        name: /Rip Deck/,
       }),
     ).toBeInTheDocument()
   })
@@ -661,7 +661,7 @@ describe("the column layout", () => {
     showFixture("held-at-startup")
 
     await screen.findByText(
-      /held · 3 discs Rip-Deck would not rip without asking/,
+      /held · 3 discs Rip Deck would not rip without asking/,
     )
 
     // Held, needs-attention and recent are one page, not three.

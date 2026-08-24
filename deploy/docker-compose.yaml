@@ -1,6 +1,6 @@
-# Rip-Deck — example docker-compose deployment.
+# Rip Deck — example docker-compose deployment.
 #
-# Rip-Deck needs `device_cgroup_rules` for the optical drives: the
+# Rip Deck needs `device_cgroup_rules` for the optical drives: the
 # tower is powered independently, so a fixed device list refuses to
 # start when the tower is off. See
 # docs/decisions/2026-07-28-rip-deck-is-a-truenas-custom-compose-app.md

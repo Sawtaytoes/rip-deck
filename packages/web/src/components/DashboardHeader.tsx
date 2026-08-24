@@ -8,10 +8,9 @@ import { TrayControls } from "./TrayControls"
  * the two controls that address the whole rack rather than one
  * bay.
  *
- * **The product is Rip-Deck.** Two words, title-cased, the way
- * the Homepage tile spells it — showing the owner a bare
- * lowercase `rip-deck` here reads like a Docker image name.
- * Hyphenated `rip-deck` is still correct for every genuine
+ * **The product is Rip Deck.** Two words, no hyphen — the
+ * hyphen exists because git and HTTP need one, so it stops at
+ * the identifier. `rip-deck` stays correct for every genuine
  * identifier (the repo, `rip-deck watch`, the image, `@rip-deck/*`,
  * the MQTT topic base, HA entity ids); it is wrong for prose, and
  * this line is prose.
@@ -43,7 +42,7 @@ export function DashboardHeader({
     <header className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
       <div className="min-w-0">
         <h1 className="mb-1 text-lg font-semibold">
-          🗜️ Rip-Deck{" "}
+          🗜️ Rip Deck{" "}
           {updatedAt > 0 && (
             <small className="font-normal text-content-muted">
               · {new Date(updatedAt).toLocaleTimeString()}

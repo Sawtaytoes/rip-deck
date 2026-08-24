@@ -274,7 +274,7 @@ export function HostSection({
                 {held.length === 1
                   ? "one disc"
                   : `${held.length} discs`}{" "}
-                Rip-Deck would not rip without asking
+                Rip Deck would not rip without asking
               </div>
               <BayGrid columns={columns}>
                 {heldWithSharedDetail.map(

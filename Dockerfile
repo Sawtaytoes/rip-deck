@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# Rip-Deck — node + makemkvcon in ONE filesystem view.
+# Rip Deck — node + makemkvcon in ONE filesystem view.
 #
 # Before this image, `rip-deck` could not invoke `makemkvcon` at
 # all: makemkvcon lived only inside the previous ripper's
@@ -36,7 +36,7 @@
 #
 # ⚠️ Only the SOURCE of a `-v` must be a host path. The earlier
 # rule here — "the destination mount must be host-identical" —
-# was too wide, and it is the reason Rip-Deck mounted its rips at
+# was too wide, and it is the reason Rip Deck mounted its rips at
 # `/media/Disc-Rips` while every one of mux-magic's
 # thirteen datasets mounts under `/media/`. Precisely:
 #

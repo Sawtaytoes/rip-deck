@@ -1206,7 +1206,7 @@ describe("buildTraySpokenMessage", () => {
 
     expect(rejection.message).toContain("`open_evrything`")
     expect(rejection.spoken_message).toBe(
-      "Rip-Deck could not understand that command. Nothing " +
+      "Rip Deck could not understand that command. Nothing " +
         "was touched.",
     )
     expect(rejection.spoken_message).not.toContain("`")
