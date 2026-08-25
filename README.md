@@ -141,6 +141,28 @@ normal way it is used. Three tiers, strongest first:
 Resolution falls through the tiers, and a firmware-serial match that disagrees
 with the cached port path *repairs* the map rather than trusting the path.
 
+## Poster lookups cache somebody else's answers
+
+`packages/daemon/src/metadata/posterStore.ts` keeps OMDb results in a memory `Map` written
+through to a versioned `posters.json` (`posterCache.ts`, atomic temp-file + `rename`). The
+daemon restarts with its container and the tower keeps its discs, so without the file every
+restart re-asks OMDb about the same nine labels.
+
+`@charcuterie/server/http` (0.4.0) offers `createHttpCache` + `createThrottle` for exactly
+this shape, and the library's own throttle documentation names **this repo's five-minute
+cooldown when OMDb is unreachable** as the case `cooldownMs` exists for. The library owns the
+policy and never the store, so `posters.json` would stay as it is behind a `{ read, write }`
+adapter.
+
+> ⚠️ **`PosterStore.get` is synchronous by contract** — *"a synchronous memory read, null
+> until an answer lands"* — and `createHttpCache` is async. `buildJob` calls `get` on a hot
+> path and `createNullPosterStore` returns `get: () => null`. An adoption sits behind the
+> async request path and leaves `get` alone; putting the library under `get` breaks a typed
+> union and a test, and would make a rip wait on somebody else's server.
+
+Nothing has been adopted yet. The measured numbers from the one app that has, and the traps
+it hit, are in `agentic/docs/runbooks/charcuterie-server-http-cache-adoption.md`.
+
 ## Hardware notes that bite
 
 - A long active USB extension into a multi-port hub shows up in sysfs as a
