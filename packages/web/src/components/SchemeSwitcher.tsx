@@ -17,11 +17,14 @@ import type { ReactNode } from "react"
  * the page flashes the wrong theme for a frame.
  *
  * **The icons are inline SVG, not a new dependency.** rip-deck
- * ships no icon library (`kindIcon` is an emoji string), and the
- * fleet convention Charcuterie's own boards use is a hand-drawn
- * `<svg>` inheriting `currentColor` — so the sun/moon/monitor here
- * match that, decoration beside the `IconButton`'s real accessible
- * name rather than glyphs a screen reader is left to guess at.
+ * ships no icon library, and the fleet convention Charcuterie's
+ * own boards use is a hand-drawn `<svg>` inheriting
+ * `currentColor` — so the sun/moon/monitor here match that,
+ * decoration beside the `IconButton`'s real accessible name
+ * rather than glyphs a screen reader is left to guess at.
+ * `DiscKindLogo` is the same convention carrying real brand
+ * marks, and it names itself because it is the only place some
+ * cards say what kind of disc is in the bay.
  */
 
 const iconProps = {

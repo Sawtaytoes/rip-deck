@@ -13,7 +13,6 @@ import {
   humanDuration,
   isBayHeld,
   isVerdictActionable,
-  kindIcon,
   kindLabel,
   latestPerDrive,
   nextTrayCommandFor,
@@ -27,17 +26,17 @@ import {
 import { buildBayView, buildRip } from "./testing/buildRip"
 import type { TrayCommandReport } from "./types"
 
-describe("kindIcon / kindLabel", () => {
+describe("kindLabel", () => {
   it("keeps 4K distinct from Blu-ray", () => {
     // `armView.toArmKind` refuses to call a 4K disc a Blu-ray to
-    // win a prettier glyph, so the UI must not undo that.
+    // win a prettier glyph, so the UI must not undo that. The
+    // marks are held to the same rule in
+    // `DiscKindLogo.test.tsx`.
     expect(kindLabel("uhd")).toBe("4K")
     expect(kindLabel("bluray")).toBe("Blu-ray")
-    expect(kindIcon("uhd")).not.toBe(kindIcon("bluray"))
   })
 
   it("falls back for a kind it has never seen", () => {
-    expect(kindIcon("hd-dvd")).toBe("💿")
     expect(kindLabel("hd-dvd")).toBe("hd-dvd")
   })
 })

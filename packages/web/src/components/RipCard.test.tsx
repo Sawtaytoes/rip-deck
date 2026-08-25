@@ -43,7 +43,18 @@ describe("RipCard", () => {
 
     expect(screen.getByText("slot 7")).toBeInTheDocument()
     expect(screen.getByText("Ivanhoe")).toBeInTheDocument()
-    expect(screen.getByText("Blu-ray")).toBeInTheDocument()
+
+    // Said TWICE on a card the daemon gave a `disctype_label`:
+    // once as the `DiscKindLogo` mark's accessible name, once in
+    // the detail row. That is the deliberate trade — the mark
+    // has to name itself because `discTypeText` returns null on
+    // every bay adopted from the ledger, and on those cards it
+    // is the only place the type appears at all. A two-word
+    // repeat is cheaper than a silent mark.
+    expect(screen.getAllByText("Blu-ray")).toHaveLength(2)
+    expect(
+      screen.getByRole("img", { name: "Blu-ray" }),
+    ).toBeInTheDocument()
   })
 
   // §3: "the drives are prefixed with their slot number. Do we

@@ -235,3 +235,53 @@ export const AllStates: Story = {
     </div>
   ),
 }
+
+/**
+ * One card per disc type, so the marks can be compared side by
+ * side and checked against a colour-scheme flip in the toolbar.
+ *
+ * > *"Rip Deck uses these diamond and square emojis for the
+ * > different types of discs. Can we just add the CD/DVD/BD/UHD
+ * > BD logos next to it for the type of disc instead?"*
+ *
+ * The two that matter most are Blu-ray and 4K. They were a blue
+ * diamond and a blue square, which is the pair the daemon works
+ * hardest to keep apart (`armView.toArmKind` will not flatten a
+ * 4K disc into `bluray`) and the pair the old glyphs made look
+ * most alike. `data` is last and wears the drawn fallback: a
+ * data disc carries whichever mark its blank was pressed with,
+ * so there is no logo to be right about.
+ *
+ * ⚠️ Check this story in BOTH schemes. The CD and DVD wordmarks
+ * follow `currentColor` because that is how they are printed;
+ * a hardcoded white would vanish against the light surface.
+ */
+export const EveryDiscKind: Story = {
+  render: (args) => (
+    <div className="flex flex-col gap-3">
+      {(
+        [
+          ["music", "cd", "Audio CD", "Kind of Blue"],
+          ["dvd", "dvd", "DVD", "Ivanhoe"],
+          ["bluray", "bluray", "Blu-ray", "The Outfit"],
+          ["uhd", "uhd", "4K", "Dune Part Two"],
+          ["data", "unknown", null, "BACKUP_2019"],
+        ] as const
+      ).map(([kind, disctype, label, title], index) => (
+        <RipCard
+          {...args}
+          key={kind}
+          rip={buildRip({
+            disctype,
+            disctype_label: label,
+            drive_name: `0${index + 1} - Pioneer BDR-211M`,
+            kind,
+            label: title,
+            path: `/data/Film/Disc-Rips/${title}`,
+            slot: index + 1,
+          })}
+        />
+      ))}
+    </div>
+  ),
+}
