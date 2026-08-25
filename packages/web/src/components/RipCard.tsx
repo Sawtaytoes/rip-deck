@@ -295,16 +295,12 @@ export function RipCard({
                   therefore the HA entity id; the card stops
                   rendering it. */}
               <span className="shrink-0 rounded-md bg-surface-sunken px-1.5 py-0.5 text-sm tabular-nums text-content-muted">
-                slot {rip.slot ?? "?"}
+                Slot {rip.slot ?? "?"}
               </span>
               {/* 2. The disc — wrap, never truncate. The poster
                   and the title are what the operator is looking
                   for on a phone; `truncate` hid both. */}
               <span className="min-w-0 break-words font-semibold text-content-primary">
-                <DiscKindLogo
-                  className="mr-1.5"
-                  kind={rip.kind}
-                />
                 {title}
               </span>
             </span>
@@ -325,7 +321,46 @@ export function RipCard({
                 the row narrow and wrap its buttons instead,
                 which is what the wrap was there for. */}
             <div className="relative z-10 flex min-w-0 flex-wrap items-center gap-2">
-              <span className="tabular-nums text-content-secondary">
+              {/* 9. The disc-type mark, and it is RIGHT-aligned
+                  on purpose. (Ninth on the ranked list, beside
+                  the number rather than in front of the name.)
+
+                  It used to sit in front of the title. The four
+                  marks are four different widths — the Ultra HD
+                  wordmark is nearly 3:1, the generic disc is
+                  1:1 — so on a stack of nine cards every disc
+                  name started at a different x and the column of
+                  titles read as ragged:
+
+                  > *"I'd like to make these Rip-Deck icons look
+                  > better as they're not the same length. Why not
+                  > put them on the right side, left of the
+                  > percentage…"*
+
+                  Against the percentage the ragged edge is the
+                  LEFT one, which nothing is trying to line up,
+                  and the marks' right edges all land on the same
+                  x because the percentage below reserves a fixed
+                  column. The title now starts hard against the
+                  slot pill on every card. */}
+              <DiscKindLogo
+                className="shrink-0"
+                kind={rip.kind}
+              />
+              {/* The percentage reserves room for THREE DIGITS —
+                  `100.0%`, not the `19.0%` a card spends most of
+                  its life showing — so the mark to its left does
+                  not step sideways when a rip crosses 100%. Two
+                  digits' worth of width would have moved every
+                  mark on the page at the last moment of the rip.
+
+                  `min-w-`, not `w-`: `percentText` is not always
+                  a number. `done`, `read errors`, `in progress`
+                  and a bare failure status all come through here
+                  (`format.ripVisual`), and a fixed width would
+                  either clip them or pad the numeric case out to
+                  the width of the longest sentence. */}
+              <span className="min-w-[5.5ch] text-right tabular-nums text-content-secondary">
                 {visual.percentText}
               </span>
               {bay !== undefined && isTrayOffered(bay) && (

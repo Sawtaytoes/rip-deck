@@ -163,13 +163,21 @@ export function discLogoFor(kind: MediaKind): DiscLogo {
  * revisited. The marks are WIDER than they are tall (the Ultra
  * HD one is nearly 3:1), so width is left to the aspect ratio.
  *
- * `inline-block`, NOT a flex item. The title beside it must
- * WRAP rather than truncate — that is §2 of `RipCard`, and it
- * is there because `truncate` hid both the poster and the name
- * on a phone. Making the mark a flex sibling of the title puts
- * the whole name in one unbreakable flex item; keeping the mark
- * inline leaves the name as ordinary text that wraps. The
- * `align-[-0.35em]` seats a 1.5em mark on a 1em baseline.
+ * `inline-block` with `align-[-0.35em]`, so the mark seats on a
+ * 1em baseline wherever a caller drops it into running text.
+ *
+ * ⚠️ **It is not drawn in front of the disc name any more, and
+ * that is a correction — do not put it back.** The four marks
+ * are four different widths (Ultra HD is nearly 3:1, the
+ * generic disc is 1:1), so a stack of bay cards started each
+ * title at a different x and the column of names read as
+ * ragged. `RipCard` now renders it on the right, immediately
+ * left of the percentage, where the ragged edge is the left one
+ * and nothing is trying to line that up. The one thing the old
+ * placement got right and the new one must keep: the mark is
+ * never a flex SIBLING of the title, because that would put the
+ * whole disc name in one unbreakable flex item and §2 of
+ * `RipCard` needs the name to wrap rather than truncate.
  *
  * It carries a `<title>` rather than `aria-hidden`, and that is
  * deliberate: the disc type is NOT reliably said anywhere else
