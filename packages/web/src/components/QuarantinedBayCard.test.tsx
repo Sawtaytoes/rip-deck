@@ -56,7 +56,7 @@ describe("QuarantinedBayCard", () => {
       />,
     )
 
-    expect(screen.getByText("slot 7")).toBeInTheDocument()
+    expect(screen.getByText("Slot 7")).toBeInTheDocument()
     expect(
       screen.getByText(/Pioneer BDR-211M · out of service/),
     ).toBeInTheDocument()

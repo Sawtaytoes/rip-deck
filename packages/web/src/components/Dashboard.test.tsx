@@ -86,7 +86,7 @@ describe("nine concurrent rips", () => {
     // the drive above the disc.
     for (const slot of [1, 5, 9]) {
       expect(
-        screen.getByText(`slot ${slot}`),
+        screen.getByText(`Slot ${slot}`),
       ).toBeInTheDocument()
       expect(
         screen.getByText(`Fixture Disc ${slot}`),
@@ -177,7 +177,7 @@ describe("a hub fault across several bays", () => {
     // word. Telling those three apart is most of why this
     // dashboard exists, so the card reads the native state.
     const slotFour = (
-      await screen.findByText("slot 4")
+      await screen.findByText("Slot 4")
     ).closest("article")
 
     expect(slotFour).not.toBeNull()
@@ -293,7 +293,7 @@ describe("discs held at startup", () => {
 
     for (const slot of [7, 8, 9]) {
       expect(
-        screen.getByText(`slot ${slot}`),
+        screen.getByText(`Slot ${slot}`),
       ).toBeInTheDocument()
     }
 

@@ -73,7 +73,7 @@ export function QuarantinedBayCard({
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
         <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 font-semibold text-intent-danger-content">
           <span className="shrink-0 rounded-md bg-surface-sunken px-1.5 py-0.5 text-sm font-normal tabular-nums text-content-muted">
-            slot {bay.slot ?? "?"}
+            Slot {bay.slot ?? "?"}
           </span>
           <span className="min-w-0 break-words">
             ⚠ {model} · out of service

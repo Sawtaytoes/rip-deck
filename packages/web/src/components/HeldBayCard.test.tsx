@@ -81,7 +81,7 @@ describe("HeldBayCard", () => {
 
     // §3: the slot is a field of its own, so the registry's
     // "07 - " prefix comes off the drive. Said once.
-    expect(screen.getByText("slot 7")).toBeInTheDocument()
+    expect(screen.getByText("Slot 7")).toBeInTheDocument()
     expect(
       screen.queryByText(/07 - Pioneer/),
     ).not.toBeInTheDocument()

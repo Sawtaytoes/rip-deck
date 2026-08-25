@@ -146,7 +146,7 @@ export function HeldBayCard({
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
         <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 font-semibold text-intent-warning-content">
           <span className="shrink-0 rounded-md border border-intent-warning-border bg-surface-raised px-1.5 py-0.5 text-sm font-normal tabular-nums text-intent-warning-content">
-            slot {bay.slot ?? "?"}
+            Slot {bay.slot ?? "?"}
           </span>
           <span className="min-w-0 break-words">
             ⏸ {bay.state.title ?? model} · held — not ripped
