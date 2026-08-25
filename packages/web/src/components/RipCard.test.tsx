@@ -41,7 +41,7 @@ describe("RipCard", () => {
       />,
     )
 
-    expect(screen.getByText("slot 7")).toBeInTheDocument()
+    expect(screen.getByText("Slot 7")).toBeInTheDocument()
     expect(screen.getByText("Ivanhoe")).toBeInTheDocument()
 
     // Said TWICE on a card the daemon gave a `disctype_label`:
