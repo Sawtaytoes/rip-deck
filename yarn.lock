@@ -292,7 +292,37 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@charcuterie/logic@npm:2.0.0, @charcuterie/logic@npm:^2.0.0":
+"@charcuterie/logic@npm:2.3.0":
+  version: 2.3.0
+  resolution: "@charcuterie/logic@npm:2.3.0"
+  peerDependencies:
+    "@preact/signals-core": ">=1.8"
+    "@tanstack/react-query": ">=5"
+    jotai: ">=2"
+    openapi-fetch: ">=0.17"
+    openapi-react-query: ">=0.5"
+    preact: ">=10.11"
+    react: ">=18"
+  peerDependenciesMeta:
+    "@preact/signals-core":
+      optional: true
+    "@tanstack/react-query":
+      optional: true
+    jotai:
+      optional: true
+    openapi-fetch:
+      optional: true
+    openapi-react-query:
+      optional: true
+    preact:
+      optional: true
+    react:
+      optional: true
+  checksum: 10c0/02ed11b8df7be5a08e56970fc4d28b49f322ac2e4ca6914111208fc3a3eac6006d7f361a29b893738acc6d5761ecb2c349d82a61f6ee9679efdd4e6cc144f65a
+  languageName: node
+  linkType: hard
+
+"@charcuterie/logic@npm:^2.0.0":
   version: 2.0.0
   resolution: "@charcuterie/logic@npm:2.0.0"
   peerDependencies:
@@ -355,6 +385,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@charcuterie/tokens@npm:1.6.0":
+  version: 1.6.0
+  resolution: "@charcuterie/tokens@npm:1.6.0"
+  checksum: 10c0/1f2c6093beffde630a6ddd9c19fbe80c95eedaad6694bdeb77104ace0b6613704da64521cf376328b50466996ca5df64c2a6e2bd56429fda15f2af73cb2d4650
+  languageName: node
+  linkType: hard
+
 "@charcuterie/tsconfig@npm:^1.0.0":
   version: 1.0.0
   resolution: "@charcuterie/tsconfig@npm:1.0.0"
@@ -362,23 +399,41 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@charcuterie/ui@npm:^2.17.0":
-  version: 2.17.0
-  resolution: "@charcuterie/ui@npm:2.17.0"
+"@charcuterie/ui@npm:^3.21.0":
+  version: 3.21.0
+  resolution: "@charcuterie/ui@npm:3.21.0"
   dependencies:
-    "@charcuterie/logic": "npm:2.0.0"
-    "@charcuterie/tokens": "npm:1.5.0"
+    "@charcuterie/logic": "npm:2.3.0"
+    "@charcuterie/tokens": "npm:1.6.0"
     "@floating-ui/react": "npm:^0.27.20"
     "@tanstack/react-virtual": "npm:^3.13.12"
     tailwind-merge: "npm:^3.6.0"
   peerDependencies:
+    "@codemirror/commands": ^6
+    "@codemirror/lang-markdown": ^6
+    "@codemirror/language": ^6
+    "@codemirror/state": ^6
+    "@codemirror/view": ^6
+    "@lezer/common": ^1
     react: ">=19"
     react-dom: ">=19"
     react-router: ">=7"
   peerDependenciesMeta:
+    "@codemirror/commands":
+      optional: true
+    "@codemirror/lang-markdown":
+      optional: true
+    "@codemirror/language":
+      optional: true
+    "@codemirror/state":
+      optional: true
+    "@codemirror/view":
+      optional: true
+    "@lezer/common":
+      optional: true
     react-router:
       optional: true
-  checksum: 10c0/2fc0e713d479b02f1e99110253e8865495d322985f2cab280c2677eae2c8109192bd73d8bd9a4d1aff88fbad3402dba5d18fc460e780791722d0ba72573bd141
+  checksum: 10c0/8223473e670d3b53471448fe3620e844a5788075636841fcb812a14f9359738b132fda7e41f14cc5af1828e16ae30092d445adc47ff7617f360fbdc44a867bea
   languageName: node
   linkType: hard
 
@@ -1257,7 +1312,7 @@ __metadata:
     "@charcuterie/logic": "npm:^2.0.0"
     "@charcuterie/storybook-config": "npm:^0.2.2"
     "@charcuterie/tokens": "npm:^1.5.0"
-    "@charcuterie/ui": "npm:^2.17.0"
+    "@charcuterie/ui": "npm:^3.21.0"
     "@charcuterie/vitest-config": "npm:^1.1.0"
     "@rip-deck/contracts": "workspace:*"
     "@storybook/addon-a11y": "npm:^10.5.5"
