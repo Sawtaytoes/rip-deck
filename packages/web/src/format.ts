@@ -21,29 +21,14 @@ import type {
  * decides anything, it only chooses words and widths.
  */
 
-// Emoji glyph per media kind. Kept as text so there are no
-// icon-font or asset dependencies; unknown kinds fall back to a
-// generic disc.
-export function kindIcon(kind: MediaKind): string {
-  switch (kind) {
-    case "bluray":
-      return "🔷"
-    // `armView.toArmKind` deliberately does NOT flatten a 4K disc
-    // into `bluray` to win a prettier glyph, so this list carries
-    // the case the viewer's could not.
-    case "uhd":
-      return "🟦"
-    case "dvd":
-      return "📀"
-    case "music":
-      return "🎵"
-    case "data":
-      return "💾"
-    default:
-      return "💿"
-  }
-}
-
+/**
+ * The disc type in words.
+ *
+ * Also the accessible name of the mark `DiscKindLogo` draws —
+ * the emoji `kindIcon` that used to live above this function is
+ * gone, and the logo replaced it (see that component's header
+ * for the owner's ask and why the marks are not all one colour).
+ */
 export function kindLabel(kind: MediaKind): string {
   switch (kind) {
     case "bluray":

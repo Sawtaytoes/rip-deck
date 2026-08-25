@@ -19,7 +19,6 @@ import {
   elapsedText,
   etaText,
   etaTrendText,
-  kindIcon,
   RIP_VISUAL_INTENT,
   ripProgressLabel,
   ripVisual,
@@ -33,6 +32,7 @@ import type {
   Drive,
   Rip,
 } from "../types"
+import { DiscKindLogo } from "./DiscKindLogo"
 import { TrayToggle } from "./TrayToggle"
 import { VerdictBadge } from "./VerdictBadge"
 
@@ -301,9 +301,10 @@ export function RipCard({
                   and the title are what the operator is looking
                   for on a phone; `truncate` hid both. */}
               <span className="min-w-0 break-words font-semibold text-content-primary">
-                <span className="mr-1">
-                  {kindIcon(rip.kind)}
-                </span>
+                <DiscKindLogo
+                  className="mr-1.5"
+                  kind={rip.kind}
+                />
                 {title}
               </span>
             </span>
