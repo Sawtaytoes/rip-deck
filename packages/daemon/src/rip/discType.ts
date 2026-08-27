@@ -113,6 +113,17 @@ export type DiscTypeDecision =
        * rather than quietly dropping it.
        */
       hasDataTracks: boolean
+      /**
+       * The disc's own volume label, free of charge.
+       *
+       * Null when udev has not recorded one — an unreadable
+       * filesystem, a genuinely unlabelled disc, or the
+       * capacity-only path where there is no udev record at all.
+       * Null is "ask makemkvcon", never "this disc has no name".
+       *
+       * See `readVolumeLabel` for why this is worth having.
+       */
+      volumeLabel: string | null
     }
   /** Empty tray, or media the kernel cannot see at all. */
   | { kind: "no_media" }
@@ -221,6 +232,51 @@ export const readUdevMedia = (
 }
 
 /**
+ * The disc's volume label, from the record already in hand.
+ *
+ * This is the same string `makemkvcon info` would return, and
+ * `blkid` prints, and the disc author burned in — but it costs
+ * **no device I/O at all**, because `cdrom_id` and `blkid` ran
+ * once at insert and udev kept the answer in a plain file.
+ *
+ * ⚠️ That is the entire point, and it is not a micro-optimisation.
+ * Reading the name with `makemkvcon` had two failure modes on
+ * this rig, both hit on 2026-08-26 with eight DVDs loaded:
+ *
+ *  1. **`--noscan` does not stop the scan.** A scoped
+ *     `info dev:/dev/srN` still reports
+ *     `PRGT:5018 "Scanning CD-ROM devices"` and walks the whole
+ *     bus, so ONE wedged drive delays the identify of every
+ *     healthy bay. `backup` was already known to ignore
+ *     `--noscan` (2026-07-25); `info` does too, and the comment
+ *     in `identifyDisc.ts` claiming otherwise was wrong.
+ *  2. **It outran the 120 s timeout**, so every disc in the rack
+ *     came back nameless and asked the owner to type a title for
+ *     a disc whose label was sitting in `/run/udev/data` the
+ *     whole time.
+ *
+ * Reading the file cannot hang, cannot fail to spawn, and cannot
+ * inherit a wedged drive's SCSI timeout — the same argument
+ * `parseUdevDatabaseRecord` already makes for reading the record
+ * at all.
+ *
+ * `ID_FS_LABEL` rather than `ID_FS_VOLUME_ID`: the latter is the
+ * ISO9660 field and is capped at 32 characters, so on the tower's
+ * own discs it truncates
+ * `Teenage_Mutant_Ninja_Turtles_V7_Disc_2` to
+ * `Teenage_Mutant_Ninja_Turtles_V`. `ID_FS_LABEL` comes from UDF
+ * and carries the whole thing. Not `ID_FS_LABEL_ENC` either —
+ * that is the escaped form, for building device paths.
+ */
+export const readVolumeLabel = (
+  properties: ReadonlyMap<string, string>,
+): string | null => {
+  const label = (properties.get("ID_FS_LABEL") ?? "").trim()
+
+  return label === "" ? null : label
+}
+
+/**
  * Which family the medium belongs to.
  *
  * `cdrom_id` emits one flag per profile it matched — `_BD`,
@@ -306,6 +362,14 @@ export const decideDiscType = (input: {
       ? null
       : readUdevMedia(input.udevProperties)
 
+  // Read once, up front. Narrowing `input.udevProperties` from
+  // `media !== null` is a chain TypeScript will not follow, and
+  // the label is the same answer at every `rip` return below.
+  const volumeLabel =
+    input.udevProperties === null
+      ? null
+      : readVolumeLabel(input.udevProperties)
+
   if (media === null) {
     return decideFromCapacityAlone({
       sizeSectors: input.sizeSectors,
@@ -359,6 +423,7 @@ export const decideDiscType = (input: {
       ripper: "cyanrip",
       capacityBytes,
       hasDataTracks: media.dataTrackCount > 0,
+      volumeLabel,
     }
   }
 
@@ -395,6 +460,7 @@ export const decideDiscType = (input: {
       ripper: "makemkv",
       capacityBytes,
       hasDataTracks: media.dataTrackCount > 0,
+      volumeLabel,
     }
   }
 
@@ -441,6 +507,10 @@ const decideFromCapacityAlone = (input: {
     ripper: "makemkv",
     capacityBytes: input.capacityBytes,
     hasDataTracks: false,
+    // This branch is reached precisely BECAUSE udev had nothing
+    // to say, so there is no label to be had here. `identifyDisc`
+    // is the fallback, exactly as it was before.
+    volumeLabel: null,
   }
 }
 

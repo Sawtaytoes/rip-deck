@@ -6,6 +6,7 @@ import {
   detectDiscType,
   parseUdevDatabaseRecord,
   readUdevMedia,
+  readVolumeLabel,
 } from "./discType.ts"
 
 /**
@@ -170,6 +171,87 @@ describe("reading media facts out of udev", () => {
   })
 })
 
+describe("the disc's own volume label", () => {
+  // Every record below is copied from `/run/udev/data/b11:N` on
+  // the live tower, 2026-08-26, with eight TMNT DVDs loaded.
+
+  it("reads the label udev already recorded", () => {
+    expect(
+      readVolumeLabel(
+        udev({
+          ID_FS_LABEL:
+            "Teenage_Mutant_Ninja_Turtles_V7_Disc_2",
+        }),
+      ),
+    ).toBe("Teenage_Mutant_Ninja_Turtles_V7_Disc_2")
+  })
+
+  it("⚠️ prefers ID_FS_LABEL over the TRUNCATED ID_FS_VOLUME_ID", () => {
+    // `ID_FS_VOLUME_ID` is the ISO9660 field and is capped at 32
+    // characters. On this very disc it truncates the name to
+    // `Teenage_Mutant_Ninja_Turtles_V`, losing the disc number —
+    // which is the one part that distinguishes it from Disc 1.
+    // `ID_FS_LABEL` comes from UDF and carries the whole string.
+    const record = udev({
+      ID_FS_VOLUME_ID: "Teenage_Mutant_Ninja_Turtles_V",
+      ID_FS_LABEL: "Teenage_Mutant_Ninja_Turtles_V7_Disc_2",
+    })
+
+    expect(readVolumeLabel(record)).toBe(
+      "Teenage_Mutant_Ninja_Turtles_V7_Disc_2",
+    )
+  })
+
+  it("says null when udev recorded no label", () => {
+    // Not "this disc has no name" — "ask makemkvcon". The
+    // caller's fallback depends on that distinction.
+    expect(readVolumeLabel(emptyDrive)).toBeNull()
+  })
+
+  it("treats an empty or blank label as no label", () => {
+    expect(
+      readVolumeLabel(udev({ ID_FS_LABEL: "" })),
+    ).toBeNull()
+    expect(
+      readVolumeLabel(udev({ ID_FS_LABEL: "   " })),
+    ).toBeNull()
+  })
+
+  it("carries the label onto a DVD routed to makemkv", () => {
+    const decision = decideDiscType({
+      sizeSectors: SECTORS.dvd,
+      udevProperties: udev({
+        ID_CDROM: "1",
+        ID_CDROM_MEDIA: "1",
+        ID_CDROM_MEDIA_DVD: "1",
+        ID_CDROM_MEDIA_STATE: "complete",
+        ID_CDROM_MEDIA_TRACK_COUNT_DATA: "1",
+        ID_FS_LABEL: "TEENAGE_MUTANT_NINJA_TURTLES",
+      }),
+    })
+
+    expect(decision.kind).toBe("rip")
+    expect(
+      decision.kind === "rip" ? decision.volumeLabel : null,
+    ).toBe("TEENAGE_MUTANT_NINJA_TURTLES")
+  })
+
+  it("has no label on the capacity-only path, and says so", () => {
+    // udev unreadable — the `/run/udev` mount missing, say. The
+    // disc still routes, and `identifyDisc` is still the
+    // fallback, exactly as before this shortcut existed.
+    const decision = decideDiscType({
+      sizeSectors: SECTORS.bluray,
+      udevProperties: null,
+    })
+
+    expect(decision.kind).toBe("rip")
+    expect(
+      decision.kind === "rip" ? decision.volumeLabel : null,
+    ).toBeNull()
+  })
+})
+
 describe("the disc-type fork", () => {
   it("routes an audio CD to cyanrip", () => {
     // The owner's request, and requirement A3: CD uses cyanrip.
@@ -184,6 +266,10 @@ describe("the disc-type fork", () => {
       ripper: "cyanrip",
       capacityBytes: SECTORS.audioCd * 512,
       hasDataTracks: false,
+      // No `ID_FS_LABEL` on an audio CD — it has no filesystem.
+      // Harmless: an album names itself from AccurateRip/CDDB,
+      // never from a volume label.
+      volumeLabel: null,
     })
   })
 
