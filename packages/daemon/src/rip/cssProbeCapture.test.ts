@@ -29,9 +29,10 @@ import {
  * `PRGV:` lines in between prove nothing this file needs, so the
  * middle is dropped and the ends are byte-for-byte.
  *
- * The job uuid in `MSG:5072` is rewritten to a nil-ish one. It
- * is the only value in the capture that identifies a particular
- * run, and nothing here reads it.
+ * The job uuid in `MSG:5072` is rewritten to a nil-ish one and
+ * the drive's firmware serial to `EXAMPLE00001`, matching the
+ * redaction the Blu-ray fixture beside it already carries.
+ * Nothing here reads either.
  */
 
 const capture = readFileSync(

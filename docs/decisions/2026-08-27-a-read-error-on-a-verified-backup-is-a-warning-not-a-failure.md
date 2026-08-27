@@ -61,7 +61,10 @@ started:
 ```
 MSG:2003,0,3,"Error 'Scsi error - ILLEGAL REQUEST:READ OF SCRAMBLED SECTOR
 WITHOUT AUTHENTICATION' occurred while reading 'BD-RE ASUS BW-16D1HT 3.02
-KL7M29G4410' at offset '1048576'", …
+EXAMPLE00001' at offset '1048576'", …
+
+(The drive's firmware serial is redacted here and in the fixture, the same
+way the Blu-ray capture beside it already is.)
 ```
 
 That is MakeMKV probing a CSS-protected DVD before `mmgplsrv` supplies the
