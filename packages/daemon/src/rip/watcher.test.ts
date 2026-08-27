@@ -666,6 +666,7 @@ const watcherDeps = (input: {
   runBayRip: WatcherDeps["runBayRip"]
   readLedger?: WatcherDeps["readLedger"]
   writeLedger?: WatcherDeps["writeLedger"]
+  appendHistory?: WatcherDeps["appendHistory"]
   runTray?: WatcherDeps["runTray"]
 }): WatcherDeps => ({
   probeDrives: input.probeDrives,
@@ -688,6 +689,7 @@ const watcherDeps = (input: {
       hasPriorState: true,
     })),
   writeLedger: input.writeLedger ?? (async () => {}),
+  appendHistory: input.appendHistory ?? (async () => {}),
   runTray:
     input.runTray ??
     (async () => ({

@@ -640,6 +640,94 @@ export type Leftover = {
   is_safe_to_delete: boolean
 }
 
+/**
+ * One finished rip, as `GET /api/history` reports it.
+ *
+ * Mirrors the daemon's `HistoryRipView` — see
+ * `api/historyEndpoint.ts` for what each field is joined from,
+ * and `rip/ripHistory.ts` for why the log holds so little of it.
+ *
+ * ⚠️ **This is a rip that is OVER.** There is no progress, no
+ * ETA and no throughput-right-now, and none of the live `Rip`
+ * fields apply. It is a separate type rather than a partial
+ * `Rip` on purpose: a card that renders both would spend its
+ * whole body asking which one it has.
+ */
+export type HistoryRip = {
+  job_uuid: string
+  drive_id: string
+  slot: number | null
+  /** The bay's house label, or the raw drive id when unmapped. */
+  bay_name: string
+  disc_name: string | null
+  /**
+   * A name was RECORDED for this rip.
+   *
+   * ⚠️ Not the same question as `disc_name !== null`, and the
+   * card renders the two differently. FALSE means the row was
+   * rebuilt from measurements that never held a name — nothing
+   * wrote one down and nothing can recover it. TRUE with a null
+   * name means rip-deck was there and could not identify the
+   * disc, which is a fact about the DISC.
+   */
+  is_named: boolean
+  disctype: DiscType | null
+  destination_path: string | null
+  size_bytes: number | null
+  started_at_ms: number | null
+  finished_at_ms: number
+  duration_ms: number | null
+  outcome_kind:
+    | "completed"
+    | "failed"
+    | "needs_attention"
+    | "no_media"
+  /** rip-deck's own sentence. Rendered, never rewritten. */
+  outcome_detail: string
+  is_successful: boolean
+  failure_reason: string | null
+  verdict: VerdictKind
+  verdict_message: string | null
+  /** Non-zero blocks success. Never render this as healthy. */
+  read_error_count: number | null
+  throughput_bytes_per_sec: number | null
+  /** A capture exists, so the Logs button has a target. */
+  has_log: boolean
+  /** `backfill` rows predate the history log. See `is_named`. */
+  source: "live" | "backfill"
+}
+
+/** One page of `GET /api/history`. */
+export type HistoryPage = {
+  /** Rows matching the filters, BEFORE the page was sliced. */
+  total: number
+  /**
+   * Rows in the whole log.
+   *
+   * So an empty list can be read as "your filter found nothing"
+   * rather than "this tower has no history" — two states that
+   * look identical without it, and only one of which is worth
+   * clearing a filter over.
+   */
+  total_unfiltered: number
+  offset: number
+  limit: number
+  /** Newest first. */
+  rips: HistoryRip[]
+  /** The whole log's span, so a date picker can bound itself. */
+  oldest_at_ms: number | null
+  newest_at_ms: number | null
+}
+
+/** What the page may narrow the list to. */
+export type HistoryFilters = {
+  /** Epoch ms. The page converts a local date; see `useHistory`. */
+  fromMs: number | null
+  toMs: number | null
+  search: string
+  outcome: "all" | "completed" | "failed"
+}
+
 export type LeftoverDeleteResult = {
   ok: boolean
   msg: string
@@ -707,4 +795,17 @@ export type RipDeckDataSource = {
   deleteLeftover: (input: {
     path: string
   }) => Promise<LeftoverDeleteResult>
+  /**
+   * One page of every rip this tower has finished.
+   *
+   * NOT on `/json`, and not on a poll either. It reads a log off
+   * disk and joins two small files per row it returns, and a
+   * finished rip does not change — so it is fetched when the page
+   * asks and again when a filter moves, never on a timer.
+   */
+  fetchHistory: (input: {
+    filters: HistoryFilters
+    limit: number
+    offset: number
+  }) => Promise<HistoryPage>
 }

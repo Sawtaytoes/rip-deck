@@ -1185,6 +1185,7 @@ describe("the watcher, feeding the store", () => {
         },
         readLedger: async () => heldLedger,
         writeLedger: async () => {},
+        appendHistory: async () => {},
         runTray: async () => ({
           isSuccessful: true,
           isCommandMissing: false,

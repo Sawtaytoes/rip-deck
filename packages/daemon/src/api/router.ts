@@ -4,6 +4,7 @@ import {
   FIXTURE_NAMES,
   isFixtureName,
 } from "./fixtures.ts"
+import { handleHistoryList } from "./historyEndpoint.ts"
 import { buildJsonDocument } from "./jsonDocument.ts"
 import {
   handleLeftoversDelete,
@@ -127,6 +128,16 @@ const TRAY_PATHNAME = "/api/tray"
  */
 const LEFTOVERS_PATHNAME = "/api/leftovers"
 
+/**
+ * Every rip this tower has finished, filterable by date.
+ *
+ * On its own path for the same reason `/api/leftovers` is: it
+ * reads a log off disk and then joins two small files per row it
+ * returns, and `/json` is a synchronous memory read that a
+ * browser polls every five seconds. See `historyEndpoint.ts`.
+ */
+const HISTORY_PATHNAME = "/api/history"
+
 /** The tower snapshot the dashboard polls. */
 const JSON_PATHNAME = "/json"
 
@@ -198,6 +209,7 @@ export const SERVER_PATHNAMES = [
   LOGS_PATHNAME,
   TRAY_PATHNAME,
   LEFTOVERS_PATHNAME,
+  HISTORY_PATHNAME,
   ...HEALTH_PATHNAMES,
   ...UNIMPLEMENTED_ACTION_PATHS,
 ]
@@ -518,7 +530,9 @@ export const createApiRouter = ({
   // router with no new argument and gets the honest answer.
   readTrayRunner = () => null,
   readLogCapture = null,
+  readLogExists = null,
   destinationRoot = null,
+  historyStateDir = null,
 }: {
   readSnapshot: () => TowerSnapshot
   readNowMs?: () => number
@@ -536,6 +550,18 @@ export const createApiRouter = ({
   readTrayRunner?: () => TrayCommandRunner | null
   readLogCapture?: LogCaptureReader | null
   /**
+   * Does a capture exist for this job? See `logCapture.ts`.
+   *
+   * Separate from `readLogCapture` because the question is
+   * different: `/logs` reads a tail, and `/api/history` only asks
+   * whether a row's Logs button has anything behind it. Null
+   * means this process serves no captures, and every history row
+   * then reports `has_log: false` — which is exactly true of it.
+   */
+  readLogExists?:
+    | ((jobUuid: string) => Promise<boolean>)
+    | null
+  /**
    * Where finished rips land, so leftovers can be found in it.
    *
    * Null means this process was not told — a fixture server, or
@@ -545,6 +571,16 @@ export const createApiRouter = ({
    * directory nobody named.
    */
   destinationRoot?: string | null
+  /**
+   * Where `history.jsonl` and the per-job files live.
+   *
+   * Null means this process was not told, and `/api/history`
+   * then answers 503 rather than reading a directory nobody
+   * named — the same shape `destinationRoot` uses one field up,
+   * and for the same reason: a fixture server and an API brought
+   * up without `rip-deck watch` are both real states.
+   */
+  historyStateDir?: string | null
 }): ApiRouter => ({
   handle: ({ method, url, readBody }) => {
     // A relative URL needs a base; the host is irrelevant to
@@ -679,6 +715,24 @@ export const createApiRouter = ({
         status: 405,
         payload: { ok: false, msg: "GET or POST only" },
       })
+    }
+
+    // Async, and below every synchronous path for the same
+    // reason the two above it are: it reads a log off disk and
+    // joins a file pair per row.
+    if (pathname === HISTORY_PATHNAME) {
+      if (method !== "GET" && method !== "HEAD") {
+        return jsonResponse({
+          status: 405,
+          payload: { ok: false, msg: "GET only" },
+        })
+      }
+
+      return handleHistoryList({
+        stateDir: historyStateDir,
+        params: parsed.searchParams,
+        readLogExists,
+      }).then(jsonResponse)
     }
 
     if (pathname === LOGS_PATHNAME) {

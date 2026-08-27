@@ -3,6 +3,7 @@ import {
   render,
 } from "@testing-library/react"
 import type { ReactElement } from "react"
+import { MemoryRouter } from "react-router"
 
 import {
   AppProviders,
@@ -25,10 +26,12 @@ export const renderWithProviders = (
   dataSource: RipDeckDataSource,
 ): RenderResult =>
   render(
-    <AppProviders
-      queryClient={createQueryClient()}
-      dataSource={dataSource}
-    >
-      {ui}
-    </AppProviders>,
+    <MemoryRouter>
+      <AppProviders
+        queryClient={createQueryClient()}
+        dataSource={dataSource}
+      >
+        {ui}
+      </AppProviders>
+    </MemoryRouter>,
   )
