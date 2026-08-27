@@ -7,6 +7,9 @@ Refines: [A DVD backup is one ISO file, not a directory](2026-08-26-a-dvd-backup
 — that decision put the collision marker BEFORE the extension. This one is
 what happens when a person then has to resolve that collision by hand, and it
 fixes the `classifyLeftover` test that decision's shape had already broken.
+Refined by: [A leftover control refuses a live rip](2026-08-27-a-leftover-control-refuses-a-live-rip.md)
+— the four source rules this decision shared did not include the one that
+matters most, so Rename inherited Delete's blindness to a rip in progress.
 
 ## Decision
 

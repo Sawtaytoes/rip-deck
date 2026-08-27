@@ -3,8 +3,13 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterAll, describe, expect, it } from "vitest"
 import {
+  type LiveRips,
+  NO_LIVE_RIPS,
+} from "../rip/liveRips.ts"
+import {
   handleLeftoversDelete,
   handleLeftoversList,
+  handleLeftoversRename,
   handleLeftoversWrite,
   parseDeleteBody,
   parseRenameBody,
@@ -82,6 +87,7 @@ describe("listing and clearing over HTTP", () => {
     })
 
     const listed = await handleLeftoversList({
+      readLiveRips: async () => NO_LIVE_RIPS,
       destinationRoot: tmpRoot,
     })
     expect(listed.status).toBe(200)
@@ -92,6 +98,7 @@ describe("listing and clearing over HTTP", () => {
     ).toEqual([".rip-deck-incomplete-http-1"])
 
     const deleted = await handleLeftoversDelete({
+      readLiveRips: async () => NO_LIVE_RIPS,
       destinationRoot: tmpRoot,
       body: JSON.stringify({
         command: "delete",
@@ -110,10 +117,123 @@ describe("listing and clearing over HTTP", () => {
     ).toEqual([])
   })
 
+  /**
+   * ⚠️ **The live-rip guard, seen from HTTP.**
+   *
+   * The list and the two verbs all take the SAME `readLiveRips`,
+   * so a row the panel shows as locked is a row the endpoint
+   * refuses, and neither can drift from the other.
+   */
+  it("⚠️ locks a folder a live rip is writing into", async () => {
+    const jobUuid = "4d37d72e-7f72-4cee-a82b-7af82c10bfd3"
+    const name = `.rip-deck-incomplete-${jobUuid}`
+    await mkdir(join(tmpRoot, name), { recursive: true })
+
+    const readLiveRips = async (): Promise<LiveRips> => ({
+      isKnown: true,
+      jobUuids: new Set([jobUuid]),
+    })
+
+    const listed = await handleLeftoversList({
+      destinationRoot: tmpRoot,
+      readLiveRips,
+    })
+
+    const row =
+      "leftovers" in listed.payload
+        ? listed.payload.leftovers.find(
+            (one) => one.name === name,
+          )
+        : undefined
+
+    expect(row?.is_locked).toBe(true)
+    expect(row?.is_safe_to_delete).toBe(false)
+    expect(row?.lock_reason).toContain(jobUuid)
+
+    const refusedDelete = await handleLeftoversDelete({
+      body: JSON.stringify({
+        command: "delete",
+        path: join(tmpRoot, name),
+      }),
+      destinationRoot: tmpRoot,
+      readLiveRips,
+    })
+
+    expect(refusedDelete.status).toBe(400)
+    expect(refusedDelete.payload.ok).toBe(false)
+    // Still listed, because nothing was removed.
+    expect(
+      "leftovers" in refusedDelete.payload
+        ? refusedDelete.payload.leftovers.map(
+            (one) => one.name,
+          )
+        : [],
+    ).toContain(name)
+
+    const refusedRename = await handleLeftoversRename({
+      body: JSON.stringify({
+        command: "rename",
+        new_name: "[BACKUP] Not While It Runs",
+        path: join(tmpRoot, name),
+      }),
+      destinationRoot: tmpRoot,
+      readLiveRips,
+    })
+
+    expect(refusedRename.status).toBe(400)
+    expect(
+      "msg" in refusedRename.payload
+        ? refusedRename.payload.msg
+        : "",
+    ).toContain("writing into this folder")
+
+    await rm(join(tmpRoot, name), {
+      recursive: true,
+      force: true,
+    })
+  })
+
+  it("⚠️ refuses when this process cannot see the rips", async () => {
+    // A router built with no `readLiveRips` is on the UNKNOWN
+    // default, and unknown fails closed. Better a refusal for
+    // the second or two before the watcher is up than a delete
+    // during it.
+    await mkdir(
+      join(tmpRoot, ".rip-deck-incomplete-unknown-1"),
+      { recursive: true },
+    )
+
+    const refused = await handleLeftoversDelete({
+      body: JSON.stringify({
+        command: "delete",
+        path: join(
+          tmpRoot,
+          ".rip-deck-incomplete-unknown-1",
+        ),
+      }),
+      destinationRoot: tmpRoot,
+      readLiveRips: async () => ({
+        isKnown: false,
+        reason: "this API process was not told",
+      }),
+    })
+
+    expect(refused.status).toBe(400)
+    expect(
+      "msg" in refused.payload ? refused.payload.msg : "",
+    ).toContain("cannot tell which rips")
+
+    await rm(
+      join(tmpRoot, ".rip-deck-incomplete-unknown-1"),
+      { recursive: true, force: true },
+    )
+  })
+
   it("⚠️ answers 400 rather than deleting a finished rip", async () => {
     // The request was understood and answered. It is not a
     // server fault, and it must not be a success either.
     const refused = await handleLeftoversDelete({
+      readLiveRips: async () => NO_LIVE_RIPS,
       destinationRoot: tmpRoot,
       body: JSON.stringify({
         command: "delete",
@@ -241,6 +361,7 @@ describe("renaming over HTTP", () => {
     )
 
     const renamed = await handleLeftoversWrite({
+      readLiveRips: async () => NO_LIVE_RIPS,
       body: JSON.stringify({
         command: "rename",
         new_name: "[BACKUP] TMNT Season 4 Disc 2 - DVD",
@@ -274,6 +395,7 @@ describe("renaming over HTTP", () => {
     await mkdir(marked, { recursive: true })
 
     const refused = await handleLeftoversWrite({
+      readLiveRips: async () => NO_LIVE_RIPS,
       body: JSON.stringify({
         command: "rename",
         new_name: "[BACKUP] Kept - DVD",
@@ -299,6 +421,7 @@ describe("renaming over HTTP", () => {
 
   it("⚠️ answers 400 for a command it does not know", async () => {
     const refused = await handleLeftoversWrite({
+      readLiveRips: async () => NO_LIVE_RIPS,
       body: JSON.stringify({
         command: "chown",
         path: "/x",
@@ -318,6 +441,7 @@ describe("renaming over HTTP", () => {
     await mkdir(marked, { recursive: true })
 
     const deleted = await handleLeftoversWrite({
+      readLiveRips: async () => NO_LIVE_RIPS,
       body: JSON.stringify({
         command: "delete",
         path: marked,
