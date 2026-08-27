@@ -2128,7 +2128,10 @@ const mockHistory: HistoryRip[] = [
     started_at_ms: mockHistoryFinishedAt(2) - 5_120_000,
     finished_at_ms: mockHistoryFinishedAt(2),
     duration_ms: 5_120_000,
-    outcome_kind: "completed",
+    // ⚠️ The row that proves the amber chip. Left as plain
+    // `completed` it renders identically to the clean Blu-ray
+    // above, so the fixture agreed with the bug.
+    outcome_kind: "completed_with_warnings",
     outcome_detail:
       "Backup at /media/Disc-Rips/EYES WIDE SHUT - 4K.",
     // ⚠️ Successful AND dirty. `read_error_count` is the field
