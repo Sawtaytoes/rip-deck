@@ -45,7 +45,11 @@ import { buildArmState } from "./armView.ts"
 import type { RipDeckJsonDocument } from "./jsonDocument.ts"
 import { createApiServer } from "./server.ts"
 import { createTowerStore } from "./snapshot.ts"
-import { createTowerFeed, toJobState } from "./towerFeed.ts"
+import {
+  createTowerFeed,
+  hasBayReArmed,
+  toJobState,
+} from "./towerFeed.ts"
 import { buildTowerView } from "./towerView.ts"
 
 /**
@@ -1802,5 +1806,195 @@ describe("showing the health engine's answer", () => {
     finish(harness)
 
     expect(request).toHaveBeenCalled()
+  })
+})
+
+describe("an empty tray retires the finished card", () => {
+  /**
+   * Measured on the tower 2026-08-27, with every tray empty.
+   *
+   * the `size` attribute under `/sys/block` read the 2097151-sector empty
+   * sentinel on all nine drives, and `/json` agreed —
+   * `has_disc: false`, `disc_size_sectors: null`. Slots 1-4
+   * still published `needs_attention` and slots 8-9 still
+   * published `completed`, each with its job id, its progress,
+   * and on slot 8 a health ALERT about a disc that had been
+   * taken out of the building.
+   *
+   * The bays that behaved are the tell: slots 5-7 read `idle`,
+   * and those are exactly the bays whose last outcome came from
+   * startup ADOPTION, which emits a note and never an outcome.
+   * No outcome event, no record left to go stale.
+   */
+  const ripAndEmptyTheTray = (harness: {
+    handlers: WatcherHandlers
+    setBays: (next: BayState[]) => void
+  }): void => {
+    // The rip lands. This is the event that creates the record
+    // the whole defect lives in — adoption never fires it.
+    harness.handlers.onBayOutcome?.({
+      ...bayEvent,
+      outcome: outcome(
+        "completed",
+        "/media/Disc-Rips/[BACKUP] TROY",
+      ),
+    })
+
+    // The disc comes out, and the watcher re-arms: `rearm`
+    // clears the bay's own outcome, so the record is the only
+    // reader still claiming a disc.
+    harness.setBays(
+      fakeBays([
+        {
+          phase: "idle",
+          jobUuid: null,
+          outcome: undefined,
+        },
+      ]),
+    )
+  }
+
+  it("clears a completed card once the disc is taken out", () => {
+    const harness = createHarness({
+      sightings: fakeSightings([{}]),
+    })
+
+    ripAndEmptyTheTray(harness)
+    harness.handlers.onTickComplete?.()
+
+    // No disc, so no job. This is the assertion the live tower
+    // failed: it answered `completed` with the tray empty.
+    expect(harness.readBay()?.job).toBeFalsy()
+  })
+
+  it("clears a needs_attention card the same way", () => {
+    const harness = createHarness({
+      sightings: fakeSightings([{}]),
+    })
+
+    harness.handlers.onBayOutcome?.({
+      ...bayEvent,
+      outcome: outcome(
+        "needs_attention",
+        "could not read a name off this disc",
+      ),
+    })
+
+    harness.setBays(
+      fakeBays([{ phase: "idle", jobUuid: null }]),
+    )
+    harness.handlers.onTickComplete?.()
+
+    // Four bays sat here for hours asking the owner to name a
+    // disc that was not in the tower.
+    expect(harness.readBay()?.job).toBeFalsy()
+  })
+
+  it("KEEPS the card while the finished disc is still in the tray", () => {
+    // The reason the record outlives its outcome at all, and it
+    // must survive this fix: a finished disc sitting in a tray
+    // is what the eject button acts on.
+    const harness = createHarness({
+      sightings: fakeSightings([{}]),
+    })
+
+    harness.handlers.onBayOutcome?.({
+      ...bayEvent,
+      outcome: outcome(
+        "completed",
+        "/media/Disc-Rips/[BACKUP] TROY",
+      ),
+    })
+
+    harness.setBays(
+      fakeBays([
+        {
+          phase: "done",
+          jobUuid: null,
+          sizeSectors: 48_000_000,
+        },
+      ]),
+    )
+    harness.handlers.onTickComplete?.()
+
+    expect(harness.readBay()?.job?.state).toBe("completed")
+  })
+
+  it("KEEPS the card while the drive is off the bus", () => {
+    // A powered-off tower must not wipe the rack. The poll loop
+    // HOLDS a drive it cannot see rather than deciding about it,
+    // so the phase never reaches `idle` — this asserts the feed
+    // does not second-guess that.
+    const harness = createHarness({
+      sightings: fakeSightings([{ isDrivePresent: false }]),
+    })
+
+    harness.handlers.onBayOutcome?.({
+      ...bayEvent,
+      outcome: outcome(
+        "completed",
+        "/media/Disc-Rips/[BACKUP] TROY",
+      ),
+    })
+
+    harness.setBays(
+      fakeBays([
+        {
+          phase: "done",
+          jobUuid: null,
+          sizeSectors: 48_000_000,
+        },
+      ]),
+    )
+    harness.handlers.onTickComplete?.()
+
+    expect(harness.readBay()?.job?.state).toBe("completed")
+  })
+})
+
+describe("hasBayReArmed", () => {
+  const bayWith = (input: Partial<BayState>): BayState => ({
+    ...createBayState({ driveId: DRIVE_ID, atMs: NOW_MS }),
+    ...input,
+  })
+
+  it("is true for an idle bay with no disc", () => {
+    expect(
+      hasBayReArmed(
+        bayWith({ phase: "idle", sizeSectors: null }),
+      ),
+    ).toBe(true)
+  })
+
+  it("is false for a bay holding a finished disc", () => {
+    expect(
+      hasBayReArmed(
+        bayWith({ phase: "done", sizeSectors: 48_000_000 }),
+      ),
+    ).toBe(false)
+  })
+
+  it("is false mid-rip", () => {
+    expect(
+      hasBayReArmed(
+        bayWith({
+          phase: "ripping",
+          sizeSectors: 48_000_000,
+        }),
+      ),
+    ).toBe(false)
+  })
+
+  it("is false for an idle bay that still reports a size", () => {
+    // Belt and braces on the `no_media` latch instant, where
+    // `applyBayOutcome` sets `phase: "idle"` itself. The size is
+    // nulled in the same object, so this pairing should not
+    // arise — and if it ever does, a disc the drive can still
+    // measure is not an empty tray.
+    expect(
+      hasBayReArmed(
+        bayWith({ phase: "idle", sizeSectors: 48_000_000 }),
+      ),
+    ).toBe(false)
   })
 })
