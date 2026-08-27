@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 
 import { buildBayView } from "../testing/buildRip"
+import type { BayView } from "../types"
 import { DriveRail } from "./DriveRail"
 
 describe("DriveRail", () => {
@@ -112,6 +113,79 @@ describe("DriveRail", () => {
     expect(
       screen.getByText("disc_scratched"),
     ).toBeInTheDocument()
+  })
+
+  /** The chip is the span wrapping the label and the detail. */
+  const chipAround = (detail: string): HTMLElement => {
+    const found = screen.getByText(detail).parentElement
+
+    if (found === null) throw new Error("chip not found")
+
+    return found
+  }
+
+  const buildBayInState = (
+    state: BayView["state"]["state"],
+    verdict: BayView["state"]["verdict"] = "ok",
+  ): BayView =>
+    buildBayView({
+      drive_id: "usb-a",
+      state: {
+        ...buildBayView().state,
+        state,
+        verdict,
+        progress_percent: 62,
+      },
+    })
+
+  // ⚠️ The bug the owner reported from the rack: a rip that
+  // produced NO backup wore the same green as one that did,
+  // because `failed` sat in a "latched" set beside `completed`.
+  it("paints a failed bay red, never the finished green", () => {
+    render(<DriveRail bays={[buildBayInState("failed")]} />)
+
+    const chip = chipAround("failed")
+
+    expect(chip.className).toContain("intent-danger")
+    expect(chip.className).not.toContain("intent-success")
+  })
+
+  // The verdict names the action, so it stays the word on the
+  // chip. It must not soften the colour: no backup exists.
+  it("keeps a failed bay red even with a disc verdict", () => {
+    render(
+      <DriveRail
+        bays={[buildBayInState("failed", "disc_scratched")]}
+      />,
+    )
+
+    const chip = chipAround("disc_scratched")
+
+    expect(chip.className).toContain("intent-danger")
+    expect(chip.className).not.toContain("intent-warning")
+  })
+
+  // The owner stopped it, so it is not an alarm — and it made no
+  // backup, so it is not a success either.
+  it("shows a cancelled bay as neither green nor an alarm", () => {
+    render(
+      <DriveRail bays={[buildBayInState("cancelled")]} />,
+    )
+
+    const chip = chipAround("cancelled")
+
+    expect(chip.className).not.toContain("intent-success")
+    expect(chip.className).not.toContain("intent-danger")
+  })
+
+  it("still reads a completed bay as done, in green", () => {
+    render(
+      <DriveRail bays={[buildBayInState("completed")]} />,
+    )
+
+    expect(chipAround("done").className).toContain(
+      "intent-success",
+    )
   })
 
   it("renders nothing when the tower is switched off", () => {
