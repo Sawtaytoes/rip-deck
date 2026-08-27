@@ -550,6 +550,70 @@ describe("parseBayLedger", () => {
     expect(parsed.records).toHaveLength(1)
   })
 
+  it("carries a warning-bearing outcome across a restart", () => {
+    // The third state has to survive the ledger or a held bay
+    // reads as a clean `done` after every redeploy — which is
+    // exactly the fact the owner asked to be told.
+    const parsed = parseBayLedger(
+      JSON.stringify({
+        version: BAY_LEDGER_VERSION,
+        records: [
+          completedRecord({
+            outcome: {
+              kind: "completed_with_warnings",
+              detail: `${DESTINATION_PATH} — 4 read errors`,
+              warnings: ["4 read errors at 3.20 GB."],
+            },
+          }),
+        ],
+      }),
+    )
+
+    expect(parsed.records[0].outcome).toEqual({
+      kind: "completed_with_warnings",
+      detail: `${DESTINATION_PATH} — 4 read errors`,
+      warnings: ["4 read errors at 3.20 GB."],
+    })
+  })
+
+  it("drops warnings that are not strings, and never the record", () => {
+    // A hand-edited or truncated file must cost the sentences,
+    // never the bay's memory of what it finished — that memory
+    // is what stops a 90 GB re-rip.
+    const parsed = parseBayLedger(
+      JSON.stringify({
+        version: BAY_LEDGER_VERSION,
+        records: [
+          completedRecord({
+            outcome: {
+              kind: "completed_with_warnings",
+              detail: DESTINATION_PATH,
+              warnings: [7, "kept", null],
+            } as never,
+          }),
+        ],
+      }),
+    )
+
+    expect(parsed.records).toHaveLength(1)
+    expect(parsed.records[0].outcome.warnings).toEqual([
+      "kept",
+    ])
+  })
+
+  it("reads an outcome written before warnings existed", () => {
+    const parsed = parseBayLedger(
+      JSON.stringify({
+        version: BAY_LEDGER_VERSION,
+        records: [completedRecord()],
+      }),
+    )
+
+    expect(
+      parsed.records[0].outcome.warnings,
+    ).toBeUndefined()
+  })
+
   it("treats a corrupt file as NO memory, not empty memory", () => {
     // The difference decides whether a loaded disc rips. A
     // truncated ledger has lost the record of what finished, so

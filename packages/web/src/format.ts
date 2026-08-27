@@ -47,10 +47,16 @@ export function kindLabel(kind: MediaKind): string {
 }
 
 export type RipVisual = {
-  // done = finished successfully; indeterminate = active but no
-  // percent (the AACS/BD+ preamble); failed = errored or stopped;
-  // running = normal.
-  state: "done" | "failed" | "indeterminate" | "running"
+  // done = finished successfully; warning = finished AND
+  // something is wrong with the copy; indeterminate = active but
+  // no percent (the AACS/BD+ preamble); failed = errored or
+  // stopped; running = normal.
+  state:
+    | "done"
+    | "warning"
+    | "failed"
+    | "indeterminate"
+    | "running"
   // Bar fill width 0..100 (100 for done + indeterminate stripe).
   fillPercent: number
   // Short text shown at the top-right of the card.
@@ -65,12 +71,18 @@ const FAILED_STATUSES = new Set(["fail", "failed", "error"])
  *
  * The one addition to the ported logic is the read-error guard,
  * and it implements the rule that overrides everything else in
- * this project: **never report success on a rip that had read
- * errors.** The daemon's `isRipSuccessful` already refuses to
- * call such a rip successful, so this can only fire if something
- * upstream is wrong — which is exactly when a green bar would do
- * the most damage. Belt and braces on the one rule that has no
- * acceptable failure mode is not redundancy worth deleting.
+ * this project: **never report a rip that had read errors as a
+ * plain success.**
+ *
+ * ⚠️ That used to read "never report success on a rip that had
+ * read errors", and it painted the bar `danger`. On 2026-08-27
+ * the owner settled that a verified backup with a bad sector in
+ * it is a WARNING, not a failure — the copy exists, and calling
+ * it a failure says it does not
+ * ([decision](https://mkdocs.octen.dev/workspace/rip-deck/docs/decisions/2026-08-27-a-read-error-on-a-verified-backup-is-a-warning-not-a-failure/)).
+ * So the guard stands and its COLOUR changed: amber, never
+ * green. A rip that genuinely failed still reaches the danger
+ * branch below on its status.
  */
 export function ripVisual(rip: Rip): RipVisual {
   const isDone =
@@ -79,11 +91,14 @@ export function ripVisual(rip: Rip): RipVisual {
       rip.percent >= 100 &&
       !rip.active)
 
-  if (isDone && rip.read_error_count > 0) {
+  if (
+    isDone &&
+    (rip.read_error_count > 0 || rip.warnings.length > 0)
+  ) {
     return {
-      state: "failed",
-      fillPercent: rip.percent ?? 0,
-      percentText: "read errors",
+      state: "warning",
+      fillPercent: 100,
+      percentText: "warning",
     }
   }
 
@@ -284,8 +299,11 @@ export function throughputText(
  * evidence rather than a time-box:
  *
  *  - the rip failed;
- *  - it finished with read errors, which the one rule says is
- *    never a success;
+ *  - it finished carrying a warning — read errors, or MakeMKV's
+ *    own hash check finding corrupt files. That IS a success as
+ *    of 2026-08-27, and it still belongs here: the owner's whole
+ *    reason for wanting a warning was *"I'd like to know that"*,
+ *    and a bay he should look at is what this bucket is for;
  *  - it carries a verdict that ASKS for something.
  *
  * ⚠️ That third clause used to be `verdict !== "ok"`, and it put
@@ -306,6 +324,7 @@ export function ripBucket(rip: Rip): RipBucket {
   const isTroubled =
     FAILED_STATUSES.has(rip.status) ||
     rip.read_error_count > 0 ||
+    rip.warnings.length > 0 ||
     isVerdictActionable(rip.verdict)
 
   return isTroubled ? "attention" : "recent"
@@ -460,6 +479,7 @@ export const RIP_VISUAL_INTENT: Record<
   IntentName
 > = {
   done: "success",
+  warning: "warning",
   failed: "danger",
   indeterminate: "accent",
   running: "accent",

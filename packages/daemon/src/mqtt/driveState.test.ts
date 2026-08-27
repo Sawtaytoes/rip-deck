@@ -47,6 +47,7 @@ const job = (overrides: Partial<Job> = {}): Job => ({
   failureReason: null,
   destinationPath: null,
   readErrorCount: 0,
+  warnings: [],
   isAdopted: false,
   isKeepTryingRequested: false,
   ...overrides,
@@ -234,6 +235,37 @@ describe("buildDriveStatePayload — the tray", () => {
 
     expect(payload.is_present).toBe(false)
     expect(payload.has_disc).toBe(true)
+  })
+
+  it("flags a finished rip that carries warnings", () => {
+    // The chip's half of the third state. A FLAG rather than
+    // the sentences, because this payload is retained per bay
+    // and one consumer is a Home Assistant attribute dict —
+    // the sentences run to several lines and the card reads
+    // them off `/json` instead.
+    const payload = buildDriveStatePayload({
+      job: job({
+        state: "completed",
+        warnings: ["4 read errors at 3.20 GB."],
+      }),
+      driveLabel: "07 - Pioneer BDR-211M",
+      slot: 7,
+      nowMs: NOW_MS,
+    })
+
+    expect(payload.has_warnings).toBe(true)
+    expect(payload.state).toBe("completed")
+  })
+
+  it("does not flag a clean rip", () => {
+    const payload = buildDriveStatePayload({
+      job: job({ state: "completed" }),
+      driveLabel: "07 - Pioneer BDR-211M",
+      slot: 7,
+      nowMs: NOW_MS,
+    })
+
+    expect(payload.has_warnings).toBe(false)
   })
 
   it("omits the tray rather than guessing at it", () => {

@@ -188,6 +188,66 @@ describe("DriveRail", () => {
     )
   })
 
+  // The THIRD state. Neither of the other two is true of it —
+  // the backup exists (so not red) and it may be damaged (so
+  // not green)
+  // ([decision](https://mkdocs.octen.dev/workspace/rip-deck/docs/decisions/2026-08-27-a-read-error-on-a-verified-backup-is-a-warning-not-a-failure/)).
+  it("gives a finished rip with warnings its own colour", () => {
+    render(
+      <DriveRail
+        bays={[
+          buildBayView({
+            drive_id: "usb-a",
+            state: {
+              ...buildBayView().state,
+              state: "completed",
+              has_warnings: true,
+            },
+          }),
+        ]}
+      />,
+    )
+
+    const chip = chipAround("warning")
+
+    expect(chip.className).toContain("intent-warning")
+    expect(chip.className).not.toContain("intent-success")
+    expect(chip.className).not.toContain("intent-danger")
+  })
+
+  // Same hue as a HELD bay, quieter fill — a held bay wants the
+  // owner now, a warning wants him eventually.
+  it("does not paint a warning as loudly as a held bay", () => {
+    render(
+      <DriveRail
+        bays={[
+          buildBayView({
+            drive_id: "usb-a",
+            state: {
+              ...buildBayView().state,
+              state: "completed",
+              has_warnings: true,
+            },
+          }),
+        ]}
+      />,
+    )
+
+    expect(chipAround("warning").className).not.toContain(
+      "bg-intent-warning-surface",
+    )
+  })
+
+  it("reads a daemon with no warnings field as no warning", () => {
+    // Older daemon, same dashboard. Absent must not paint amber
+    // on every finished bay in the rack.
+    render(
+      <DriveRail bays={[buildBayInState("completed")]} />,
+    )
+
+    expect(screen.queryByText("warning")).toBeNull()
+  })
+
   it("renders nothing when the tower is switched off", () => {
     // F3. The empty-rack wording belongs to `HostSection`; the
     // rail must not invent an empty-state of its own.

@@ -78,6 +78,12 @@ const outcomeLine = (outcome: BayOutcome): string => {
   switch (outcome.kind) {
     case "completed":
       return `DONE -> ${outcome.detail}`
+    // The word says which of the three it was, because the
+    // console line is what an operator greps. "DONE" on a rip
+    // with a bad sector in it reads as a clean rip, and the
+    // sentence explaining otherwise is at the end of a long path.
+    case "completed_with_warnings":
+      return `DONE WITH WARNINGS -> ${outcome.detail}`
     case "failed":
       return `FAILED: ${outcome.detail}`
     case "needs_attention":

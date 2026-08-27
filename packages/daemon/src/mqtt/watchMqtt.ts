@@ -277,6 +277,10 @@ export const buildBayJob = (input: {
   // startup is one whose rip belongs to the daemon before it,
   // and hardcoding false here told the opposite story.
   isAdopted: input.bay.isAdopted,
+  // The retained per-bay payload has never carried a rip's
+  // outcome sentence and does not start now: this shape is built
+  // from a `DriveStatePayload`, which has no warnings field.
+  warnings: [],
   isKeepTryingRequested: false,
 })
 
