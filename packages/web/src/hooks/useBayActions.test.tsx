@@ -26,6 +26,10 @@ const buildDataSource = (
   // hook (`useTrayCommand`) and its own transport.
   runTrayCommand: () =>
     Promise.reject(new Error("not used in this test")),
+  fetchLeftovers: () =>
+    Promise.reject(new Error("not used in this test")),
+  deleteLeftover: () =>
+    Promise.reject(new Error("not used in this test")),
 })
 
 const renderBayActions = (dataSource: RipDeckDataSource) =>
