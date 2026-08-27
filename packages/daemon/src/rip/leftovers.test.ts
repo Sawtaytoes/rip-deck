@@ -83,6 +83,23 @@ describe("saying whether a rip finished", () => {
     expect(described.isSafeToDelete).toBe(false)
     expect(described.detail).toContain("UNFINISHED")
     expect(described.detail).toContain("4.0 GB")
+    expect(described.detail).toContain("VIDEO_TS directory")
+  })
+
+  it("⚠️ describes a DVD image as an image, not a directory", () => {
+    // A DVD backup is a FILE — `makemkvcon` writes one ISO, not
+    // a folder — and calling it "a directory" on the card would
+    // send the operator looking for something that is not there.
+    const described = describeLeftover({
+      kind: "incomplete",
+      occupiedName: null,
+      sizeBytes: 8_203_894_784,
+      discStructure: "ISO",
+    })
+
+    expect(described.isSafeToDelete).toBe(false)
+    expect(described.detail).toContain("ISO disc image")
+    expect(described.detail).not.toContain("directory")
   })
 
   it("says a partial rip with no structure is unreadable", () => {
@@ -97,8 +114,9 @@ describe("saying whether a rip finished", () => {
 
     expect(described.isSafeToDelete).toBe(true)
     expect(described.detail).toContain("600 MB")
+    expect(described.detail).toContain("no VIDEO_TS")
     expect(described.detail).toContain(
-      "no VIDEO_TS or BDMV",
+      "no ISO9660 signature",
     )
   })
 
@@ -228,6 +246,30 @@ describe("scanning and clearing, on a real filesystem", () => {
     )
     expect(emptyFound?.sizeBytes).toBe(0)
     expect(emptyFound?.isSafeToDelete).toBe(true)
+  })
+
+  it("⚠️ lists a leftover DVD image, which is a FILE", async () => {
+    // `scanLeftovers` used to skip anything that was not a
+    // directory, which made every leftover DVD invisible to the
+    // one panel that exists to clear them.
+    const image = join(
+      tmpRoot,
+      ".rip-deck-incomplete-image-3",
+    )
+    const bytes = Buffer.alloc(40_000)
+    bytes.write("CD001", 32_769, "latin1")
+    await writeFile(image, bytes)
+
+    const found = await scanLeftovers({ rootPath: tmpRoot })
+    const listed = found.find(
+      (one) => one.name === ".rip-deck-incomplete-image-3",
+    )
+
+    expect(listed?.discStructure).toBe("ISO")
+    expect(listed?.sizeBytes).toBe(40_000)
+    expect(listed?.detail).toContain("ISO disc image")
+
+    await rm(image, { force: true })
   })
 
   it("clears one, and refuses the finished rip beside it", async () => {

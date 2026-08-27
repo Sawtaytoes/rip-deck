@@ -1,4 +1,4 @@
-import { readdir, rm, stat } from "node:fs/promises"
+import { open, readdir, rm, stat } from "node:fs/promises"
 import { basename, join, resolve, sep } from "node:path"
 import { incompleteDirName } from "./destination.ts"
 
@@ -147,20 +147,28 @@ export const describeLeftover = (input: {
             "refused before it wrote anything, so there is " +
             "nothing here to lose."
           : `${formatBytes(input.sizeBytes)} of partial output ` +
-            "with no VIDEO_TS or BDMV directory, so no player " +
-            "or scanner can read it. The rip stopped before " +
-            "the disc structure was written.",
+            "with no disc structure in it — no VIDEO_TS, no " +
+            "BDMV, and no ISO9660 signature — so no player or " +
+            "scanner can read it. The rip stopped before the " +
+            "disc structure was written.",
       isSafeToDelete: true,
     }
   }
 
+  // ⚠️ `ISO` here means a DVD image, which is a FILE rather than
+  // a directory — see `verifyBackup.ts`. The wording has to fit
+  // both shapes, because both land under the same name.
+  const shape =
+    input.discStructure === "ISO"
+      ? "a complete-looking ISO disc image"
+      : `a ${input.discStructure} directory`
+
   return {
     detail:
-      `An UNFINISHED rip: ${formatBytes(input.sizeBytes)} with ` +
-      `a ${input.discStructure} directory, kept where it fell. ` +
-      `It was never renamed into the library, so it is ` +
-      `incomplete — but it is not empty, so check it before ` +
-      `you delete it.`,
+      `An UNFINISHED rip: ${formatBytes(input.sizeBytes)}, ` +
+      `${shape}, kept where it fell. It was never renamed into ` +
+      `the library, so Rip Deck never confirmed it — but it is ` +
+      `not empty, so check it before you delete it.`,
     isSafeToDelete: false,
   }
 }
@@ -184,7 +192,12 @@ export const scanLeftovers = async (input: {
   const found: Leftover[] = []
 
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue
+    // ⚠️ A DVD backup is a FILE, not a directory — see
+    // `verifyBackup.ts`. Skipping non-directories here would
+    // make every leftover DVD image invisible to the one panel
+    // that exists to clear them, which is exactly the shape of
+    // the bug that produced them.
+    if (!entry.isDirectory() && !entry.isFile()) continue
 
     const classified = classifyLeftover(entry.name)
     if (classified === null) continue
@@ -192,8 +205,12 @@ export const scanLeftovers = async (input: {
     const path = join(input.rootPath, entry.name)
     const [sizeBytes, discStructure, modifiedAtMs] =
       await Promise.all([
-        measureTree(path),
-        findDiscStructure(path),
+        entry.isDirectory()
+          ? measureTree(path)
+          : fileSize(path),
+        entry.isDirectory()
+          ? findDiscStructure(path)
+          : readIsoMarker(path),
         modifiedAt(path),
       ])
 
@@ -309,6 +326,51 @@ export const deleteLeftover = async (input: {
   return {
     isDeleted: true,
     message: `Cleared ${basename(input.path)}.`,
+  }
+}
+
+/**
+ * `"ISO"` when this file carries the ISO9660 signature.
+ *
+ * The same `CD001`-at-byte-32769 check `verifyBackup.ts` makes,
+ * and for the same reason: MakeMKV writes a DVD image with no
+ * extension, so there is nothing else to key on. A COPY rather
+ * than a shared import, because that one is on the rip path and
+ * answers a different question — whether a finished rip counts —
+ * and coupling a UI listing to the verification rule would mean
+ * a threshold change silently relabelling the panel.
+ */
+const readIsoMarker = async (
+  path: string,
+): Promise<string | null> => {
+  let handle: Awaited<ReturnType<typeof open>> | null = null
+
+  try {
+    handle = await open(path, "r")
+    const buffer = Buffer.alloc(5)
+    const { bytesRead } = await handle.read(
+      buffer,
+      0,
+      buffer.length,
+      32_769,
+    )
+
+    return bytesRead === buffer.length &&
+      buffer.toString("latin1") === "CD001"
+      ? "ISO"
+      : null
+  } catch {
+    return null
+  } finally {
+    await handle?.close().catch(() => {})
+  }
+}
+
+const fileSize = async (path: string): Promise<number> => {
+  try {
+    return (await stat(path)).size
+  } catch {
+    return 0
   }
 }
 
