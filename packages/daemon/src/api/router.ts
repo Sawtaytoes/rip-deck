@@ -6,6 +6,10 @@ import {
 } from "./fixtures.ts"
 import { buildJsonDocument } from "./jsonDocument.ts"
 import {
+  handleLeftoversDelete,
+  handleLeftoversList,
+} from "./leftoversEndpoint.ts"
+import {
   isSafeJobUuid,
   LOG_CAPTURE_TUNING,
   type LogCaptureReader,
@@ -114,6 +118,15 @@ export type ApiResponse = {
 /** The one write endpoint. See `trayEndpoint.ts`. */
 const TRAY_PATHNAME = "/api/tray"
 
+/**
+ * The folders a rip left behind, and the button that clears one.
+ *
+ * `GET` lists, `POST` deletes. On its own path rather than on
+ * `/json` because listing means walking each leftover's tree to
+ * size it — see `leftoversEndpoint.ts`.
+ */
+const LEFTOVERS_PATHNAME = "/api/leftovers"
+
 /** The tower snapshot the dashboard polls. */
 const JSON_PATHNAME = "/json"
 
@@ -184,6 +197,7 @@ export const SERVER_PATHNAMES = [
   FIXTURES_PATHNAME,
   LOGS_PATHNAME,
   TRAY_PATHNAME,
+  LEFTOVERS_PATHNAME,
   ...HEALTH_PATHNAMES,
   ...UNIMPLEMENTED_ACTION_PATHS,
 ]
@@ -504,6 +518,7 @@ export const createApiRouter = ({
   // router with no new argument and gets the honest answer.
   readTrayRunner = () => null,
   readLogCapture = null,
+  destinationRoot = null,
 }: {
   readSnapshot: () => TowerSnapshot
   readNowMs?: () => number
@@ -520,6 +535,16 @@ export const createApiRouter = ({
    */
   readTrayRunner?: () => TrayCommandRunner | null
   readLogCapture?: LogCaptureReader | null
+  /**
+   * Where finished rips land, so leftovers can be found in it.
+   *
+   * Null means this process was not told — a fixture server, or
+   * an API brought up without `rip-deck watch`. The endpoint then
+   * answers 503 rather than guessing a path, because the one
+   * thing worse than not listing leftovers is deleting inside a
+   * directory nobody named.
+   */
+  destinationRoot?: string | null
 }): ApiRouter => ({
   handle: ({ method, url, readBody }) => {
     // A relative URL needs a base; the host is irrelevant to
@@ -607,6 +632,52 @@ export const createApiRouter = ({
         readBody,
         runTrayCommand: readTrayRunner(),
         nowMs,
+      })
+    }
+
+    // Also async, and also below every synchronous path: a list
+    // walks each leftover's tree.
+    if (pathname === LEFTOVERS_PATHNAME) {
+      if (destinationRoot === null) {
+        return jsonResponse({
+          status: 503,
+          payload: {
+            ok: false,
+            msg:
+              "this process was not told where rips land, so " +
+              "it cannot list or clear leftovers. That needs " +
+              "`rip-deck watch`.",
+          },
+        })
+      }
+
+      if (method === "GET" || method === "HEAD") {
+        return handleLeftoversList({
+          destinationRoot,
+        }).then(jsonResponse)
+      }
+
+      if (method === "POST") {
+        // A caller with no body reader sends the empty payload,
+        // which `parseDeleteBody` refuses by name — the same
+        // shape `handleTrayRequest` uses one route above.
+        return (
+          readBody === undefined
+            ? Promise.resolve("")
+            : readBody()
+        )
+          .then((body) =>
+            handleLeftoversDelete({
+              body,
+              destinationRoot,
+            }),
+          )
+          .then(jsonResponse)
+      }
+
+      return jsonResponse({
+        status: 405,
+        payload: { ok: false, msg: "GET or POST only" },
       })
     }
 

@@ -612,6 +612,41 @@ export type TrayCommandReport = {
  * rip-deck's `/json`. A hide button backed by nothing is worse
  * than no button.
  */
+/**
+ * A folder a rip left behind, as `GET /api/leftovers` reports it.
+ *
+ * Mirrors the daemon's `Leftover` — see `rip/leftovers.ts` for
+ * what each kind means and why `is_safe_to_delete` is
+ * deliberately conservative.
+ */
+export type Leftover = {
+  path: string
+  name: string
+  /**
+   * `incomplete` — a rip that never finished, because the
+   * rename into the library is the last step and it never
+   * happened. `duplicate` — a rip that DID finish, into a name
+   * something already occupied.
+   */
+  kind: "incomplete" | "duplicate"
+  /** For a duplicate, the folder it collided with. */
+  occupied_name: string | null
+  size_bytes: number
+  /** `VIDEO_TS` or `BDMV`, or null when neither is there. */
+  disc_structure: string | null
+  modified_at_ms: number
+  /** The daemon's own sentence. Rendered, never rewritten. */
+  detail: string
+  is_safe_to_delete: boolean
+}
+
+export type LeftoverDeleteResult = {
+  ok: boolean
+  msg: string
+  /** The remaining leftovers, so the panel needs no refetch. */
+  leftovers: Leftover[]
+}
+
 export type RipDeckDataSource = {
   /** `fixture` selects a server-side `?fake=` scenario. */
   fetchState: (
@@ -652,4 +687,24 @@ export type RipDeckDataSource = {
      */
     name?: string
   }) => Promise<TrayCommandReport>
+  /**
+   * The folders a rip left behind.
+   *
+   * NOT on `/json`. Answering it walks each leftover's tree to
+   * size it, and a half-finished UHD rip is 40 GB of `stat`
+   * calls — twelve times a minute, for a panel nobody has open.
+   * So it is fetched on demand instead.
+   */
+  fetchLeftovers: () => Promise<Leftover[]>
+  /**
+   * Clear one leftover.
+   *
+   * Resolves for a REFUSAL as well as a success — the 400 body
+   * carries the daemon's reason, and "that is a finished rip"
+   * is the most important sentence this endpoint produces. It
+   * rejects only when there was no answer at all.
+   */
+  deleteLeftover: (input: {
+    path: string
+  }) => Promise<LeftoverDeleteResult>
 }

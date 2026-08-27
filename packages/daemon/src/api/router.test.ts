@@ -970,6 +970,7 @@ describe("the server's own surface", () => {
       "FIXTURES_PATHNAME",
       "HEALTH_PATHNAMES",
       "JSON_PATHNAME",
+      "LEFTOVERS_PATHNAME",
       "LOGS_PATHNAME",
       "TRAY_PATHNAME",
       "UNIMPLEMENTED_ACTION_PATHS",

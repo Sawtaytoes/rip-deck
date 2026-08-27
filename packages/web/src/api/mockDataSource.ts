@@ -22,6 +22,7 @@ import type {
   Drive,
   DriveAlertPayload,
   Host,
+  Leftover,
   LoadedDiscsView,
   Rip,
   RipDeckDataSource,
@@ -1844,4 +1845,84 @@ export const mockDataSource: RipDeckDataSource = {
       150,
     )
   },
+
+  /**
+   * Two leftovers, one of each kind, held in module state so a
+   * Delete press in the mock actually removes one — the whole
+   * point of the panel is the list shrinking.
+   */
+  fetchLeftovers: () => delay([...mockLeftovers], 150),
+
+  deleteLeftover: ({ path }) => {
+    const target = mockLeftovers.find(
+      (one) => one.path === path,
+    )
+
+    if (target === undefined) {
+      return delay(
+        {
+          ok: false,
+          msg: `Refused to delete: "${path}" is not a Rip Deck leftover.`,
+          leftovers: [...mockLeftovers],
+        },
+        150,
+      )
+    }
+
+    mockLeftovers = mockLeftovers.filter(
+      (one) => one.path !== path,
+    )
+
+    return delay(
+      {
+        ok: true,
+        msg: `Cleared ${target.name}.`,
+        leftovers: [...mockLeftovers],
+      },
+      150,
+    )
+  },
 }
+
+/**
+ * The fixture leftovers, and both are real shapes:
+ *
+ *  - an EMPTY incomplete folder, which is the MSG:5068 signature
+ *    that stranded four DVDs on 2026-08-26, and
+ *  - a duplicate landing, which is a FINISHED rip and must never
+ *    be offered as safe.
+ *
+ * `let` rather than `const` because the mock's Delete really
+ * removes one; a panel whose list never changes proves nothing.
+ */
+let mockLeftovers: Leftover[] = [
+  {
+    path: "/media/Disc-Rips/.rip-deck-incomplete-71f30886-ede6-4b11-9c60-995210bb0588",
+    name: ".rip-deck-incomplete-71f30886-ede6-4b11-9c60-995210bb0588",
+    kind: "incomplete",
+    occupied_name: null,
+    size_bytes: 0,
+    disc_structure: null,
+    modified_at_ms: 1_787_700_000_000,
+    detail:
+      "An EMPTY rip folder. The rip was cancelled or refused " +
+      "before it wrote anything, so there is nothing here to lose.",
+    is_safe_to_delete: true,
+  },
+  {
+    path: "/media/Disc-Rips/[BACKUP] Ivanhoe (1952) - Blu-ray (rip-deck-duplicate-01234567)",
+    name: "[BACKUP] Ivanhoe (1952) - Blu-ray (rip-deck-duplicate-01234567)",
+    kind: "duplicate",
+    occupied_name: "[BACKUP] Ivanhoe (1952) - Blu-ray",
+    size_bytes: 22_400_000_000,
+    disc_structure: "BDMV",
+    modified_at_ms: 1_787_600_000_000,
+    detail:
+      'A FINISHED rip that landed beside "[BACKUP] Ivanhoe ' +
+      '(1952) - Blu-ray", which was already there. Rip Deck ' +
+      "never overwrites, so both copies were kept. Delete " +
+      "whichever one you do not want — this is a real rip, not " +
+      "a leftover.",
+    is_safe_to_delete: false,
+  },
+]
