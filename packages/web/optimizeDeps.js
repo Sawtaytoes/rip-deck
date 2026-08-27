@@ -49,6 +49,12 @@ export const optimizeDepsInclude = [
   "react",
   "react-dom",
   "react-dom/client",
+  // Entered the TEST graph on 2026-08-27, when `renderWithProviders`
+  // gained a `MemoryRouter`. `app.tsx` had imported it since the
+  // router shipped, but `app.tsx` is not in the suite's graph — so
+  // the parity check went from silent to failing on the harness
+  // change, not on the router one.
+  "react-router",
   "react/jsx-dev-runtime",
   "react/jsx-runtime",
 ]
