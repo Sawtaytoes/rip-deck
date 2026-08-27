@@ -130,6 +130,15 @@ container that names a missing device node. A ready-to-adapt Compose file is in
 [`deploy/docker-compose.yaml`](deploy/docker-compose.yaml). `probe` and `rip`
 must run where `/sys/block/sr*` is real.
 
+> ⚠️ **Identify a drive by its firmware SERIAL, never by its model string.**
+> Slots 2–4 are LG drives running OmniDrive firmware that reports them as
+> `BW-16D1HT`, an ASUS model, so a model-keyed count credits the wrong drive.
+> `config/drives.json` keys on `firmwareSerial` for this reason. Those three LG
+> drives read Blu-ray at 23–35 MB/s and **cannot read a DVD at all** — a
+> two-block read at sector 2048 times out after 30 s and the kernel resets the
+> device
+> ([findings](docs/2026-08-27-the-lg-drives-read-blu-ray-and-cannot-read-dvd.md)).
+
 > ⚠️ **A redeploy cancels every running rip.** A rip runs in its own
 > `rip-deck-rip-<uuid>` container, which makes a redeploy look safe. It is not:
 > the daemon owns that child and kills it on `SIGTERM`, so restarting, stopping
