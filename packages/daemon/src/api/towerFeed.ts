@@ -9,6 +9,14 @@ import {
   makeVerdict,
   type Verdict,
 } from "@rip-deck/contracts"
+import {
+  hedged,
+  isHealthVerdictPublished,
+} from "../health/publish.ts"
+import {
+  type ComputedVerdictStore,
+  createComputedVerdictStore,
+} from "../health/verdictStore.ts"
 import { parseDiscLabel } from "../metadata/discQuery.ts"
 import {
   createPosterStoreFromEnv,
@@ -25,6 +33,7 @@ import type {
   BayState,
   WatcherHandlers,
 } from "../rip/watcher.ts"
+import { readStateDir } from "./logCapture.ts"
 import {
   createBaySnapshot,
   type TowerStore,
@@ -95,20 +104,21 @@ import {
  *
  * Two fields are still honestly unknown, and say so:
  *
- *  1. **`verdict` is always `unknown`, and that is now a choice
- *     about PUBLISHING rather than a missing engine.** The engine
- *     runs on every rip and writes what it computed to
- *     `<uuid>.verdict.json`; what it does not do is become the
- *     job's verdict, because every number in `HEALTH_THRESHOLDS`
- *     is invented and `AGENTS.md` says not to tune them before
- *     ~30 real jobs (there are 3). Shipping that answer today
- *     would be the confidently-wrong alert the whole health model
- *     exists to prevent. `unknown`'s own template says "Not
- *     enough information to judge this rip yet", which is exactly
- *     true of a verdict computed from guessed thresholds.
- *     `docs/mqtt.md` already settles the identical question the
- *     same way for the mid-rip alert: timing says the rip stopped
- *     moving and not why, "so the verdict kind stays `unknown`".
+ *  1. **`verdict` is the engine's answer once the corpus has
+ *     earned it, and `unknown` until then.** The engine runs on
+ *     every rip and writes what it computed to
+ *     `<uuid>.verdict.json`. Whether that answer may be SHOWN is
+ *     `health/publish.ts`, which counts the feature vectors in
+ *     the state directory and opens itself at ~30 with at least
+ *     one bad job among them. Below that the bay carries
+ *     `unknown`, whose template says "Not enough information to
+ *     judge this rip yet" — exactly true of a verdict computed
+ *     from guessed thresholds. Above it the real verdict is read
+ *     back through `health/verdictStore.ts` and passed through
+ *     `hedged`, so it can be read and can never announce.
+ *     `docs/mqtt.md` settles the identical question the same way
+ *     for the mid-rip alert: timing says the rip stopped moving
+ *     and not why, "so the verdict kind stays `unknown`".
  *  2. **`readErrorCount` is 0 because the count never reaches
  *     us**, not because zero errors were seen. `armView` warns
  *     "never render this as healthy"; the paired `unknown`
@@ -163,16 +173,6 @@ import {
  * `RIP_DECK_OMDB_API_KEY` the store is a null object: no
  * request, no file, no log line, and a card with no thumbnail.
  */
-
-/**
- * Said on every card, so the `unknown` verdict reads as a
- * statement about rip-deck rather than about the disc.
- */
-const NO_HEALTH_ENGINE_EVIDENCE =
-  "The health engine has judged this rip, but its answer is not " +
-  "published yet: every threshold it uses is still a guess, and " +
-  "tuning them needs about 30 real rips of data (there are 3). " +
-  "The verdict it computed is saved with the rip."
 
 /** One bay's current run, as the handler stream describes it. */
 type BayRecord = {
@@ -374,18 +374,72 @@ const finishedAtOf = (facts: BayFacts): number | null =>
     ? facts.latchedAtMs
     : null
 
-const buildVerdict = (facts: BayFacts): Verdict =>
-  makeVerdict(
-    "unknown",
-    // NEVER `confirmed`: only a confirmed verdict may announce
-    // over MQTT, and an announcement carrying a verdict nothing
-    // computed is the confidently-wrong alert the whole health
-    // model exists to prevent.
-    "suspected",
-    facts.outcome === null
-      ? [NO_HEALTH_ENGINE_EVIDENCE]
-      : [facts.outcome.detail, NO_HEALTH_ENGINE_EVIDENCE],
-  )
+/**
+ * The verdict this bay's card carries.
+ *
+ * ## The paragraph that used to be here
+ *
+ * Every card's evidence list opened with a four-sentence note
+ * explaining that the health engine's answer was computed but
+ * not published, and that tuning needed "about 30 real rips of
+ * data (there are 3)". Three things were wrong with it. It was a
+ * statement about rip-deck's own build state printed on a
+ * household appliance's status card; it repeated verbatim on all
+ * nine bays; and the count was typed by hand, so it was wrong
+ * from the first rip after it was written. The gate counts the
+ * corpus itself now, so there is nothing left for a sentence to
+ * get stale about.
+ *
+ * ## What replaces it
+ *
+ * With the gate SHUT the bay carries `unknown` — no engine
+ * answer may be shown, and `unknown`'s template says so in one
+ * line. With the gate OPEN it carries whatever the engine
+ * actually decided for this job, read back from
+ * `<uuid>.verdict.json`, or `unknown` again when there is no
+ * such file (a rip still running, an adopted disc from before
+ * capture existed, a write that failed).
+ *
+ * The outcome sentence rides in the evidence list either way.
+ * That sentence is the one thing on this card that names what
+ * actually happened — "empty_output … partial output KEPT at
+ * …" — and it belongs to the RIP, not to the health engine, so
+ * it survives both sides of the gate.
+ *
+ * `hedged` on the published verdict is not a formality: the gate
+ * opens on file counts, so the thresholds behind that verdict
+ * are still guesses at the instant it opens. Forcing
+ * `suspected` is what keeps it off MQTT.
+ */
+const buildVerdict = (input: {
+  facts: BayFacts
+  computed: Verdict | null
+}): Verdict => {
+  const { computed, facts } = input
+
+  const evidence =
+    facts.outcome === null ? [] : [facts.outcome.detail]
+
+  if (computed === null || !isHealthVerdictPublished()) {
+    return makeVerdict(
+      "unknown",
+      // NEVER `confirmed`: only a confirmed verdict may announce
+      // over MQTT, and an announcement carrying a verdict
+      // nothing computed is the confidently-wrong alert the
+      // whole health model exists to prevent.
+      "suspected",
+      evidence,
+    )
+  }
+
+  return hedged({
+    ...computed,
+    // The engine's own evidence first — it is the reasoning —
+    // then what the rip itself did. Never the other way round:
+    // the card shows the verdict's reasons under its message.
+    evidence: [...computed.evidence, ...evidence],
+  })
+}
 
 /**
  * The disc, as much of it as the watcher actually knows.
@@ -465,6 +519,7 @@ const buildJob = (input: {
   record: BayRecord
   facts: BayFacts
   poster: PosterStore
+  verdicts: ComputedVerdictStore
 }): Job | null => {
   const { record, facts } = input
 
@@ -511,7 +566,14 @@ const buildJob = (input: {
       poster: input.poster,
     }),
     progress: record.progress,
-    verdict: buildVerdict(facts),
+    // A synchronous memory read. `publish` below is what asks
+    // for the file, on the watcher's own poll.
+    verdict: buildVerdict({
+      facts,
+      computed: input.verdicts.get({
+        jobUuid: record.jobId,
+      }),
+    }),
     // `unknown` rather than null for a failure: null reads as
     // "nothing went wrong". The outcome's own sentence — which
     // names the real reason — travels as verdict evidence.
@@ -539,6 +601,8 @@ export const createTowerFeed = ({
   handlers = {},
   now = () => Date.now(),
   poster = createPosterStoreFromEnv(),
+  stateDir = readStateDir(),
+  verdicts = createComputedVerdictStore({ stateDir }),
 }: {
   store: TowerStore
   /** The console handlers, wrapped rather than replaced. */
@@ -554,6 +618,23 @@ export const createTowerFeed = ({
    * must never reach the real OMDb API.
    */
   poster?: PosterStore
+  /**
+   * Where `<uuid>.verdict.json` lives.
+   *
+   * Defaulted from the environment like `api/server.ts` does,
+   * and passed explicitly by `main.ts` from the watcher's own
+   * `config.stateDir`, so the feed can never look somewhere the
+   * verdicts are not.
+   */
+  stateDir?: string
+  /**
+   * The engine's saved answers.
+   *
+   * **Every test passes its own** — a test must never read the
+   * real state directory, and one that did would pass or fail
+   * on whatever the tower happened to have ripped.
+   */
+  verdicts?: ComputedVerdictStore
 }): TowerFeed => {
   const records = new Map<string, BayRecord>()
 
@@ -605,6 +686,15 @@ export const createTowerFeed = ({
       poster.request({ discName: facts.discName })
     }
 
+    // Same rule, same tick: ask for the engine's saved answer
+    // here rather than on the request path, and only once the
+    // bay has an outcome — before that the file does not exist
+    // yet, and asking for it every five seconds would be nine
+    // misses a poll for the length of every rip.
+    if (facts.outcome !== null) {
+      verdicts.request({ jobUuid: record.jobId })
+    }
+
     store.setBay({
       bay: createBaySnapshot({
         driveId: record.driveId,
@@ -635,7 +725,7 @@ export const createTowerFeed = ({
                 isDrivePresent:
                   sighting?.isDrivePresent ?? true,
               },
-        job: buildJob({ record, facts, poster }),
+        job: buildJob({ record, facts, poster, verdicts }),
         supervision:
           facts.phase === "quarantined"
             ? {
@@ -841,6 +931,7 @@ export const createTowerFeed = ({
             record,
           }),
           poster,
+          verdicts,
         })
 
         // `last_rip` is the retained "what happened most

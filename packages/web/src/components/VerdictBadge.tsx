@@ -101,13 +101,35 @@ export function VerdictBadge({
   // get the emphasis a finding gets. See `verdictTone`.
   const isUnmeasured = verdictTone(verdict) === "unmeasured"
 
+  // An `unknown` verdict has no message worth printing. It says
+  // "not enough information to judge this rip yet", which is a
+  // statement about rip-deck's own build state, and it was
+  // printed on every finished card on the rack — nine copies of
+  // a sentence the owner cannot act on. `ok` is dropped one
+  // branch up for the same reason: a chip that always shows is a
+  // chip nobody reads.
+  //
+  // The EVIDENCE is a different thing and survives. It carries
+  // the rip's own outcome sentence — "empty_output …", the path
+  // a partial rip was kept at — which is the one line on the
+  // card that names what actually happened. So an unmeasured
+  // verdict with evidence renders as its evidence alone, and one
+  // without renders as nothing at all.
+  if (isUnmeasured && evidence.length === 0) return null
+
+  // Something has to occupy the heading, or `Alert` renders a
+  // block of detail lines under a blank first row. For a real
+  // verdict that is the message; for an unmeasured one it is the
+  // first evidence line, promoted, with the rest left as detail.
+  const [lead, ...rest] = evidence
+
   return (
     <Alert
       className="mt-1.5"
-      details={evidence}
+      details={isUnmeasured ? rest : evidence}
       heading={
         <span className={isUnmeasured ? "font-normal" : ""}>
-          {message}
+          {isUnmeasured ? lead : message}
           {/* `suspected` earns that sentence only when there is a
               verdict to confirm. On `unknown` there is not: it is
               the absence of a measurement, so a second drive has

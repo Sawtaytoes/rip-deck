@@ -1,6 +1,29 @@
-import { EMPTY_PROGRESS } from "@rip-deck/contracts"
-import { afterEach, describe, expect, it } from "vitest"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import {
+  EMPTY_PROGRESS,
+  isAnnounceable,
+  makeVerdict,
+  type Verdict,
+} from "@rip-deck/contracts"
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest"
 import type { ProbedDrive } from "../drives/sysfs.ts"
+import {
+  refreshHealthGate,
+  resetHealthGate,
+} from "../health/publish.ts"
+import {
+  type ComputedVerdictStore,
+  createNullComputedVerdictStore,
+} from "../health/verdictStore.ts"
 import {
   createNullPosterStore,
   createPosterStoreFromEnv,
@@ -16,6 +39,7 @@ import {
   type BayState,
   createBayState,
   startWatcher,
+  type WatcherHandlers,
 } from "../rip/watcher.ts"
 import { buildArmState } from "./armView.ts"
 import type { RipDeckJsonDocument } from "./jsonDocument.ts"
@@ -95,6 +119,7 @@ const createHarness = (
     sightings?: BaySighting[]
     isAttached?: boolean
     poster?: PosterStore
+    verdicts?: ComputedVerdictStore
   } = {},
 ) => {
   const store = createTowerStore()
@@ -110,6 +135,11 @@ const createHarness = (
     // OMDb API, and it would if this machine happened to have
     // `RIP_DECK_OMDB_API_KEY` exported.
     poster: input.poster ?? createNullPosterStore(),
+    // Same rule as the poster store, for the same reason: the
+    // default reads `$RIP_DECK_STATE_DIR`, so a test that took
+    // it would pass or fail on whatever the tower had ripped.
+    verdicts:
+      input.verdicts ?? createNullComputedVerdictStore(),
     handlers: {
       onNote: () => calls.push("onNote"),
       onBayNote: () => calls.push("onBayNote"),
@@ -1502,5 +1532,196 @@ describe("the fed store, served", () => {
     // The bay label is still there, as the DRIVE's name. The
     // bug was the disc borrowing it.
     expect(rip.drive_name).toBe("02 - Pioneer BDR-211M")
+  })
+})
+
+/**
+ * The gate, from the dashboard's side.
+ *
+ * `health/corpus.test.ts` proves the counting. This proves the
+ * consequence: what a card carries on each side of the switch,
+ * and that opening it can never put an announceable verdict on
+ * the wire.
+ *
+ * The corpus is a real temporary directory with a real feature
+ * vector in it, and `minJobCount: 1` stands in for the production
+ * 30. Faking the gate would have tested a mock of the one
+ * mechanism these tests exist to check.
+ */
+describe("showing the health engine's answer", () => {
+  let corpusDir = ""
+
+  beforeEach(async () => {
+    corpusDir = await mkdtemp(
+      join(tmpdir(), "rip-deck-feed-corpus-"),
+    )
+
+    resetHealthGate()
+  })
+
+  afterEach(async () => {
+    await rm(corpusDir, { recursive: true, force: true })
+
+    resetHealthGate()
+  })
+
+  /** One rip that went badly — enough to earn the gate. */
+  const seedCorpus = async (): Promise<void> => {
+    await writeFile(
+      join(corpusDir, "job-1.features.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        readErrorCount: 4,
+        ioErrorTotalDelta: 2,
+        outcome: {
+          isSuccessful: false,
+          failureReason: "read_errors",
+          exitCode: 1,
+          verdictKind: null,
+        },
+      }),
+      "utf8",
+    )
+
+    await refreshHealthGate({
+      stateDir: corpusDir,
+      minJobCount: 1,
+    })
+  }
+
+  /** A store that already holds one answer, as if read. */
+  const storeHolding = (
+    verdict: Verdict,
+  ): ComputedVerdictStore => ({
+    request: () => {},
+    get: () => verdict,
+  })
+
+  const finish = (harness: {
+    handlers: WatcherHandlers
+  }): void => {
+    harness.handlers.onBayOutcome?.({
+      ...bayEvent,
+      outcome: outcome(
+        "failed",
+        "empty_output (makemkvcon exited 0)",
+      ),
+    })
+  }
+
+  it("keeps a saved verdict off the card while the gate is shut", () => {
+    const harness = createHarness({
+      verdicts: storeHolding(
+        makeVerdict("disc_scratched", "suspected", [
+          "Errors in one band.",
+        ]),
+      ),
+    })
+
+    finish(harness)
+
+    const verdict = harness.readBay()?.job?.verdict
+
+    // The engine judged this rip and the answer is on disk. With
+    // three rips of corpus behind it, showing "source another
+    // copy" would be a guess wearing a finding's clothes.
+    expect(verdict?.kind).toBe("unknown")
+    // The rip's own sentence survives either way — it is the one
+    // line that names what actually happened.
+    expect(verdict?.evidence).toEqual([
+      "empty_output (makemkvcon exited 0)",
+    ])
+  })
+
+  it("shows it once the corpus has earned it", async () => {
+    await seedCorpus()
+
+    const harness = createHarness({
+      verdicts: storeHolding(
+        makeVerdict("disc_dirty", "suspected", [
+          "Errors scattered across the disc.",
+        ]),
+      ),
+    })
+
+    finish(harness)
+
+    const verdict = harness.readBay()?.job?.verdict
+
+    expect(verdict?.kind).toBe("disc_dirty")
+    expect(verdict?.action).toBe("clean_disc")
+    // The engine's reasoning first, then what the rip did. The
+    // card prints the detail lines under the message, so the
+    // other order would put the outcome above its own verdict's
+    // reasons.
+    expect(verdict?.evidence).toEqual([
+      "Errors scattered across the disc.",
+      "empty_output (makemkvcon exited 0)",
+    ])
+  })
+
+  it("never lets an open gate produce an announceable verdict", async () => {
+    await seedCorpus()
+
+    const harness = createHarness({
+      verdicts: storeHolding(
+        makeVerdict("key_expired", "confirmed", [
+          "MakeMKV reported D8.",
+        ]),
+      ),
+    })
+
+    finish(harness)
+
+    const verdict = harness.readBay()?.job?.verdict
+
+    // ⚠️ The load-bearing one. The gate opens on FILE COUNTS, so
+    // the thresholds behind this verdict are still invented at
+    // the instant it opens. `isAnnounceable` asks for exactly
+    // one property, and `hedged` takes it away — so a verdict
+    // published by the automatic gate can be read and can never
+    // wake the house.
+    expect(verdict?.kind).toBe("key_expired")
+    expect(verdict?.confidence).toBe("suspected")
+    expect(isAnnounceable(verdict as Verdict)).toBe(false)
+  })
+
+  it("falls back to unknown when no answer was saved", async () => {
+    await seedCorpus()
+
+    const harness = createHarness({
+      verdicts: createNullComputedVerdictStore(),
+    })
+
+    finish(harness)
+
+    // An open gate is permission, not an answer. A rip still
+    // running, an adopted disc from before capture existed, or a
+    // write that failed all land here.
+    expect(harness.readBay()?.job?.verdict.kind).toBe(
+      "unknown",
+    )
+  })
+
+  it("asks for the file only once the bay has an outcome", () => {
+    const request = vi.fn()
+
+    const harness = createHarness({
+      verdicts: { request, get: () => null },
+    })
+
+    harness.handlers.onBayProgress?.({
+      ...bayEvent,
+      progress: { ...EMPTY_PROGRESS, totalFraction: 0.2 },
+    })
+
+    // Nothing has been written yet, and nine bays asking every
+    // five seconds for the length of every rip is nine misses a
+    // poll for hours.
+    expect(request).not.toHaveBeenCalled()
+
+    finish(harness)
+
+    expect(request).toHaveBeenCalled()
   })
 })

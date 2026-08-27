@@ -9,6 +9,7 @@ import type {
 } from "@rip-deck/contracts"
 import { readScsiGenericPath } from "../drives/sysfs.ts"
 import { evaluateJobHealth } from "../health/jobVerdict.ts"
+import { refreshHealthGate } from "../health/publish.ts"
 import { createSampleStore } from "../health/sampleStore.ts"
 import { parseMakemkvLine } from "../makemkv/parseLine.ts"
 import {
@@ -540,13 +541,14 @@ const superviseChild = async (
   // The engine runs here, on the real path, for every job. What
   // it does NOT do is decide anything: its answer is written to
   // `<uuid>.verdict.json` beside the vector it judged, and is
-  // stamped onto `outcome.verdictKind` only once
-  // `IS_HEALTH_VERDICT_PUBLISHED` is flipped — which `AGENTS.md`
-  // says needs ~30 real jobs of corpus first, and there are
-  // three. Running it now anyway is the point: when the
-  // thresholds are finally tuned the wiring is already proven,
-  // and every historical job can be asked "what would the engine
-  // have said" without a re-rip.
+  // stamped onto `outcome.verdictKind` only once the gate in
+  // `health/publish.ts` has counted enough corpus to open. That
+  // gate counts `*.features.json` in the state directory, so it
+  // needs no flag flipped by hand and cannot go stale. Running
+  // the engine before it opens is the point: the wiring is
+  // already proven on the day the corpus arrives, and every
+  // historical job can be asked "what would the engine have
+  // said" without a re-rip.
   //
   // `verdictKind: null` is the caller's own answer — `runRipJob`
   // computes no verdict of its own, and never one that could
@@ -571,6 +573,18 @@ const superviseChild = async (
         },
       }),
   )
+
+  // This rip just added a row to the corpus, which is the only
+  // event that can move the gate. Re-count now rather than on a
+  // timer: the count changes once per rip and never otherwise,
+  // and the dashboard reads the answer synchronously.
+  //
+  // Swallowed for the same reason every other write on this path
+  // is. A `readdir` that fails must cost the gate one refresh,
+  // never a finished rip its result.
+  await refreshHealthGate({
+    stateDir: input.stateDir,
+  }).catch(() => null)
 
   // --- Land it, or keep the partial output. ----------------
   if (!summary.isSuccessful) {
