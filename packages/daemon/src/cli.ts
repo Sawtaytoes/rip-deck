@@ -673,6 +673,13 @@ const runRip = async (flags: string[]) => {
   // "failed" that reads like a crash.
   console.error(`FAILED: ${result.failureReason}`)
 
+  // The structural check's own sentence. Without it,
+  // `empty_output` is indistinguishable from three different
+  // things that want three different actions.
+  if (result.verificationFailure !== null) {
+    console.error(result.verificationFailure)
+  }
+
   if (result.exitCode === 0) {
     console.error(
       "Note that makemkvcon exited 0. This is exactly the " +

@@ -41,6 +41,7 @@ export const buildRip = (
   eta_trend: "falling",
   throughput_bytes_per_sec: 21 * 1024 * 1024,
   read_error_count: 0,
+  warnings: [],
   verdict: "ok",
   verdict_message: "Reading normally.",
   verdict_confidence: "suspected",

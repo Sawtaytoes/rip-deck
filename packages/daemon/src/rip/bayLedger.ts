@@ -482,6 +482,33 @@ const isLedgerRecord = (
   )
 }
 
+/**
+ * Normalise a stored outcome's warnings.
+ *
+ * The rest of the outcome rides through as-is — `isLedgerRecord`
+ * has already proved it is an object with a string `kind`, and
+ * inventing a kind allowlist here would drop a bay's memory the
+ * day a new one ships. The warnings are different: they are the
+ * one field a reader RENDERS as a list, so a hand-edited file
+ * holding a number in it would reach the UI. Absent, malformed
+ * and empty all normalise to "nothing to say".
+ */
+const readOutcome = (outcome: BayOutcome): BayOutcome => {
+  const warnings = Array.isArray(outcome.warnings)
+    ? outcome.warnings.filter(
+        (warning) => typeof warning === "string",
+      )
+    : []
+
+  return warnings.length === 0
+    ? { kind: outcome.kind, detail: outcome.detail }
+    : {
+        kind: outcome.kind,
+        detail: outcome.detail,
+        warnings,
+      }
+}
+
 const DISC_TYPES: readonly DiscType[] = [
   "none",
   "cd",
@@ -519,7 +546,7 @@ const readLedgerRecord = (
         : null,
       destinationPath: value.destinationPath ?? null,
       jobUuid: optionalStringField(value.jobUuid),
-      outcome: value.outcome,
+      outcome: readOutcome(value.outcome),
       // `=== true` rather than a cast: absent (a ledger written
       // before this field existed) and anything that is not the
       // boolean both read as "nobody has said this disc is out",

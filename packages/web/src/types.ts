@@ -115,8 +115,24 @@ export type Rip = {
   eta_seconds: number | null
   eta_trend: EtaTrend | null
   throughput_bytes_per_sec: number | null
-  /** Non-zero blocks success. Never render this as healthy. */
+  /**
+   * Read errors during the copy. Never render this as healthy.
+   *
+   * ⚠️ It no longer BLOCKS success, which is what this comment
+   * used to say. The CSS handshake probe every protected DVD
+   * emits is not counted here, and a genuine read error on a
+   * backup that verified is a warning — see `warnings`.
+   */
   read_error_count: number
+  /**
+   * Trouble on a rip that still worked. Empty for a clean one.
+   *
+   * The third state. A `completed` rip with a non-empty list
+   * paints the warning chip and prints these sentences on the
+   * card
+   * ([decision](https://mkdocs.octen.dev/workspace/rip-deck/docs/decisions/2026-08-27-a-read-error-on-a-verified-backup-is-a-warning-not-a-failure/)).
+   */
+  warnings: string[]
   verdict: VerdictKind
   verdict_message: string
   /**
@@ -176,6 +192,15 @@ export type DriveStatePayload = {
   eta_trend: EtaTrend | null
   throughput_bytes_per_sec: number | null
   read_error_count: number
+  /**
+   * This rip finished AND has something wrong with it.
+   *
+   * The chip's half of the third state — the sentences are on
+   * `Rip.warnings`. Optional: a daemon older than this field is
+   * still one this dashboard renders, and absent reads as "no
+   * warning", which is what every rip before it meant.
+   */
+  has_warnings?: boolean
   verdict: VerdictKind
   updated_at: number
 }

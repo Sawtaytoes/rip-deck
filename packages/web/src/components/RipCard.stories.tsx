@@ -53,6 +53,7 @@ const buildRip = (overrides: Partial<Rip> = {}): Rip => ({
   eta_trend: "rising",
   throughput_bytes_per_sec: 16.3 * 1024 * 1024,
   read_error_count: 0,
+  warnings: [],
   verdict: "ok",
   verdict_message: "Reading normally.",
   verdict_confidence: "suspected",

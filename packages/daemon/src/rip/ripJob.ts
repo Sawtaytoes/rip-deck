@@ -177,6 +177,23 @@ export type RipJobResult = RipSummary & {
    */
   wrongDriveDevPath: string | null
   /**
+   * Why the structural check failed, in plain language.
+   *
+   * Null when the check passed, or when it never ran (a
+   * non-zero exit, a termination we caused).
+   *
+   * ⚠️ **This used to be computed and thrown away**, and the
+   * cost was measured: `empty_output` on its own says a backup
+   * produced nothing, which is the same sentence for "the
+   * destination is not there", "the output is a file with no
+   * ISO9660 signature in it" and "only 3.9 GB landed for a
+   * 7.5 GB disc". Those want three different actions, and on
+   * 2026-08-27 the bare reason cost a full investigation before
+   * anybody could say which of them had happened.
+   * `verifyBackupStructure` already writes the sentence.
+   */
+  verificationFailure: string | null
+  /**
    * The child's stderr.
    *
    * Robot mode puts everything useful on stdout, so stderr is
@@ -220,6 +237,7 @@ export const runRipJob = async (
       incompletePath: null,
       hasCollision: false,
       wrongDriveDevPath: null,
+      verificationFailure: null,
       stderr: "",
     }
   }
@@ -534,6 +552,15 @@ const superviseChild = async (
     hasVerifiedStructure: verification?.isVerified ?? false,
   })
 
+  // Only when the check ran AND said no. A `null` verification
+  // means it never ran, and reporting "nothing was written" for
+  // a rip we killed ourselves would be a claim about a dataset
+  // nobody looked at.
+  const verificationFailure =
+    verification === null || verification.isVerified
+      ? null
+      : verification.reason
+
   // Close the feature vector BEFORE the success branch, so a
   // FAILED rip is sampled too. A rip that went badly is the more
   // valuable row of the two — every assertion in the current
@@ -610,6 +637,7 @@ const superviseChild = async (
         : null,
       hasCollision: false,
       wrongDriveDevPath,
+      verificationFailure,
       stderr: stderrChunks.join(""),
     }
   }
@@ -626,6 +654,7 @@ const superviseChild = async (
     incompletePath: null,
     hasCollision: finalised.hasCollision,
     wrongDriveDevPath: null,
+    verificationFailure: null,
     stderr: stderrChunks.join(""),
   }
 }

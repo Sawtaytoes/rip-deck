@@ -234,6 +234,36 @@ describe("the fixture set", () => {
     }
   })
 
+  it("puts the three finished outcomes in one rack", () => {
+    // Pass, warning and fail together, because they are only
+    // judgeable against each other.
+    const view = viewOf("three-outcomes")
+
+    const finished = view.bays.filter(
+      (bay) => bay.state.state === "completed",
+    )
+    const failed = view.bays.filter(
+      (bay) => bay.state.state === "failed",
+    )
+
+    expect(finished).toHaveLength(2)
+    expect(failed).toHaveLength(1)
+
+    const warned = finished.filter(
+      (bay) => bay.state.has_warnings === true,
+    )
+
+    expect(warned).toHaveLength(1)
+    expect(warned[0].slot).toBe(5)
+    // The clean one must NOT be flagged, or the fixture proves
+    // nothing about telling them apart.
+    expect(
+      finished.filter(
+        (bay) => bay.state.has_warnings !== true,
+      ),
+    ).toHaveLength(1)
+  })
+
   it("shows a quarantined drive with its clear control", () => {
     const view = viewOf("quarantined")
 

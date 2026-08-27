@@ -98,7 +98,7 @@ import {
   type RipHistoryRecord,
   ripHistoryPath,
 } from "./ripHistory.ts"
-import { runRipJob } from "./ripJob.ts"
+import { type RipJobResult, runRipJob } from "./ripJob.ts"
 import { waitForSettledMedia } from "./settle.ts"
 import {
   type EjectCommand,
@@ -340,6 +340,21 @@ export type BayPhase =
 
 export type BayOutcomeKind =
   | "completed"
+  /**
+   * The rip WORKED, and something about it is worth saying.
+   *
+   * A separate kind rather than a flag on `completed`, because
+   * every reader of this union already switches on the kind —
+   * the chip, the ledger, the job state, the console line — and
+   * a flag beside it would be a second thing each of them had to
+   * remember to look at. The third state is the point
+   * ([decision](../../../docs/decisions/2026-08-27-a-read-error-on-a-verified-backup-is-a-warning-not-a-failure.md)).
+   *
+   * It is a SUCCESS: the disc is backed up, the bay latches, and
+   * `toJobState` maps it to `completed`. What differs is the
+   * colour and the sentence.
+   */
+  | "completed_with_warnings"
   | "failed"
   /** Flagged for a human. The disc STAYS in the drive. */
   | "needs_attention"
@@ -356,6 +371,14 @@ export type BayOutcome = {
   kind: BayOutcomeKind
   /** Plain language, for the console and the card. */
   detail: string
+  /**
+   * What went wrong on a rip that still worked, if anything.
+   *
+   * Optional so every existing construction site — and every
+   * ledger file written before this field existed — stays valid.
+   * Absent and empty mean the same thing: nothing to say.
+   */
+  warnings?: string[]
 }
 
 export type BayState = {
@@ -1428,18 +1451,67 @@ const ripWithMakemkv = async (context: {
       result.destinationPath ?? config.destinationRoot
 
     input.onDestination?.(destinationPath)
+  }
 
+  return describeRipOutcome({
+    result,
+    destinationPath:
+      result.destinationPath ?? config.destinationRoot,
+  })
+}
+
+/**
+ * The rip's own result, as the bay latches it.
+ *
+ * Extracted from `runBayRip` and exported so it can be
+ * EXECUTED. `runBayRip` sits behind `waitForSettledMedia`,
+ * `detectDiscType` and a `makemkvcon` spawn, so no test reaches
+ * it — which is how the failure sentence came to be composed
+ * from three inputs with nothing asserting what it says. That
+ * sentence is what the owner reads on a phone at the rack, and
+ * on 2026-08-27 it read `empty_output` about a rip that had
+ * produced a complete 8 GB ISO.
+ *
+ * The three outcomes it can produce are the three states:
+ * `completed`, `completed_with_warnings`, `failed`
+ * ([decision](../../../docs/decisions/2026-08-27-a-read-error-on-a-verified-backup-is-a-warning-not-a-failure.md)).
+ */
+export const describeRipOutcome = (input: {
+  result: RipJobResult
+  /** Where it landed. Only read on the success path. */
+  destinationPath: string
+}): BayOutcome => {
+  const { result } = input
+
+  const warnings = result.warnings.map(
+    (warning) => warning.message,
+  )
+
+  if (result.isSuccessful) {
     return {
-      kind: "completed",
+      // The rip landed either way. A warning changes the badge
+      // and adds a sentence; it never turns a finished backup
+      // into a bay the owner has to rescue.
+      kind:
+        warnings.length === 0
+          ? "completed"
+          : "completed_with_warnings",
       detail:
-        destinationPath +
+        input.destinationPath +
         // A collision never clobbers: the new rip lands beside the
         // old one under a marked name and a human picks. Saying so
         // on the success line is the only place it gets said.
         (result.hasCollision
           ? " (landed beside an existing folder of the same " +
             "name — decide which copy to keep)"
-          : ""),
+          : "") +
+        // Appended rather than replacing the path: the path is
+        // what the owner goes and looks at, and the warning is
+        // why he should look at it.
+        (warnings.length === 0
+          ? ""
+          : ` — ${warnings.join(" ")}`),
+      warnings,
     }
   }
 
@@ -1453,9 +1525,21 @@ const ripWithMakemkv = async (context: {
         ? " (makemkvcon exited 0 — the silent-success case " +
           "ARM reports as a completed rip)"
         : ` (exit ${String(result.exitCode)})`) +
+      // What the structural check actually saw. `empty_output`
+      // alone is the same word for "the destination is not
+      // there", "this is a file with no ISO9660 signature" and
+      // "only half a disc landed", and the owner reads this
+      // sentence on a phone.
+      (result.verificationFailure === null
+        ? ""
+        : ` — ${result.verificationFailure}`) +
       (result.incompletePath === null
         ? ""
         : `. Partial output KEPT at ${result.incompletePath}`),
+    // Read errors on a rip that failed anyway still explain it,
+    // so they travel with the failure rather than being dropped
+    // for not being a warning-shaped outcome.
+    warnings,
   }
 }
 

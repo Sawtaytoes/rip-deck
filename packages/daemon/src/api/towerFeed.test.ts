@@ -206,7 +206,11 @@ const fakePoster = (
 const outcome = (
   kind: BayOutcome["kind"],
   detail: string,
-): BayOutcome => ({ kind, detail })
+  warnings?: string[],
+): BayOutcome =>
+  warnings === undefined
+    ? { kind, detail }
+    : { kind, detail, warnings }
 
 describe("the bay-phase to job-state mapping", () => {
   it("resolves an ambiguous phase downwards", () => {
@@ -247,6 +251,23 @@ describe("the bay-phase to job-state mapping", () => {
     ).toBeNull()
   })
 
+  it("keeps a warning-bearing rip COMPLETED, not needs_attention", () => {
+    // A warning is not a state. The disc IS backed up, so the
+    // bay is done with it — routing this to `needs_attention`
+    // would put a finished rip in the queue of bays waiting on
+    // the owner, which is the opposite of what he asked for.
+    expect(
+      toJobState({
+        phase: "done",
+        outcome: outcome(
+          "completed_with_warnings",
+          "/media/Disc-Rips/x.iso — 4 read errors",
+        ),
+        hasSeenProgress: true,
+      }),
+    ).toBe("completed")
+  })
+
   it("treats a quarantined bay as needing a human", () => {
     expect(
       toJobState({
@@ -274,6 +295,63 @@ describe("the feed", () => {
     expect(bay?.job?.state).toBe("settling")
     expect(bay?.job?.startedAt).toBe(NOW_MS)
     expect(bay?.job?.finishedAt).toBeNull()
+  })
+
+  it("carries a finished rip's warnings onto its job", () => {
+    // The third state, end to end through the feed: the bay
+    // table holds the sentences `buildRipWarnings` wrote, the
+    // job carries them, and the state stays `completed`.
+    const harness = createHarness({
+      bays: fakeBays([
+        {
+          phase: "done",
+          latchedAtMs: NOW_MS - 60_000,
+          destinationPath: "/media/Disc-Rips/x.iso",
+          outcome: outcome(
+            "completed_with_warnings",
+            "/media/Disc-Rips/x.iso — 4 read errors",
+            ["4 read errors at 3.20 GB."],
+          ),
+        },
+      ]),
+    })
+
+    harness.handlers.onBayNote?.({
+      ...bayEvent,
+      message: "ripping -> x",
+    })
+
+    const job = harness.readBay()?.job
+
+    expect(job?.state).toBe("completed")
+    expect(job?.warnings).toEqual([
+      "4 read errors at 3.20 GB.",
+    ])
+    // A warning is not a failure, and nothing here may turn it
+    // into one.
+    expect(job?.failureReason).toBeNull()
+  })
+
+  it("gives a clean finished rip an empty warning list", () => {
+    const harness = createHarness({
+      bays: fakeBays([
+        {
+          phase: "done",
+          latchedAtMs: NOW_MS - 60_000,
+          outcome: outcome(
+            "completed",
+            "/media/Disc-Rips/x.iso",
+          ),
+        },
+      ]),
+    })
+
+    harness.handlers.onBayNote?.({
+      ...bayEvent,
+      message: "ripping -> x",
+    })
+
+    expect(harness.readBay()?.job?.warnings).toEqual([])
   })
 
   it("carries the watcher's REAL job uuid", () => {
