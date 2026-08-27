@@ -31,6 +31,15 @@ export const LEFTOVERS_KEY = "rip-deck-leftovers"
  * with no second round trip and no window where a deleted folder
  * is still on screen with a live Delete button beside it.
  *
+ * ## Why rename shares this hook rather than getting its own
+ *
+ * The two verbs are one route, one answer shape and one cache
+ * entry. Splitting them would mean two `lastMessage` states that
+ * can both be on screen at once, saying different things about
+ * the same folder — and the panel has exactly one place to put a
+ * sentence. `pendingPath` is shared for the same reason: one row
+ * is busy, whichever button started it.
+ *
  * ## Why a refusal is not an error
  *
  * The daemon refuses to delete a FINISHED rip, and says so. That
@@ -45,7 +54,16 @@ export function useLeftovers(): {
   isLoading: boolean
   loadError: string | null
   clear: (path: string) => void
-  /** The path currently being deleted, so one row can spin. */
+  /**
+   * Rename one, in place.
+   *
+   * Resolves through `lastMessage` like `clear` does — including
+   * "that name is already taken", which is the answer an
+   * operator gets first when he renames a duplicate onto the
+   * name it collided with.
+   */
+  rename: (input: { path: string; newName: string }) => void
+  /** The path currently being written, so one row can spin. */
   pendingPath: string | null
   lastMessage: string | null
   isLastRefused: boolean
@@ -95,6 +113,37 @@ export function useLeftovers(): {
     onSettled: () => setPendingPath(null),
   })
 
+  const renaming = useMutation({
+    mutationFn: (input: {
+      path: string
+      newName: string
+    }) => dataSource.renameLeftover(input),
+    onMutate: (input: {
+      path: string
+      newName: string
+    }) => {
+      setPendingPath(input.path)
+      setLastMessage(null)
+    },
+    onSuccess: (result) => {
+      setLastMessage(result.msg)
+      setIsLastRefused(!result.ok)
+      queryClient.setQueryData<Leftover[]>(
+        [LEFTOVERS_KEY],
+        result.leftovers,
+      )
+    },
+    onError: (error: unknown) => {
+      setLastMessage(
+        error instanceof Error
+          ? error.message
+          : String(error),
+      )
+      setIsLastRefused(true)
+    },
+    onSettled: () => setPendingPath(null),
+  })
+
   return {
     leftovers: listed.data ?? [],
     isLoading: listed.isLoading,
@@ -105,6 +154,8 @@ export function useLeftovers(): {
           ? listed.error.message
           : String(listed.error),
     clear: (path: string) => deleting.mutate(path),
+    rename: (input: { path: string; newName: string }) =>
+      renaming.mutate(input),
     pendingPath,
     lastMessage,
     isLastRefused,

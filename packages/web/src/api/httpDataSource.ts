@@ -4,7 +4,7 @@ import type {
   ActionResult,
   HistoryPage,
   Leftover,
-  LeftoverDeleteResult,
+  LeftoverCommandResult,
   RipDeckDataSource,
   RipDeckState,
   TrayCommandReport,
@@ -302,7 +302,44 @@ export const httpDataSource: RipDeckDataSource = {
 
     const body = await readJsonBody(response)
 
-    if (isLeftoverDeleteResult(body)) return body
+    if (isLeftoverCommandResult(body)) return body
+
+    throw new Error(
+      `/api/leftovers failed: ${response.status} ` +
+        `${readMessage(body) ?? response.statusText}`,
+    )
+  },
+
+  /**
+   * Rename one, by the exact path the list reported.
+   *
+   * ⚠️ NO retry, and here the reason is sharper than it is for
+   * the delete beside it. A rename that timed out may already
+   * have landed, so a second attempt is aimed at a path that no
+   * longer exists — and the daemon would then answer "no longer
+   * there" about a rename that in fact worked.
+   *
+   * `new_name` is snake_case because the daemon's fields are.
+   * A 400 RESOLVES: "that name is already taken" is the sentence
+   * this endpoint exists to say, and it belongs on screen.
+   */
+  async renameLeftover({ newName, path }) {
+    const response = await fetch(
+      `${apiBase}/api/leftovers`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          command: "rename",
+          new_name: newName,
+          path,
+        }),
+      },
+    )
+
+    const body = await readJsonBody(response)
+
+    if (isLeftoverCommandResult(body)) return body
 
     throw new Error(
       `/api/leftovers failed: ${response.status} ` +
@@ -412,13 +449,13 @@ const isLeftoverList = (
     (body as { leftovers?: unknown }).leftovers,
   )
 
-const isLeftoverDeleteResult = (
+const isLeftoverCommandResult = (
   body: unknown,
-): body is LeftoverDeleteResult =>
+): body is LeftoverCommandResult =>
   typeof body === "object" &&
   body !== null &&
-  typeof (body as LeftoverDeleteResult).ok === "boolean" &&
-  typeof (body as LeftoverDeleteResult).msg === "string" &&
+  typeof (body as LeftoverCommandResult).ok === "boolean" &&
+  typeof (body as LeftoverCommandResult).msg === "string" &&
   isLeftoverArray(
     (body as { leftovers?: unknown }).leftovers,
   )
