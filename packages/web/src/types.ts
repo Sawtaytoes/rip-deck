@@ -704,6 +704,7 @@ export type HistoryRip = {
   duration_ms: number | null
   outcome_kind:
     | "completed"
+    | "completed_with_warnings"
     | "failed"
     | "needs_attention"
     | "no_media"
@@ -713,7 +714,11 @@ export type HistoryRip = {
   failure_reason: string | null
   verdict: VerdictKind
   verdict_message: string | null
-  /** Non-zero blocks success. Never render this as healthy. */
+  /**
+   * ⚠️ Non-zero no longer blocks success — see the 2026-08-27
+   * decision. It still must never render as healthy: the rip is
+   * `completed_with_warnings`, and this count is why.
+   */
   read_error_count: number | null
   throughput_bytes_per_sec: number | null
   /** A capture exists, so the Logs button has a target. */

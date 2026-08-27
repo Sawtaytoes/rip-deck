@@ -96,6 +96,34 @@ describe("the outcome chip", () => {
     expect(historyOutcomeText(flagged)).toBe("Flagged")
     expect(historyOutcomeIntent(flagged)).toBe("warning")
   })
+
+  it("⚠️ never calls a rip WITH WARNINGS failed", () => {
+    // The regression this file exists to hold shut. Both
+    // functions ended in the failure branch, so a kind they did
+    // not name fell through to red — and `completed_with_warnings`
+    // arrived after they were written. The backup is on disk; a
+    // red "Failed" beside it is the same wrong answer the owner
+    // reported on slot 1.
+    const warned = rip({
+      outcome_kind: "completed_with_warnings",
+    })
+
+    expect(historyOutcomeText(warned)).toBe(
+      "Finished with warnings",
+    )
+    expect(historyOutcomeIntent(warned)).toBe("warning")
+    expect(historyOutcomeIntent(warned)).not.toBe("danger")
+  })
+
+  it("gives a no-media row the failure treatment", () => {
+    // Named explicitly now that the switch is exhaustive, so the
+    // behaviour is asserted rather than inherited from a
+    // fall-through.
+    const empty = rip({ outcome_kind: "no_media" })
+
+    expect(historyOutcomeText(empty)).toBe("Failed")
+    expect(historyOutcomeIntent(empty)).toBe("danger")
+  })
 })
 
 describe("the measurements", () => {

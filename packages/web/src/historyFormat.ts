@@ -58,25 +58,53 @@ export function hasHistoryTitle(rip: HistoryRip): boolean {
  * built to stop reporting (`README.md`, ARM #1298), so it gets
  * its own warning-coloured word rather than being folded into
  * either green or red.
+ *
+ * ⚠️ **Both functions used to END in the failure branch**, so
+ * every kind they did not name painted red and read "Failed".
+ * That is how `completed_with_warnings` — added the same day
+ * this page shipped, by a change that could not see it — turned
+ * a finished, verified backup into the exact red badge the owner
+ * asked us to stop showing him. Every kind is now named, and the
+ * switch is exhaustive, so the next outcome added to
+ * `BayOutcomeKind` fails to compile here instead of silently
+ * painting itself red.
  */
 export const historyOutcomeText = (
   rip: HistoryRip,
 ): string => {
-  if (rip.outcome_kind === "completed") return "Finished"
-  if (rip.outcome_kind === "needs_attention")
-    return "Flagged"
-
-  return "Failed"
+  switch (rip.outcome_kind) {
+    case "completed":
+      return "Finished"
+    // Says both halves out loud. "Finished" alone hides the
+    // warning on a page that is scanned, and the read-error line
+    // beside it is empty whenever the warning came from
+    // somewhere else — MakeMKV's own hash check, for one.
+    case "completed_with_warnings":
+      return "Finished with warnings"
+    case "needs_attention":
+      return "Flagged"
+    case "failed":
+    case "no_media":
+      return "Failed"
+  }
 }
 
 export const historyOutcomeIntent = (
   rip: HistoryRip,
 ): IntentName => {
-  if (rip.outcome_kind === "completed") return "success"
-  if (rip.outcome_kind === "needs_attention")
-    return "warning"
-
-  return "danger"
+  switch (rip.outcome_kind) {
+    case "completed":
+      return "success"
+    // Amber, not green and not red: the backup EXISTS, so red is
+    // a lie, and it is not clean, so green is the swallow this
+    // project exists to prevent.
+    case "completed_with_warnings":
+    case "needs_attention":
+      return "warning"
+    case "failed":
+    case "no_media":
+      return "danger"
+  }
 }
 
 /**
