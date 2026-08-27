@@ -26,8 +26,16 @@ type ChipState =
   | "ripping"
   | "done"
   | "attention"
+  | "failed"
+  | "stopped"
   | "quarantined"
   | "idle"
+
+const DANGER_CHIP =
+  "border-intent-danger-border bg-intent-danger-surface text-intent-danger-content"
+
+const NEUTRAL_CHIP =
+  "border-border-subtle bg-surface-raised text-content-muted"
 
 const CHIP: Record<ChipState, string> = {
   ripping:
@@ -38,17 +46,18 @@ const CHIP: Record<ChipState, string> = {
   done: "border-intent-success-border bg-surface-raised text-intent-success-content",
   attention:
     "border-intent-warning-border bg-intent-warning-surface text-intent-warning-content",
-  quarantined:
-    "border-intent-danger-border bg-intent-danger-surface text-intent-danger-content",
-  idle: "border-border-subtle bg-surface-raised text-content-muted",
+  // A failed rip and an out-of-service bay are both red. They
+  // are not the same fact, and the DETAIL word is what separates
+  // them — "failed" against "quarantined". The colour answers
+  // one question only, and both answer it the same way: there is
+  // no backup, and this bay wants you.
+  failed: DANGER_CHIP,
+  quarantined: DANGER_CHIP,
+  // The owner stopped this one on purpose, so it is not an
+  // alarm. It produced no backup either, so it is not green.
+  stopped: NEUTRAL_CHIP,
+  idle: NEUTRAL_CHIP,
 }
-
-/** A rip is finished with this bay, one way or another. */
-const LATCHED_STATES = new Set([
-  "completed",
-  "failed",
-  "cancelled",
-])
 
 const ACTIVE_STATES = new Set([
   "ripping",
@@ -75,6 +84,30 @@ function bayStatus(bay: BayView): {
     return { state: "attention", detail: "held" }
   }
 
+  // ⚠️ BEFORE the verdict, and before the latched branch below,
+  // which is where this used to land. `failed` sat in one set
+  // with `completed` and `cancelled`, so a rip that produced no
+  // backup at all painted the same calm GREEN as one that
+  // finished — a chip reading "01 failed" in success colours.
+  // Most failures reach it: the verdict branch above catches a
+  // failure only when the health engine judged the disc, and
+  // `towerFeed` stamps the non-actionable `unknown` on every bay
+  // nothing measured.
+  //
+  // A failure outranks its own verdict here. The verdict names
+  // the ACTION and is worth keeping as the word on the chip, but
+  // it must not soften the colour to amber: "go clean the disc"
+  // and "there is no backup" are two facts, and the second is
+  // the louder one.
+  if (bay.state.state === "failed") {
+    return {
+      state: "failed",
+      detail: isVerdictActionable(bay.state.verdict)
+        ? bay.state.verdict
+        : "failed",
+    }
+  }
+
   // A verdict that asks for nothing is not trouble. This read
   // `verdict !== "ok"` while three finished backups showed amber
   // `unknown` chips on the live rack — `unknown` is what the
@@ -93,14 +126,15 @@ function bayStatus(bay: BayView): {
   // A bay with a finished disc still in it is not idle, and
   // saying "idle" hides the one thing the owner might act on:
   // there is something in there to take out.
-  if (LATCHED_STATES.has(bay.state.state)) {
-    return {
-      state: "done",
-      detail:
-        bay.state.state === "completed"
-          ? "done"
-          : bay.state.state,
-    }
+  if (bay.state.state === "completed") {
+    return { state: "done", detail: "done" }
+  }
+
+  // Cancelled is the same "there is a disc in there" fact, said
+  // about a rip the owner stopped. Not an alarm, and not a
+  // success — see `CHIP`.
+  if (bay.state.state === "cancelled") {
+    return { state: "stopped", detail: "cancelled" }
   }
 
   return { state: "idle", detail: "idle" }
