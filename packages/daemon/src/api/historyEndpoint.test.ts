@@ -304,6 +304,7 @@ describe("listing the history over HTTP", () => {
       join(tmpRoot, `${uuid("aaaaaaaa")}.features.json`),
       JSON.stringify({
         discBytes: 45_000_000_000,
+        driveThroughputP50BytesPerSec: 24_981_706.85,
         durationMs: 1_800_000,
         readErrorCount: 3,
         outcome: {
@@ -320,7 +321,61 @@ describe("listing the history over HTTP", () => {
     expect(row.duration_ms).toBe(1_800_000)
     expect(row.read_error_count).toBe(3)
     expect(row.failure_reason).toBe("read_errors")
-    expect(row.throughput_bytes_per_sec).toBe(25_000_000)
+    expect(row.throughput_bytes_per_sec).toBe(24_981_707)
+  })
+
+  it("⚠️ never divides the disc size by a FAILED rip's duration", async () => {
+    // The whole-disc assumption that division makes is false the
+    // moment a rip gives up early. It shipped "2175.6 MB/s" on a
+    // 4-second failure and "77186.5 MB/s" on a 1-second one,
+    // both on the live page, because a 7.5 GB disc was divided by
+    // the time before the ripper stopped. A plausible wrong
+    // number is worse than a blank.
+    await seed([record({ jobUuid: uuid("eeeeeeee") })])
+
+    await writeFile(
+      join(tmpRoot, `${uuid("eeeeeeee")}.features.json`),
+      JSON.stringify({
+        discBytes: 8_086_454_272,
+        // What a 4-second failure actually records: the sampler
+        // never got a rate, so there is nothing measured to show.
+        driveThroughputP50BytesPerSec: null,
+        durationMs: 3_608,
+        outcome: {
+          isSuccessful: false,
+          failureReason: "empty_output",
+        },
+      }),
+      "utf8",
+    )
+
+    expect(
+      (await list()).rips[0].throughput_bytes_per_sec,
+    ).toBeNull()
+  })
+
+  it("says nothing about a rate the drive measured as zero", async () => {
+    // What a failed rip that never got a read through records.
+    // "0.0 MB/s" is noise; the outcome sentence beside it
+    // already says what happened.
+    await seed([record({ jobUuid: uuid("ffffffff") })])
+
+    await writeFile(
+      join(tmpRoot, `${uuid("ffffffff")}.features.json`),
+      JSON.stringify({
+        driveThroughputP50BytesPerSec: 0,
+        durationMs: 1_121_000,
+        outcome: {
+          isSuccessful: false,
+          failureReason: "empty_output",
+        },
+      }),
+      "utf8",
+    )
+
+    expect(
+      (await list()).rips[0].throughput_bytes_per_sec,
+    ).toBeNull()
   })
 
   it("renders a row whose job files are gone", async () => {
