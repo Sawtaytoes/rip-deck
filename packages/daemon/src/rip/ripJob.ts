@@ -16,6 +16,7 @@ import {
   checkFreeSpace,
   finaliseDestination,
   type PreparedDestination,
+  pathExists,
   prepareDestination,
 } from "./destination.ts"
 import { verifyDiscIndex } from "./discIndex.ts"
@@ -225,7 +226,7 @@ export const runRipJob = async (
 
   await ensureStateDir(input.stateDir)
 
-  const prepared = await prepareDestination({
+  const prepared = prepareDestination({
     rootPath: input.destinationRoot,
     folderName: input.folderName,
     jobUuid: input.jobUuid,
@@ -588,6 +589,15 @@ const superviseChild = async (
 
   // --- Land it, or keep the partial output. ----------------
   if (!summary.isSuccessful) {
+    // Only claim partial output when there IS some. `makemkvcon`
+    // owns the creation of this directory now, so a rip that
+    // failed before the backup began leaves no trace — and D4's
+    // promise ("a killed rip keeps what it wrote") must not turn
+    // into a path the operator cannot find.
+    const hasPartialOutput = await pathExists(
+      prepared.incompletePath,
+    )
+
     return {
       ...summary,
       termination,
@@ -595,7 +605,9 @@ const superviseChild = async (
       observations,
       progress: tracker.progress,
       destinationPath: null,
-      incompletePath: prepared.incompletePath,
+      incompletePath: hasPartialOutput
+        ? prepared.incompletePath
+        : null,
       hasCollision: false,
       wrongDriveDevPath,
       stderr: stderrChunks.join(""),

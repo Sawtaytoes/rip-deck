@@ -2,6 +2,7 @@ import type { MakemkvEvent } from "@rip-deck/contracts"
 import { describe, expect, it } from "vitest"
 import { parseMakemkvLine } from "../makemkv/parseLine.ts"
 import {
+  chooseDiscNameSource,
   extractDiscName,
   identifyDisc,
   retryUntilRead,
@@ -410,5 +411,71 @@ describe("retrying a read the drive never answered", () => {
 
     // Three reads, two gaps between them.
     expect(sleeps).toBe(2)
+  })
+})
+
+describe("where a disc's name comes from", () => {
+  it("takes the operator's name over everything", () => {
+    // He is looking at the sleeve. `--name` exists to override a
+    // label that is wrong, and a disc CAN carry a wrong one.
+    expect(
+      chooseDiscNameSource({
+        explicitName: "Teenage Mutant Ninja Turtles S1",
+        volumeLabel: "TEENAGE_MUTANT_NINJA_TURTLES",
+      }),
+    ).toEqual({
+      kind: "operator",
+      discName: "Teenage Mutant Ninja Turtles S1",
+    })
+  })
+
+  it("⚠️ uses the volume label rather than reading the drive", () => {
+    // The 2026-08-26 fix. udev already read this string at
+    // insert, so going to `makemkvcon info` for it is a bus scan
+    // and a 120 s timeout bought for nothing — and on a tower
+    // with one wedged drive, bought for worse than nothing.
+    expect(
+      chooseDiscNameSource({
+        explicitName: null,
+        volumeLabel:
+          "Teenage_Mutant_Ninja_Turtles_V7_Disc_2",
+      }),
+    ).toEqual({
+      kind: "volume_label",
+      discName: "Teenage_Mutant_Ninja_Turtles_V7_Disc_2",
+    })
+  })
+
+  it("falls back to reading the disc when udev had no label", () => {
+    // Not a regression — this is what every disc did before the
+    // shortcut existed, and it still has to work for the discs
+    // udev genuinely cannot read.
+    expect(
+      chooseDiscNameSource({
+        explicitName: null,
+        volumeLabel: null,
+      }),
+    ).toEqual({ kind: "identify" })
+  })
+
+  it("treats a blank name from either source as no name", () => {
+    // An empty string is not a title. Accepting one would build a
+    // folder called `" (2026) - DVD"` and bury the disc.
+    expect(
+      chooseDiscNameSource({
+        explicitName: "   ",
+        volumeLabel: "REAL_LABEL",
+      }),
+    ).toEqual({
+      kind: "volume_label",
+      discName: "REAL_LABEL",
+    })
+
+    expect(
+      chooseDiscNameSource({
+        explicitName: "",
+        volumeLabel: "  ",
+      }),
+    ).toEqual({ kind: "identify" })
   })
 })
