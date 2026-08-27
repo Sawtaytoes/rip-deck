@@ -133,9 +133,12 @@ must run where `/sys/block/sr*` is real.
 > ⚠️ **A redeploy cancels every running rip.** A rip runs in its own
 > `rip-deck-rip-<uuid>` container, which makes a redeploy look safe. It is not:
 > the daemon owns that child and kills it on `SIGTERM`, so restarting, stopping
-> or redeploying the app destroys every disc in flight. Check first —
-> `curl -s <host>/json | grep -c '"status": "ripping"'` must read `0`
-> ([decision](docs/decisions/2026-08-27-a-redeploy-cancels-every-running-rip.md)).
+> or redeploying the app destroys every disc in flight. Check first, with a
+> command that fails CLOSED: `curl -sf <host>/json` piped into a parser that
+> exits non-zero on any `"status": "ripping"`. Never `grep -c` — it prints `0`
+> both when nothing is ripping and when the request FAILS, and those are
+> opposite facts. The full command is in the
+> [decision](docs/decisions/2026-08-27-a-redeploy-cancels-every-running-rip.md).
 
 > **UHD discs.** A brand-new 4K UHD disc can fail to rip until MakeMKV's hashed-key
 > bundle catches up (12–48 h), or until an AACS `keydb.cfg` that already knows the

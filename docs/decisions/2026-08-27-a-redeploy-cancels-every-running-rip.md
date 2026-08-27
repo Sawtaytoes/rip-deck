@@ -13,14 +13,29 @@ redeploy sends `SIGTERM` to the daemon, and the daemon answers that signal by
 cancelling **every** rip in flight. Read `/json` first. If any bay reports
 `ripping`, wait.
 
-The check is one command:
+The check must FAIL CLOSED, because the two dangerous answers look the same.
+This is the command:
 
 ```sh
-curl -s https://rip-deck.octen.dev/json \
-  | grep -o '"status": "ripping"' | wc -l
+curl -sf --max-time 20 https://rip-deck.octen.dev/json | python3 -c '
+import json, sys
+doc = json.load(sys.stdin)
+rips = [r for h in doc["hosts"] for r in h["rips"] if r.get("status") == "ripping"]
+print(len(rips))
+sys.exit(1 if rips else 0)
+'
 ```
 
-Zero means it is safe. Anything else means a disc is being read right now.
+Exit 0 means it is safe. Any other exit means WAIT.
+
+⚠️ **Do not count the matches with `grep -c`.** `curl | grep -c` prints `0`
+when nothing is ripping AND when the request fails — an unreachable daemon,
+a timeout, a DNS failure. Those are opposite facts and the naive command
+gives them one answer, which is the same mistake as reading the container
+layout: a signal that cannot say "I do not know" will say "safe" instead. The
+command above pipes into a parser, so a failed fetch raises rather than
+printing zero. This was measured on 2026-08-27: a `grep -c` watch loop
+reported "0 bays ripping" while both bays were at 91%.
 
 ## Context
 
