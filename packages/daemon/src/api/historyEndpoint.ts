@@ -508,11 +508,31 @@ const joinJob = async (input: {
       typeof vector?.readErrorCount === "number"
         ? vector.readErrorCount
         : null,
+    // ⚠️ The MEASURED rate, never `size / duration`.
+    //
+    // That division assumes the whole disc was read, and on a
+    // rip that FAILED it is nonsense: the live page shipped
+    // "2175.6 MB/s" on a 4-second failure and "77186.5 MB/s" on
+    // a 1-second one, because it divided a 7.5 GB disc by the
+    // time before the ripper gave up. A plausible wrong number
+    // is worse than a blank — the same rule `format.etaText`
+    // states for the ETA it refuses to extrapolate.
+    //
+    // `driveThroughputP50BytesPerSec` is the median rate the
+    // KERNEL's own counters observed, which is the input the
+    // whole health engine is built on rather than MakeMKV's
+    // self-report. `ripThroughputP50BytesPerSec` was the other
+    // candidate and is measured too, but it is derived from
+    // MakeMKV's progress fraction and carries its own outlier:
+    // 6992 MB/s on job 71f30886, an 18-second failure.
+    //
+    // Zero says nothing worth rendering — it is what a failed
+    // rip that never got a read through records, and the
+    // outcome sentence beside it already says what happened.
     throughputBytesPerSec:
-      sizeBytes !== null &&
-      durationMs !== null &&
-      durationMs > 0
-        ? Math.round(sizeBytes / (durationMs / 1000))
+      typeof vector?.driveThroughputP50BytesPerSec ===
+        "number" && vector.driveThroughputP50BytesPerSec > 0
+        ? Math.round(vector.driveThroughputP50BytesPerSec)
         : null,
     failureReason:
       typeof vector?.outcome?.failureReason === "string"

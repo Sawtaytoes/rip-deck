@@ -129,12 +129,15 @@ describe("the measurements", () => {
     expect(historySizeText(rip())).toBe("42.3 GB")
   })
 
-  it("writes the average rate in MB/s", () => {
+  it("writes the measured rate in MB/s", () => {
     // MB/s and not GB/s: real rips run at 15–25 MB/s, so a GB/s
     // figure would read "0.0" for every disc on this tower.
-    expect(historyThroughputText(rip())).toBe(
-      "23.7 MB/s average",
-    )
+    //
+    // ⚠️ No "average" in the text. What the daemon sends is the
+    // MEDIAN of the kernel's per-sample rates, and calling that
+    // an average is a small untrue claim about a number somebody
+    // might hold against a drive's spec sheet.
+    expect(historyThroughputText(rip())).toBe("23.7 MB/s")
   })
 
   it("says nothing about a rate it does not have", () => {

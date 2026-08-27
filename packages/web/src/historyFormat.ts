@@ -137,7 +137,19 @@ export function historySizeText(rip: HistoryRip): string {
   return `${(rip.size_bytes / 1024 ** 3).toFixed(1)} GB`
 }
 
-/** Average read rate across the whole rip, in MB/s. */
+/**
+ * The read rate the DRIVE was measured at, in MB/s.
+ *
+ * ⚠️ Not "average", and the word was removed deliberately. What
+ * the daemon sends is the MEDIAN of the kernel's own per-sample
+ * rates (`driveThroughputP50BytesPerSec`), so calling it an
+ * average would be a small untrue claim about a number somebody
+ * might compare against a drive's spec sheet.
+ *
+ * It also used to be `size / duration`, which is only valid if
+ * the whole disc was read — see `historyEndpoint.joinJob` for
+ * the 77186.5 MB/s that shipped.
+ */
 export function historyThroughputText(
   rip: HistoryRip,
 ): string {
@@ -152,7 +164,7 @@ export function historyThroughputText(
   // figure would read "0.0" for every disc on this tower.
   return `${(
     rip.throughput_bytes_per_sec / 1024 ** 2
-  ).toFixed(1)} MB/s average`
+  ).toFixed(1)} MB/s`
 }
 
 /**
