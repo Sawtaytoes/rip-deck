@@ -52,6 +52,12 @@ import {
   writeBayLedger,
 } from "./bayLedger.ts"
 import {
+  appendRipHistory,
+  RIP_HISTORY_VERSION,
+  type RipHistoryRecord,
+  ripHistoryPath,
+} from "./ripHistory.ts"
+import {
   buildCyanripInvocation,
   buildCyanripKillArgs,
   type CyanripCommand,
@@ -1809,6 +1815,19 @@ export type WatcherDeps = {
     ledger: BayLedger
   }) => Promise<void>
   /**
+   * Write one finished rip into the permanent history.
+   *
+   * A separate dep from `writeLedger` because the two files have
+   * opposite shapes: the ledger is current state, rewritten
+   * whole behind a fingerprint; this is an append that is never
+   * edited again. Injectable for the same reason the ledger is —
+   * a watcher test must not need a state directory.
+   */
+  appendHistory: (input: {
+    path: string
+    record: RipHistoryRecord
+  }) => Promise<void>
+  /**
    * Move one tray. Reachable ONLY from `runTrayCommand`, i.e.
    * from an operator pressing something.
    */
@@ -1826,6 +1845,7 @@ export const defaultWatcherDeps: WatcherDeps = {
   runBayRip,
   readLedger: readBayLedger,
   writeLedger: writeBayLedger,
+  appendHistory: appendRipHistory,
   runTray: runTrayCommand,
   now: () => Date.now(),
 }
@@ -2377,6 +2397,13 @@ export const startWatcher = (
     const { slot, name } = placementOf(dispatch.drive)
     const driveId = dispatch.drive.identity.usbPortPath
 
+    // Stamped where the pipeline starts rather than read back
+    // off the bay: `BayState` has no start time, deliberately —
+    // it is a fold over observations and a dispatch instant is
+    // not one. The history row wants it, so it is captured at
+    // the one place that knows it.
+    const startedAtMs = deps.now()
+
     return defer(() =>
       // Cancelled before it ever reached the head of the queue.
       // Only reachable if the `mergeMap` bound is ever set below
@@ -2472,13 +2499,15 @@ export const startWatcher = (
         controllers.delete(driveId)
 
         const current = bays.get(driveId)
+        const finishedAtMs = deps.now()
+
         if (current !== undefined) {
           bays.set(
             driveId,
             applyBayOutcome({
               bay: current,
               outcome,
-              atMs: deps.now(),
+              atMs: finishedAtMs,
             }),
           )
         }
@@ -2488,6 +2517,45 @@ export const startWatcher = (
         // later must not come back as a disc nobody remembers
         // ripping.
         persistLedger()
+
+        // ⚠️ **The bay's LAST chance to say what the disc was.**
+        // `bays.get` above is the only place the name, the type
+        // and the destination exist together with the outcome —
+        // the ledger overwrites all three the moment the next
+        // disc lands in this bay, and no job file records any of
+        // them. So the row is written here, once, and it is the
+        // only reason a rip from last month has a title
+        // (`ripHistory.ts`).
+        //
+        // `no_media` is excluded, matching `applyBayOutcome`'s
+        // own latch rule: the disc left before anything could be
+        // done with it, so there is no rip to remember.
+        //
+        // Never awaited and it cannot throw — `appendRipHistory`
+        // swallows every filesystem failure. Losing a row is a
+        // nuisance; delaying the eight other bays' supervision
+        // behind a disk write is the failure this architecture
+        // exists to prevent.
+        if (current !== undefined && outcome.kind !== "no_media") {
+          void deps.appendHistory({
+            path: ripHistoryPath(input.config.stateDir),
+            record: {
+              v: RIP_HISTORY_VERSION,
+              jobUuid: dispatch.jobUuid,
+              driveId,
+              slot,
+              bayName: name,
+              discName: current.discName,
+              discType: current.discType,
+              destinationPath: current.destinationPath,
+              sizeSectors: current.sizeSectors,
+              startedAtMs,
+              finishedAtMs,
+              outcome,
+              source: "live",
+            },
+          })
+        }
 
         handlers.onBayOutcome?.({
           driveId,
