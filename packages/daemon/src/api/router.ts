@@ -7,8 +7,8 @@ import {
 import { handleHistoryList } from "./historyEndpoint.ts"
 import { buildJsonDocument } from "./jsonDocument.ts"
 import {
-  handleLeftoversDelete,
   handleLeftoversList,
+  handleLeftoversWrite,
 } from "./leftoversEndpoint.ts"
 import {
   isSafeJobUuid,
@@ -122,9 +122,10 @@ const TRAY_PATHNAME = "/api/tray"
 /**
  * The folders a rip left behind, and the button that clears one.
  *
- * `GET` lists, `POST` deletes. On its own path rather than on
- * `/json` because listing means walking each leftover's tree to
- * size it — see `leftoversEndpoint.ts`.
+ * `GET` lists; `POST` deletes or renames, by the `command` in
+ * its body. On its own path rather than on `/json` because
+ * listing means walking each leftover's tree to size it — see
+ * `leftoversEndpoint.ts`.
  */
 const LEFTOVERS_PATHNAME = "/api/leftovers"
 
@@ -695,15 +696,19 @@ export const createApiRouter = ({
 
       if (method === "POST") {
         // A caller with no body reader sends the empty payload,
-        // which `parseDeleteBody` refuses by name — the same
-        // shape `handleTrayRequest` uses one route above.
+        // which `readLeftoversCommand` refuses by name — the
+        // same shape `handleTrayRequest` uses one route above.
+        //
+        // `handleLeftoversWrite` picks the verb out of the
+        // body's `command`, so this route knows about delete and
+        // rename without naming either.
         return (
           readBody === undefined
             ? Promise.resolve("")
             : readBody()
         )
           .then((body) =>
-            handleLeftoversDelete({
+            handleLeftoversWrite({
               body,
               destinationRoot,
             }),

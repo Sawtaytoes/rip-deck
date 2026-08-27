@@ -453,6 +453,8 @@ describe("a failing daemon", () => {
         Promise.reject(new Error("not used in this test")),
       fetchHistory: () =>
         Promise.reject(new Error("not used in this test")),
+      renameLeftover: () =>
+        Promise.reject(new Error("not used in this test")),
     }
 
     renderWithProviders(
