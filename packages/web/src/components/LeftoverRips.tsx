@@ -101,6 +101,7 @@ export function LeftoverRips() {
     pendingPath,
     lastMessage,
     isLastRefused,
+    lastCommand,
   } = useLeftovers()
 
   // Which row has its form open. A path rather than a boolean per
@@ -148,9 +149,10 @@ export function LeftoverRips() {
       {lastMessage === null ? null : (
         <Alert
           description={lastMessage}
-          heading={
-            isLastRefused ? "Not cleared" : "Cleared"
-          }
+          heading={headingFor({
+            command: lastCommand,
+            isRefused: isLastRefused,
+          })}
           intent={isLastRefused ? "warning" : "success"}
           label="Leftover rips"
         />
@@ -316,14 +318,17 @@ function RenameForm({
 
   return (
     <form
-      className="border-border flex flex-col gap-2 border-t pt-3 @md/leftovers:flex-row @md/leftovers:items-end"
+      // Stacked, not a row: the hint under the input is two lines
+      // wide, and a `items-end` row puts Save level with the HINT
+      // rather than with the control it submits.
+      className="border-border flex flex-col gap-3 border-t pt-3"
       onSubmit={(event) => {
         event.preventDefault()
         onSubmit(draft)
       }}
     >
       <Field
-        className="min-w-0 flex-1"
+        className="min-w-0"
         description={
           "One folder name, no slashes. A DVD rip is a single " +
           "ISO file and keeps its .iso — you do not have to " +
@@ -341,7 +346,7 @@ function RenameForm({
         />
       </Field>
 
-      <div className="flex shrink-0 gap-2">
+      <div className="flex justify-end gap-2">
         <Button
           appearance="ghost"
           intent="neutral"
@@ -378,6 +383,25 @@ function RenameForm({
  */
 const TEXT_INPUT_CLASS =
   "border-border bg-surface-raised text-content w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-solid focus-visible:outline-(length:--focus-ring-width) focus-visible:outline-offset-(--focus-ring-offset) focus-visible:outline-focus-ring"
+
+/**
+ * The heading over the daemon's sentence.
+ *
+ * Named for the VERB, because "Not cleared" over a refused
+ * rename contradicts the sentence beneath it — and that sentence
+ * ("that name is already taken") is the most useful thing this
+ * endpoint produces.
+ */
+const headingFor = (input: {
+  command: "delete" | "rename" | null
+  isRefused: boolean
+}): string => {
+  if (input.command === "rename") {
+    return input.isRefused ? "Not renamed" : "Renamed"
+  }
+
+  return input.isRefused ? "Not cleared" : "Cleared"
+}
 
 /**
  * Bytes for a person.

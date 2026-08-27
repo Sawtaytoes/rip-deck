@@ -260,6 +260,12 @@ describe("LeftoverRips", () => {
       ),
     ).toBeInTheDocument()
 
+    // ⚠️ Headed for the verb. "Not cleared" over a refused
+    // rename contradicts the sentence under it.
+    expect(
+      screen.getByText("Not renamed"),
+    ).toBeInTheDocument()
+
     expect(
       screen.getByText(".rip-deck-incomplete-abc-123"),
     ).toBeInTheDocument()
