@@ -155,6 +155,74 @@ FROM node:26-trixie-slim
 COPY --from=makemkv /opt/makemkv /opt/makemkv
 ENV PATH="/opt/makemkv/bin:${PATH}"
 
+# --- The DVD half of MakeMKV, which is a MUSL binary ----------
+#
+# ⚠️ **`/opt/makemkv` is NOT as self-contained as the comment
+# above says.** `makemkvcon` is, and that is what the smoke test
+# below proves. But DVD decryption does not happen inside
+# `makemkvcon` at all — it is delegated to a second binary,
+# `mmgplsrv`, the GPL-licensed helper MakeMKV ships separately for
+# licensing reasons. And `mmgplsrv` is built against **musl**,
+# because jlesage's image is Alpine:
+#
+#     $ ldd /opt/makemkv/bin/mmgplsrv        # on THIS base
+#     libc.musl-x86_64.so.1 => not found
+#     /lib/ld-musl-x86_64.so.1 => /lib64/ld-linux-x86-64.so.2
+#
+#     $ /opt/makemkv/bin/mmgplsrv
+#     sh: /opt/makemkv/bin/mmgplsrv: not found   # the LOADER is missing
+#
+# `/opt/makemkv/lib` bundles a **glibc** loader for `makemkvcon`
+# and nothing for `mmgplsrv`, so the musl interpreter named in its
+# ELF header does not exist on a Debian base and it can never
+# start.
+#
+# The cost was silent and total: **no DVD has ever ripped in this
+# image.** Blu-ray and UHD never touch `mmgplsrv` — AACS and BD+
+# are handled inside `makemkvcon` — so every rip the tower has
+# ever completed worked, and the first DVD batch (8 Teenage Mutant
+# Ninja Turtles discs, 2026-08-26) failed on every drive with
+#
+#     MSG:4041 "Failed to execute external program 'mmgplsrv'
+#               from location '/opt/makemkv/bin/mmgplsrv'"
+#     MSG:5069 "Backup failed"
+#
+# The smoke test below could not catch it, and still cannot:
+# `info disc:9999` never spawns the helper. That is why this stage
+# has its OWN assertion.
+#
+# Three files, taken from the Alpine stage — the interpreter plus
+# the two libraries it links:
+#
+#  - `/lib/ld-musl-x86_64.so.1` goes at that exact path because it
+#    is the `PT_INTERP` compiled into the binary. Nothing else in
+#    a Debian image looks there, so it collides with nothing.
+#  - `libstdc++` and `libgcc_s` go in their OWN prefix and are
+#    found through `/etc/ld-musl-x86_64.path`, which musl's loader
+#    reads in place of its built-in search path. ⚠️ Do NOT drop
+#    Alpine's `libstdc++.so.6` into `/usr/lib` instead — it would
+#    shadow Debian's for every glibc binary in the image,
+#    starting with `node`.
+#
+# This does not make the image "musl-compatible" and must not be
+# grown into that. It is one binary, three files, and a search
+# path that only a musl loader ever consults.
+COPY --from=makemkv /lib/ld-musl-x86_64.so.1 /lib/ld-musl-x86_64.so.1
+COPY --from=makemkv /usr/lib/libstdc++.so.6.0.32 /opt/makemkv-musl/lib/
+COPY --from=makemkv /usr/lib/libgcc_s.so.1 /opt/makemkv-musl/lib/
+
+RUN ln -s libstdc++.so.6.0.32 /opt/makemkv-musl/lib/libstdc++.so.6 \
+  && echo /opt/makemkv-musl/lib > /etc/ld-musl-x86_64.path
+
+# The assertion the smoke test below cannot make.
+#
+# `mmgplsrv` with no arguments exits non-zero and prints its
+# usage, which is fine — the failure this guards against is the
+# binary not STARTING. A missing interpreter is reported by the
+# shell as "not found", indistinguishable from a missing file, so
+# the check is for that string rather than for an exit code.
+RUN ! /opt/makemkv/bin/mmgplsrv --help 2>&1 | grep -q 'not found'
+
 # The transplant, asserted rather than assumed.
 #
 # `--cache=1` and a nonexistent `disc:9999` keep this cheap and
