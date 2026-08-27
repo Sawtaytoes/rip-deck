@@ -38,6 +38,17 @@ import {
 /** Headroom over the disc size required before starting. */
 export const SPACE_HEADROOM_FRACTION = 1.1
 
+/**
+ * What a DVD backup gets called once it lands.
+ *
+ * `makemkvcon` writes a DVD image with NO extension at all, so
+ * without this the library gains an 8 GB file named
+ * `[BACKUP] Some Film (1987) - DVD` that Windows offers to open
+ * with a text editor. A Blu-ray backup is a directory and takes
+ * no suffix.
+ */
+export const ISO_SUFFIX = ".iso"
+
 export const incompleteDirName = (
   jobUuid: string,
 ): string => `.rip-deck-incomplete-${jobUuid}`
@@ -341,6 +352,13 @@ export const applyOutputOwnership = async (input: {
 
   await chown(input.path, uid, gid)
 
+  // ⚠️ A DVD backup is a single ISO FILE, not a directory — see
+  // `verifyBackup.ts`. `readdir` on one throws ENOTDIR, and that
+  // throw reached `failureOfChown`, which reported every DVD as
+  // landing with the wrong owner while the chown above had in
+  // fact already succeeded.
+  if (!(await stat(input.path)).isDirectory()) return
+
   const entries = await readdir(input.path, {
     withFileTypes: true,
   })
@@ -406,11 +424,29 @@ export const finaliseDestination = async (
   prepared: PreparedDestination,
   ownership: OutputOwnership | null = createOutputOwnership(),
 ): Promise<FinalisedDestination> => {
-  const hasCollision = await pathExists(prepared.finalPath)
+  // ⚠️ A DVD backup is a single ISO FILE and a Blu-ray backup is
+  // a directory (see `verifyBackup.ts`), and only the filesystem
+  // says which one this rip produced — `makemkvcon` never does.
+  // A disc image published with no extension is one the owner
+  // cannot open by double-clicking and no scanner recognises, so
+  // the suffix is decided here, from what is actually on disk,
+  // rather than inferred from the disc type upstream.
+  const suffix = (await isFile(prepared.incompletePath))
+    ? ISO_SUFFIX
+    : ""
+
+  const finalPath = `${prepared.finalPath}${suffix}`
+  const hasCollision = await pathExists(finalPath)
+
+  // The marker goes BEFORE the extension, not after it: a file
+  // called `… .iso (rip-deck-duplicate-01234567)` is not an ISO
+  // to anything that reads extensions, which is the one property
+  // the collision copy has to keep.
   const path = hasCollision
     ? `${prepared.finalPath} ` +
-      `(rip-deck-duplicate-${prepared.jobUuid.slice(0, 8)})`
-    : prepared.finalPath
+      `(rip-deck-duplicate-${prepared.jobUuid.slice(0, 8)})` +
+      suffix
+    : finalPath
 
   const ownershipFailure =
     ownership === null
@@ -498,6 +534,15 @@ export const pathExists = async (
   try {
     await stat(path)
     return true
+  } catch {
+    return false
+  }
+}
+
+/** Is this path a regular file — i.e. a DVD image? */
+const isFile = async (path: string): Promise<boolean> => {
+  try {
+    return (await stat(path)).isFile()
   } catch {
     return false
   }
