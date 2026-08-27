@@ -35,6 +35,8 @@ const buildLeftover = (
   modified_at_ms: 1_787_700_000_000,
   detail: "An EMPTY rip folder.",
   is_safe_to_delete: true,
+  is_locked: false,
+  lock_reason: null,
   ...overrides,
 })
 
@@ -91,6 +93,99 @@ describe("LeftoverRips", () => {
     // number is the MSG:5068 signature an operator acts on.
     expect(screen.getByText("empty")).toBeInTheDocument()
     expect(screen.getByText("22.4 GB")).toBeInTheDocument()
+  })
+
+  /**
+   * ⚠️ **A rip that is RUNNING is the data-loss case.** Its folder
+   * has the same name shape as an abandoned one, so it was listed
+   * as deletable with its bytes still arriving. The daemon
+   * refuses now — and a refusal the operator only meets by
+   * pressing Delete is worse than a disabled button, because by
+   * then he has already decided to delete it.
+   */
+  it("⚠️ disables BOTH controls on a rip that is running", async () => {
+    const deleteLeftover = vi.fn()
+    const renameLeftover = vi.fn()
+
+    renderWithProviders(
+      <LeftoverRips />,
+      createStubDataSource({
+        deleteLeftover,
+        fetchLeftovers: () =>
+          Promise.resolve([
+            buildLeftover({
+              detail:
+                "A rip is writing into this folder right now — " +
+                "job 4d37d72e is live.",
+              is_locked: true,
+              is_safe_to_delete: false,
+              lock_reason:
+                "a rip is writing into this folder right now",
+              size_bytes: 31_900_000_000,
+            }),
+          ]),
+        renameLeftover,
+      }),
+    )
+
+    expect(
+      await screen.findByText("Ripping now"),
+    ).toBeInTheDocument()
+
+    // Said in plain words, beside the buttons it explains. A
+    // disabled control with no reason reads as a broken page.
+    expect(
+      screen.getByText(
+        "Rip Deck will not delete or rename this folder while the rip is running.",
+      ),
+    ).toBeInTheDocument()
+
+    const clear = screen.getByRole("button", {
+      name: "Delete",
+    })
+    const rename = screen.getByRole("button", {
+      name: "Rename",
+    })
+
+    expect(clear).toBeDisabled()
+    // ⚠️ Rename too. Moving a directory out from under a running
+    // `makemkvcon` strands the rip exactly as deleting it does.
+    expect(rename).toBeDisabled()
+
+    await userEvent.click(clear)
+    await userEvent.click(rename)
+
+    expect(deleteLeftover).not.toHaveBeenCalled()
+    expect(renameLeftover).not.toHaveBeenCalled()
+  })
+
+  it("⚠️ still LISTS the running rip rather than hiding it", async () => {
+    // Hiding it would make this panel disagree with the bay grid
+    // about what is on disk, and an operator who cannot see the
+    // folder cannot tell "no leftover" from "the panel is not
+    // listing one".
+    renderWithProviders(
+      <LeftoverRips />,
+      createStubDataSource({
+        fetchLeftovers: () =>
+          Promise.resolve([
+            buildLeftover({
+              is_locked: true,
+              is_safe_to_delete: false,
+              lock_reason: "a rip is writing into it",
+            }),
+          ]),
+      }),
+    )
+
+    expect(
+      await screen.findByText(
+        ".rip-deck-incomplete-abc-123",
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText("Leftover rip folders (1)"),
+    ).toBeInTheDocument()
   })
 
   it("clears one by its exact path", async () => {

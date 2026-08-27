@@ -4,6 +4,7 @@ import {
   renameLeftover,
   scanLeftovers,
 } from "../rip/leftovers.ts"
+import type { LiveRipsReader } from "../rip/liveRips.ts"
 
 /**
  * `GET /api/leftovers` and `POST /api/leftovers` — the folders a
@@ -43,6 +44,22 @@ import {
  * than usual — the target dataset holds 700-odd finished rips,
  * and the validation is the only thing between an HTTP body and
  * `rm -rf`.
+ *
+ * ## Why every entry point takes a `readLiveRips`
+ *
+ * A `.rip-deck-incomplete-<uuid>` is where a RUNNING rip writes,
+ * not only where a dead one is left, and nothing on disk can tell
+ * the two apart. So the one question the filesystem cannot answer
+ * is threaded in from the watcher, exactly the way
+ * `destinationRoot` is: passed down from `main.ts`, never re-read
+ * or re-derived here. `liveRips.ts` is the single answer and both
+ * verbs — and the LIST, so the panel's disabled rows agree with
+ * the API — take it from there.
+ *
+ * It is read once per request rather than once per verb, and the
+ * read walks `/proc`. That is affordable only because this route
+ * is on demand and not on the 5-second snapshot; see the section
+ * above for why that was already true.
  */
 
 /**
@@ -62,6 +79,17 @@ export type LeftoverView = {
   modified_at_ms: number
   detail: string
   is_safe_to_delete: boolean
+  /**
+   * Neither verb may touch this one. See `Leftover.isLocked`.
+   *
+   * The panel disables both controls on this, so a live rip is
+   * never a button the operator presses to find out. A refusal
+   * discovered by pressing is worse than a disabled button — by
+   * then he has already decided to delete something.
+   */
+  is_locked: boolean
+  /** Why it is locked, in words. Null when it is not. */
+  lock_reason: string | null
 }
 
 const buildLeftoverView = (
@@ -76,14 +104,20 @@ const buildLeftoverView = (
   modified_at_ms: leftover.modifiedAtMs,
   detail: leftover.detail,
   is_safe_to_delete: leftover.isSafeToDelete,
+  is_locked: leftover.isLocked,
+  lock_reason: leftover.lockReason,
 })
 
-const listLeftovers = async (
-  destinationRoot: string,
-): Promise<LeftoverView[]> =>
-  (await scanLeftovers({ rootPath: destinationRoot })).map(
-    buildLeftoverView,
-  )
+const listLeftovers = async (input: {
+  destinationRoot: string
+  readLiveRips: LiveRipsReader
+}): Promise<LeftoverView[]> =>
+  (
+    await scanLeftovers({
+      liveRips: await input.readLiveRips(),
+      rootPath: input.destinationRoot,
+    })
+  ).map(buildLeftoverView)
 
 export type LeftoversListPayload = {
   ok: true
@@ -119,11 +153,12 @@ export type LeftoversEndpointResult = {
 
 export const handleLeftoversList = async (input: {
   destinationRoot: string
+  readLiveRips: LiveRipsReader
 }): Promise<LeftoversEndpointResult> => ({
   status: 200,
   payload: {
     ok: true,
-    leftovers: await listLeftovers(input.destinationRoot),
+    leftovers: await listLeftovers(input),
   },
 })
 
@@ -137,6 +172,7 @@ export const handleLeftoversList = async (input: {
 export const handleLeftoversDelete = async (input: {
   body: string
   destinationRoot: string
+  readLiveRips: LiveRipsReader
 }): Promise<LeftoversEndpointResult> => {
   const parsed = parseDeleteBody(input.body)
 
@@ -147,7 +183,14 @@ export const handleLeftoversDelete = async (input: {
     }
   }
 
+  // Read ONCE and used for both the refusal and the list that
+  // answers it. Asking twice would let a rip start between them
+  // and hand back a row whose locked state contradicts the
+  // sentence above it.
+  const liveRips = await input.readLiveRips()
+
   const outcome = await deleteLeftover({
+    liveRips,
     rootPath: input.destinationRoot,
     path: parsed.path,
   })
@@ -159,7 +202,10 @@ export const handleLeftoversDelete = async (input: {
     payload: {
       ok: outcome.isDeleted,
       msg: outcome.message,
-      leftovers: await listLeftovers(input.destinationRoot),
+      leftovers: await listLeftovers({
+        destinationRoot: input.destinationRoot,
+        readLiveRips: () => Promise.resolve(liveRips),
+      }),
     },
   }
 }
@@ -176,6 +222,7 @@ export const handleLeftoversDelete = async (input: {
 export const handleLeftoversRename = async (input: {
   body: string
   destinationRoot: string
+  readLiveRips: LiveRipsReader
 }): Promise<LeftoversEndpointResult> => {
   const parsed = parseRenameBody(input.body)
 
@@ -186,7 +233,10 @@ export const handleLeftoversRename = async (input: {
     }
   }
 
+  const liveRips = await input.readLiveRips()
+
   const outcome = await renameLeftover({
+    liveRips,
     newName: parsed.new_name,
     path: parsed.path,
     rootPath: input.destinationRoot,
@@ -200,7 +250,10 @@ export const handleLeftoversRename = async (input: {
     payload: {
       ok: outcome.isRenamed,
       msg: outcome.message,
-      leftovers: await listLeftovers(input.destinationRoot),
+      leftovers: await listLeftovers({
+        destinationRoot: input.destinationRoot,
+        readLiveRips: () => Promise.resolve(liveRips),
+      }),
     },
   }
 }
@@ -255,6 +308,7 @@ export const readLeftoversCommand = (
 export const handleLeftoversWrite = async (input: {
   body: string
   destinationRoot: string
+  readLiveRips: LiveRipsReader
 }): Promise<LeftoversEndpointResult> => {
   const read = readLeftoversCommand(input.body)
 
