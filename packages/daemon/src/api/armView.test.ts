@@ -55,6 +55,7 @@ const buildJob = (overrides: Partial<Job> = {}): Job => ({
   failureReason: null,
   destinationPath: "/media/Disc-Rips/Ivanhoe",
   readErrorCount: 0,
+  warnings: [],
   isAdopted: false,
   isKeepTryingRequested: false,
   ...overrides,

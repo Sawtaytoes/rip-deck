@@ -20,6 +20,7 @@ const buildBay = (input: {
   state: BayView["state"]["state"]
   verdict?: BayView["state"]["verdict"]
   percent?: number
+  hasWarnings?: boolean
   isQuarantined?: boolean
 }): BayView => ({
   drive_id: `usb-slot-${input.slot}`,
@@ -40,7 +41,8 @@ const buildBay = (input: {
     eta_seconds: null,
     eta_trend: null,
     throughput_bytes_per_sec: null,
-    read_error_count: 0,
+    read_error_count: input.hasWarnings === true ? 4 : 0,
+    has_warnings: input.hasWarnings ?? false,
     verdict: makeVerdict(
       input.verdict ?? "ok",
       "suspected",
@@ -74,7 +76,8 @@ type Story = StoryObj<typeof meta>
  * same green as slot 02, which produced a 90 GB one — because
  * `failed` sat in a "latched" set beside `completed`. Slot 04
  * shows the other half: the owner's own cancel is not an alarm,
- * and it is not a success either.
+ * and it is not a success either. Slot 08 is the third state —
+ * a rip that WORKED and has something wrong with it.
  */
 export const EveryState: Story = {
   args: {
@@ -94,8 +97,40 @@ export const EveryState: Story = {
         state: "completed",
         isQuarantined: true,
       }),
-      buildBay({ slot: 8, state: "idle" }),
+      buildBay({
+        slot: 8,
+        state: "completed",
+        hasWarnings: true,
+      }),
       buildBay({ slot: 9, state: "idle" }),
+    ],
+  },
+}
+
+/**
+ * The three finished outcomes, and only those.
+ *
+ * The row that made this story necessary: `done`, `warning` and
+ * `failed` have to be three colours a glance from the doorway
+ * tells apart. Slot 05 is a real rip — a CSS DVD that reached
+ * `Backup done`, left a mountable 8 GB ISO and hit one bad
+ * sector. It wore slot 08's colours until 2026-08-27
+ * ([decision](https://mkdocs.octen.dev/workspace/rip-deck/docs/decisions/2026-08-27-a-read-error-on-a-verified-backup-is-a-warning-not-a-failure/)).
+ */
+export const ThreeOutcomes: Story = {
+  args: {
+    bays: [
+      buildBay({ slot: 1, state: "completed" }),
+      buildBay({
+        slot: 5,
+        state: "completed",
+        hasWarnings: true,
+      }),
+      buildBay({ slot: 8, state: "failed" }),
+      // A HELD bay, for the contrast that matters most: it is
+      // the same hue as the warning and a louder fill, because
+      // it wants the owner NOW.
+      buildBay({ slot: 9, state: "needs_attention" }),
     ],
   },
 }

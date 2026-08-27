@@ -25,6 +25,7 @@ import type { BayView } from "../types"
 type ChipState =
   | "ripping"
   | "done"
+  | "warning"
   | "attention"
   | "failed"
   | "stopped"
@@ -44,6 +45,16 @@ const CHIP: Record<ChipState, string> = {
   // bright green chips would compete with the one that is
   // actually moving.
   done: "border-intent-success-border bg-surface-raised text-intent-success-content",
+  // The THIRD state, and it needs its own colour because it is
+  // neither of the other two: the backup exists (so not red) and
+  // it may be damaged (so not green). Amber on the calm raised
+  // surface, which is to `attention` exactly what `done` is to
+  // `ripping` — same hue, quieter fill. A held bay is a bay
+  // waiting on the owner RIGHT NOW; a warning is a finished rip
+  // he should look at when he gets to it, and the fill is what
+  // separates the two.
+  warning:
+    "border-intent-warning-border bg-surface-raised text-intent-warning-content",
   attention:
     "border-intent-warning-border bg-intent-warning-surface text-intent-warning-content",
   // A failed rip and an out-of-service bay are both red. They
@@ -127,7 +138,15 @@ function bayStatus(bay: BayView): {
   // saying "idle" hides the one thing the owner might act on:
   // there is something in there to take out.
   if (bay.state.state === "completed") {
-    return { state: "done", detail: "done" }
+    // The three-state split, on the one word the rail shows.
+    // "done" on a backup with a bad sector in it is the same
+    // lie ARM tells; "failed" on it is the lie this repo told
+    // until 2026-08-27. Neither is true, so there is a third
+    // word
+    // ([decision](https://mkdocs.octen.dev/workspace/rip-deck/docs/decisions/2026-08-27-a-read-error-on-a-verified-backup-is-a-warning-not-a-failure/)).
+    return bay.state.has_warnings === true
+      ? { state: "warning", detail: "warning" }
+      : { state: "done", detail: "done" }
   }
 
   // Cancelled is the same "there is a disc in there" fact, said

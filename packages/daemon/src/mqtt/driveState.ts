@@ -180,8 +180,26 @@ export type DriveStatePayload = {
    */
   eta_trend: "falling" | "steady" | "rising" | null
   throughput_bytes_per_sec: number | null
-  /** Non-zero blocks success — never publish it as healthy. */
+  /**
+   * Read errors during the copy — never publish it as healthy.
+   *
+   * ⚠️ It no longer BLOCKS success. The CSS handshake probe
+   * every protected DVD emits is not counted, and a genuine read
+   * error on a backup that verified is a warning — the third
+   * state, which `has_warnings` carries.
+   */
   read_error_count: number
+  /**
+   * This rip finished AND has something wrong with it.
+   *
+   * A flag rather than the sentences, deliberately: this payload
+   * is RETAINED per bay, one consumer is a Home Assistant
+   * attribute dictionary with a 255-character state limit, and
+   * the warning sentences run to several lines each. The chip
+   * needs to know THAT there is a warning; the card reads the
+   * sentences off `/json`.
+   */
+  has_warnings: boolean
   verdict: VerdictKind
   /** Epoch milliseconds, so a stale card is visibly stale. */
   updated_at: number
@@ -227,6 +245,7 @@ export const buildDriveStatePayload = (input: {
       eta_trend: null,
       throughput_bytes_per_sec: null,
       read_error_count: 0,
+      has_warnings: false,
       verdict: "ok",
       updated_at: nowMs,
       ...disc,
@@ -248,6 +267,7 @@ export const buildDriveStatePayload = (input: {
     throughput_bytes_per_sec:
       job.progress.throughputBytesPerSec,
     read_error_count: job.readErrorCount,
+    has_warnings: job.warnings.length > 0,
     verdict: job.verdict.kind,
     updated_at: nowMs,
     ...disc,

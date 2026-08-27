@@ -21,8 +21,11 @@ are the design history — why each non-obvious choice was made, in ADR form.
 ARM works, but several of its worst behaviours are architectural and
 long-standing:
 
-- it reports **success on rips that had read errors**
-  ([#1298](https://github.com/automatic-ripping-machine/automatic-ripping-machine/issues/1298))
+- it reports **success on rips that had read errors**, silently
+  ([#1298](https://github.com/automatic-ripping-machine/automatic-ripping-machine/issues/1298)).
+  Rip Deck badges that rip a **warning** and names the count and the offsets —
+  a backup that verified is a backup, and hiding the bad sectors is the bug
+  ([decision](docs/decisions/2026-08-27-a-read-error-on-a-verified-backup-is-a-warning-not-a-failure.md))
 - **abort doesn't cancel** ([#1014](https://github.com/automatic-ripping-machine/automatic-ripping-machine/issues/1014))
 - **DB-locked with multiple drives** ([#500](https://github.com/automatic-ripping-machine/automatic-ripping-machine/issues/500) — filed by another 9-drive user)
 - **no MQTT** ([#1613](https://github.com/automatic-ripping-machine/automatic-ripping-machine/issues/1613))
@@ -30,6 +33,16 @@ long-standing:
 Every off-the-shelf alternative was audited against a written requirements
 catalogue before any code was written. The evidence table is in
 [`docs/decisions/2026-07-24-build-rip-deck-rather-than-adopt.md`](docs/decisions/2026-07-24-build-rip-deck-rather-than-adopt.md).
+
+## A finished rip has three outcomes, not two
+
+`pass`, `warning`, `fail`. The middle one exists because a real rip needed it:
+a CSS-protected DVD that reached `Backup done`, left a mountable 8 GB ISO, and
+hit one bad sector on the way. `fail` would say there is no backup, which is
+false; `pass` would say nothing is wrong, which is also false. A warning names
+the count and the offsets, and it says plainly that MakeMKV's robot output
+does **not** report whether it recovered from the error — because it does not,
+and implying otherwise would be worse than saying nothing.
 
 ## The health engine is separable from the ripper
 

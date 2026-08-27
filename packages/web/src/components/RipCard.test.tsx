@@ -175,8 +175,9 @@ describe("RipCard", () => {
     expect(screen.getByText("43.0%")).toBeInTheDocument()
   })
 
-  // The one rule that overrides everything.
-  it("never lets a read-error rip read as a success", () => {
+  // The one rule that overrides everything, with one word
+  // changed: never let a read-error rip read as a PLAIN success.
+  it("never lets a read-error rip read as a plain success", () => {
     renderCard(
       <RipCard
         rip={buildRip({
@@ -194,12 +195,63 @@ describe("RipCard", () => {
     expect(
       screen.getByText("12 read errors"),
     ).toBeInTheDocument()
-    expect(
-      screen.getByText("read errors"),
-    ).toBeInTheDocument()
+    expect(screen.getByText("warning")).toBeInTheDocument()
     expect(
       screen.queryByText("done"),
     ).not.toBeInTheDocument()
+  })
+
+  // The third state on the card. The count is amber rather than
+  // red on a rip that WORKED, and the sentence explaining it is
+  // not behind the collapse
+  // ([decision](https://mkdocs.octen.dev/workspace/rip-deck/docs/decisions/2026-08-27-a-read-error-on-a-verified-backup-is-a-warning-not-a-failure/)).
+  it("prints the warning sentence on a rip that still worked", () => {
+    renderCard(
+      <RipCard
+        rip={buildRip({
+          status: "success",
+          active: false,
+          percent: 100,
+          read_error_count: 4,
+          warnings: [
+            "4 read errors at 3.20 GB. The backup finished " +
+              "and its structure verified.",
+          ],
+        })}
+        onShowLog={noop}
+        onAction={noop}
+        now={NOW}
+      />,
+    )
+
+    expect(
+      screen.getByText(/4 read errors at 3\.20 GB/),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText("4 read errors").className,
+    ).toContain("intent-warning")
+  })
+
+  it("keeps the read-error count RED on a rip that failed", () => {
+    // A failure's read errors are the cause of having nothing,
+    // not a note about a copy that exists. Amber there would
+    // undo the 2026-08-26 chip fix from the other direction.
+    renderCard(
+      <RipCard
+        rip={buildRip({
+          status: "fail",
+          active: false,
+          read_error_count: 4,
+        })}
+        onShowLog={noop}
+        onAction={noop}
+        now={NOW}
+      />,
+    )
+
+    expect(
+      screen.getByText("4 read errors").className,
+    ).toContain("intent-danger")
   })
 
   it("gives dirty and scratched their opposite advice", () => {

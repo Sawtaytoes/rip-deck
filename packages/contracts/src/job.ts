@@ -81,6 +81,34 @@ export type FailureReason =
   | "daemon_restart"
   | "unknown"
 
+/**
+ * Something worth telling the owner about a rip that WORKED.
+ *
+ * The third state, and the one this project was missing. A rip
+ * was `pass` or `fail`, so a backup that produced a complete,
+ * verified, plausible-size ISO with one bad sector in the middle
+ * of it was badged `fail` and read as "there is no backup" —
+ * which was false, and hid the thing actually worth knowing.
+ *
+ * The owner's rule: *"This should be a warning. It didn't fail
+ * because it made the ISO, but the ISO is problematic, so I'd
+ * like to know that."*
+ * ([decision](../../../docs/decisions/2026-08-27-a-read-error-on-a-verified-backup-is-a-warning-not-a-failure.md))
+ *
+ * A warning NEVER changes `isSuccessful`. It rides beside it.
+ */
+export type RipWarningKind =
+  /** SCSI read errors during the copy. The disc has bad sectors. */
+  | "read_errors"
+  /** MakeMKV's own content-hash check reported corrupt files. */
+  | "hash_check_failed"
+
+export type RipWarning = {
+  kind: RipWarningKind
+  /** Plain language, written to be read on a phone. */
+  message: string
+}
+
 /** Identification result for a disc. */
 export type DiscIdentity = {
   title: string
@@ -176,6 +204,21 @@ export type Job = {
   progress: JobProgress
   verdict: Verdict
   failureReason: FailureReason | null
+  /**
+   * Trouble on a rip that still SUCCEEDED. Empty for a clean one.
+   *
+   * Orthogonal to `failureReason`: a job can be `completed` and
+   * carry warnings, which is the whole point of the three-state
+   * outcome. A FAILED job may carry them too — the read errors
+   * that preceded a failure are still worth naming.
+   *
+   * Sentences rather than `RipWarning`s, deliberately. The kind
+   * is a fold-time discriminator (`buildRipWarnings` switches on
+   * it); by the time a warning reaches a card there is nothing
+   * left to decide, and a UI that switched on the kind would be
+   * a second place the wording lived.
+   */
+  warnings: string[]
   /** Final destination, once known. */
   destinationPath: string | null
   /** Count of read errors seen so far. Non-zero blocks success. */
@@ -236,25 +279,71 @@ export type RipMode = "backup" | "mkv"
  * the real ones. So backup proves itself structurally — the
  * output has to actually contain a disc — rather than by a
  * message, which is both mode-specific and locale-fragile.
+ *
+ * ## ⚠️ A read error is a WARNING here, not a failure
+ *
+ * This used to open `if (readErrorCount !== 0) return false`,
+ * and on 2026-08-27 that line badged a perfect DVD `fail`: one
+ * `MSG:2003` at offset 1 MB — the CSS handshake artefact every
+ * protected DVD produces — against `Backup done` and an 8 GB
+ * mountable ISO.
+ *
+ * Two separate fixes, and they must not be confused:
+ *
+ *  1. The CSS probe error is not a read error AT ALL, and is
+ *     dropped before it reaches this function. See
+ *     `isScrambledSectorError`.
+ *  2. A GENUINE mid-disc read error on a backup that still
+ *     produced a verified, plausible-size disc is a WARNING.
+ *     The bytes are on the pool and the owner can use them; the
+ *     ISO is merely suspect. Badging it `fail` says "there is no
+ *     backup", which is false, and the owner then has to work
+ *     out for himself which of the two it was.
+ *
+ * This is NOT a retreat to ARM's #1298. ARM reports read errors
+ * as a plain success and says nothing. Rip Deck states the count
+ * and the offsets, on the card and on the chip, in its own
+ * colour — see `RipWarning`. The rule the project was built on
+ * ("never report success on a rip that had read errors") becomes
+ * "never report a rip that had read errors WITHOUT SAYING SO".
+ *
+ * A rip that produced NO verified output is still a failure,
+ * read errors or not — nothing here softens that.
  */
 export const isRipSuccessful = (input: {
   mode: RipMode
   exitCode: number | null
   titlesSaved: number | null
+  /**
+   * Genuine read errors only.
+   *
+   * No longer consulted — kept because it documents the input
+   * the caller has, and because removing it would let a caller
+   * silently stop counting. `summariseRip` turns a non-zero
+   * count into a `RipWarning` instead.
+   */
   readErrorCount: number
   /**
    * Backup only: the output directory holds a real disc
-   * structure (BDMV/VIDEO_TS) of plausible size.
+   * structure (BDMV/VIDEO_TS), or a real ISO image, of
+   * plausible size.
    *
    * Evidence that bytes landed, independent of anything
    * makemkvcon said about itself.
    */
   hasVerifiedStructure?: boolean
-  /** A failure message was seen, e.g. "Backup failed." */
+  /**
+   * MakeMKV said the backup failed — `MSG:5069` / `MSG:5080`.
+   *
+   * Declared here since the first version of this function and
+   * fed by NOTHING until 2026-08-27. `observeOutcomeEvent` now
+   * sets it, which matters far more than it used to: with the
+   * read-error gate gone, this is the message half of the
+   * failure test.
+   */
   hasFailureMessage?: boolean
 }): boolean => {
   if (input.exitCode !== 0) return false
-  if (input.readErrorCount !== 0) return false
   if (input.hasFailureMessage === true) return false
 
   return input.mode === "backup"
