@@ -6,6 +6,7 @@ import {
 import type { AddressInfo } from "node:net"
 import type { TopicConfig } from "../mqtt/topics.ts"
 import {
+  createLogCaptureProbe,
   createLogCaptureReader,
   type LogCaptureReader,
   readStateDir,
@@ -146,6 +147,9 @@ export const createApiServer = ({
   // own `config.stateDir` so the two can never diverge.
   stateDir = readStateDir(),
   readLogCapture = createLogCaptureReader({ stateDir }),
+  // Same argument as `readLogCapture` one line up: a directory
+  // name is all it needs, so it can be defaulted honestly.
+  readLogExists = createLogCaptureProbe({ stateDir }),
   destinationRoot = null,
 }: {
   readSnapshot: () => TowerSnapshot
@@ -157,6 +161,8 @@ export const createApiServer = ({
   readTrayRunner?: () => TrayCommandRunner | null
   stateDir?: string
   readLogCapture?: LogCaptureReader | null
+  /** Does a capture exist for this job? See `logCapture.ts`. */
+  readLogExists?: ((jobUuid: string) => Promise<boolean>) | null
   /**
    * Where finished rips land. Null when this process was not
    * told, which makes `/api/leftovers` answer 503 rather than
@@ -171,7 +177,12 @@ export const createApiServer = ({
     webAssets,
     readTrayRunner,
     readLogCapture,
+    readLogExists,
     destinationRoot,
+    // The SAME directory `/logs` reads captures from, passed
+    // rather than re-read, so the history log and the per-job
+    // files it joins can never be looked for in two places.
+    historyStateDir: stateDir,
   })
 
   const server: Server = createServer(
