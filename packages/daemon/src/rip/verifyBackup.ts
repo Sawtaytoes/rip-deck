@@ -83,10 +83,101 @@ const measureTree = async (
   return total
 }
 
+/**
+ * ⚠️ **A DVD backup is a FILE, not a directory.**
+ *
+ * `makemkvcon backup` produces two completely different shapes
+ * and nothing in its output says which you are about to get:
+ *
+ *  - **Blu-ray / UHD** — a DIRECTORY at the destination path,
+ *    holding `BDMV`, `CERTIFICATE` and the rest.
+ *  - **DVD** — a single decrypted **ISO image file** at that
+ *    exact path, with no extension and no directory anywhere.
+ *
+ * Measured on the live tower 2026-08-26. Slot 6 rode to
+ * `MSG:5070 "Backup done"` and left
+ * `.rip-deck-incomplete-68fa9004-…` as an 8,203,894,784-byte
+ * regular file which `file(1)` reads as
+ * `UDF filesystem data (version 1.5) 'TEENAGE_MUTANT_NINJA_TURTLE_V6'`
+ * and which loop-mounts with an intact `VIDEO_TS`. The rip was
+ * perfect. This function called it `empty_output`, because it
+ * looked for a `VIDEO_TS` **directory** inside a path that was
+ * not a directory at all.
+ *
+ * The same fact explains `MSG:5068 "Folder … already contains a
+ * backup"`: MakeMKV wanted to CREATE a file at that path, and a
+ * directory was sitting in the way. The message is misleading —
+ * the directory was empty — and it is why Blu-ray never hit it
+ * while every DVD did.
+ *
+ * So the marker for an ISO is the ISO9660 signature at its own
+ * fixed offset rather than a filename: MakeMKV writes no
+ * extension, so there is nothing else to key on, and trusting
+ * "it is a big file" would bless a truncated one.
+ */
+
+/** `CD001`, at byte 32769 — sector 16, offset 1. */
+const ISO9660_MAGIC = "CD001"
+const ISO9660_MAGIC_OFFSET = 32_769
+
+/** Is this file an ISO image MakeMKV wrote? */
+const readIsoMarker = async (
+  path: string,
+): Promise<string | null> => {
+  const { open } = await import("node:fs/promises")
+
+  let handle: Awaited<ReturnType<typeof open>> | null = null
+
+  try {
+    handle = await open(path, "r")
+    const buffer = Buffer.alloc(ISO9660_MAGIC.length)
+    const { bytesRead } = await handle.read(
+      buffer,
+      0,
+      buffer.length,
+      ISO9660_MAGIC_OFFSET,
+    )
+
+    return bytesRead === buffer.length &&
+      buffer.toString("latin1") === ISO9660_MAGIC
+      ? "ISO"
+      : null
+  } catch {
+    return null
+  } finally {
+    await handle?.close().catch(() => {})
+  }
+}
+
 export const verifyBackupStructure = async (input: {
   path: string
   discBytes: number
 }): Promise<BackupVerification> => {
+  const target = await stat(input.path).catch(() => null)
+
+  if (target === null) {
+    return {
+      isVerified: false,
+      markerFound: null,
+      bytesOnDisk: 0,
+      reason:
+        "nothing was written at the destination at all",
+    }
+  }
+
+  // The DVD shape. Checked FIRST because it is the cheap,
+  // unambiguous one — a regular file is never a Blu-ray backup.
+  if (target.isFile()) {
+    return verifySize({
+      markerFound: await readIsoMarker(input.path),
+      bytesOnDisk: target.size,
+      discBytes: input.discBytes,
+      missingReason:
+        "the output is a file with no ISO9660 signature in " +
+        "it, so whatever ran did not produce a disc image",
+    })
+  }
+
   let markerFound: string | null = null
 
   for (const marker of DISC_MARKERS) {
@@ -101,27 +192,47 @@ export const verifyBackupStructure = async (input: {
     }
   }
 
-  if (markerFound === null) {
+  return verifySize({
+    markerFound,
+    bytesOnDisk: await measureTree(input.path),
+    discBytes: input.discBytes,
+    missingReason:
+      "the output has no BDMV or VIDEO_TS directory, so " +
+      "whatever ran did not produce a disc",
+  })
+}
+
+/**
+ * The floor both shapes are held to, once their marker is known.
+ *
+ * Shared so a DVD image and a Blu-ray directory cannot drift
+ * apart on the one threshold that decides whether a rip counts —
+ * the shapes differ, the standard does not.
+ */
+const verifySize = (input: {
+  markerFound: string | null
+  bytesOnDisk: number
+  discBytes: number
+  missingReason: string
+}): BackupVerification => {
+  if (input.markerFound === null) {
     return {
       isVerified: false,
       markerFound: null,
-      bytesOnDisk: 0,
-      reason:
-        "the output has no BDMV or VIDEO_TS directory, so " +
-        "whatever ran did not produce a disc",
+      bytesOnDisk: input.bytesOnDisk,
+      reason: input.missingReason,
     }
   }
 
-  const bytesOnDisk = await measureTree(input.path)
   const required = input.discBytes * MINIMUM_SIZE_FRACTION
 
-  if (bytesOnDisk < required) {
+  if (input.bytesOnDisk < required) {
     return {
       isVerified: false,
-      markerFound,
-      bytesOnDisk,
+      markerFound: input.markerFound,
+      bytesOnDisk: input.bytesOnDisk,
       reason:
-        `only ${formatGb(bytesOnDisk)} landed for a ` +
+        `only ${formatGb(input.bytesOnDisk)} landed for a ` +
         `${formatGb(input.discBytes)} disc — the structure is ` +
         "there but the content is not",
     }
@@ -129,9 +240,11 @@ export const verifyBackupStructure = async (input: {
 
   return {
     isVerified: true,
-    markerFound,
-    bytesOnDisk,
-    reason: `${markerFound}, ${formatGb(bytesOnDisk)} on disk`,
+    markerFound: input.markerFound,
+    bytesOnDisk: input.bytesOnDisk,
+    reason:
+      `${input.markerFound}, ` +
+      `${formatGb(input.bytesOnDisk)} on disk`,
   }
 }
 

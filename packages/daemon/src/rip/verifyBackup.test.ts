@@ -126,3 +126,96 @@ describe("proving a backup produced a disc", () => {
     expect(result.isVerified).toBe(true)
   })
 })
+
+/**
+ * ⚠️ The 2026-08-26 shape discovery, pinned.
+ *
+ * `makemkvcon backup` produces a DIRECTORY for a Blu-ray and a
+ * single decrypted ISO FILE for a DVD, and says nothing about
+ * which. Slot 6 rode to `MSG:5070 "Backup done"` and left an
+ * 8,203,894,784-byte file that loop-mounts with an intact
+ * `VIDEO_TS` — and this function reported `empty_output`,
+ * because it looked for a directory inside something that was
+ * not one.
+ */
+describe("a DVD backup, which is an ISO file", () => {
+  /** `CD001` at byte 32769 — sector 16, offset 1. */
+  const writeIsoImage = async (input: {
+    path: string
+    sizeBytes: number
+  }) => {
+    const image = Buffer.alloc(input.sizeBytes)
+    image.write("CD001", 32_769, "latin1")
+    await writeFile(input.path, image)
+  }
+
+  it("verifies a file carrying the ISO9660 signature", async () => {
+    const root = await mkdtemp(
+      join(tmpdir(), "rip-deck-iso-"),
+    )
+    const path = join(root, "backup")
+
+    await writeIsoImage({ path, sizeBytes: 200_000 })
+
+    const result = await verifyBackupStructure({
+      path,
+      discBytes: 200_000,
+    })
+
+    expect(result.isVerified).toBe(true)
+    expect(result.markerFound).toBe("ISO")
+    expect(result.bytesOnDisk).toBe(200_000)
+  })
+
+  it("⚠️ refuses a file with no ISO9660 signature", async () => {
+    // Size alone would bless a truncated or garbage file, and
+    // MakeMKV writes no extension to key on instead.
+    const root = await mkdtemp(
+      join(tmpdir(), "rip-deck-iso-"),
+    )
+    const path = join(root, "backup")
+
+    await writeFile(path, Buffer.alloc(200_000))
+
+    const result = await verifyBackupStructure({
+      path,
+      discBytes: 200_000,
+    })
+
+    expect(result.isVerified).toBe(false)
+    expect(result.markerFound).toBeNull()
+    expect(result.reason).toContain("ISO9660")
+  })
+
+  it("holds an image to the same size floor as a directory", async () => {
+    const root = await mkdtemp(
+      join(tmpdir(), "rip-deck-iso-"),
+    )
+    const path = join(root, "backup")
+
+    await writeIsoImage({ path, sizeBytes: 100_000 })
+
+    const result = await verifyBackupStructure({
+      path,
+      discBytes: 1_000_000,
+    })
+
+    expect(result.isVerified).toBe(false)
+    expect(result.markerFound).toBe("ISO")
+    expect(result.reason).toContain("the content is not")
+  })
+
+  it("says so when nothing was written at all", async () => {
+    const root = await mkdtemp(
+      join(tmpdir(), "rip-deck-iso-"),
+    )
+
+    const result = await verifyBackupStructure({
+      path: join(root, "never-created"),
+      discBytes: 1_000_000,
+    })
+
+    expect(result.isVerified).toBe(false)
+    expect(result.reason).toContain("nothing was written")
+  })
+})
