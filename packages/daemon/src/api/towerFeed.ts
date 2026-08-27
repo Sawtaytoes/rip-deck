@@ -264,6 +264,12 @@ export const toJobState = (input: {
   if (outcome !== null) {
     switch (outcome.kind) {
       case "completed":
+      // A warning is not a state. The disc IS backed up, so the
+      // job is `completed` and the warning rides beside it —
+      // mapping it to `needs_attention` would put a finished
+      // backup in the queue of bays wanting a human, which is
+      // the opposite of what the owner asked for.
+      case "completed_with_warnings":
         return "completed"
       case "failed":
         return "failed"
@@ -579,6 +585,10 @@ const buildJob = (input: {
     // names the real reason — travels as verdict evidence.
     failureReason:
       facts.outcome?.kind === "failed" ? "unknown" : null,
+    // The third state, on the wire. Straight off the bay table,
+    // where `runBayRip` put the sentences `buildRipWarnings`
+    // wrote, and kept across a restart by the ledger.
+    warnings: facts.outcome?.warnings ?? [],
     // A field on the bay, set by the ripper's publish step. Null
     // for anything that has not published — a held disc, a
     // failure, a rip still running.

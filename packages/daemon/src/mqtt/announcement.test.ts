@@ -38,6 +38,7 @@ const job = (overrides: Partial<Job> = {}): Job => ({
   failureReason: null,
   destinationPath: null,
   readErrorCount: 0,
+  warnings: [],
   isAdopted: false,
   isKeepTryingRequested: false,
   ...overrides,

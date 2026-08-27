@@ -74,9 +74,12 @@ describe("ripVisual", () => {
     expect(visual.percentText).toBe("done")
   })
 
-  // The one rule that overrides everything: never report success
-  // on a rip that had read errors.
-  it("refuses to paint a read-error rip as done", () => {
+  // The one rule that overrides everything, with one word
+  // changed on 2026-08-27: never report a rip that had read
+  // errors as a PLAIN success. It is not a failure either — the
+  // backup exists — so it gets the third colour
+  // ([decision](https://mkdocs.octen.dev/workspace/rip-deck/docs/decisions/2026-08-27-a-read-error-on-a-verified-backup-is-a-warning-not-a-failure/)).
+  it("refuses to paint a read-error rip as plain done", () => {
     const visual = ripVisual(
       buildRip({
         status: "success",
@@ -86,8 +89,40 @@ describe("ripVisual", () => {
       }),
     )
 
+    expect(visual.state).toBe("warning")
+    expect(visual.percentText).toBe("warning")
+  })
+
+  it("paints a warning even when the error count did not travel", () => {
+    // `warnings` and `read_error_count` are two different
+    // fields, and the retained MQTT payload carries only a
+    // flag. Either one alone must reach amber.
+    const visual = ripVisual(
+      buildRip({
+        status: "success",
+        active: false,
+        percent: 100,
+        read_error_count: 0,
+        warnings: [
+          "MakeMKV's hash check found corrupt files.",
+        ],
+      }),
+    )
+
+    expect(visual.state).toBe("warning")
+  })
+
+  it("still paints a genuinely FAILED rip as failed", () => {
+    const visual = ripVisual(
+      buildRip({
+        status: "fail",
+        active: false,
+        percent: 62,
+        read_error_count: 41,
+      }),
+    )
+
     expect(visual.state).toBe("failed")
-    expect(visual.percentText).toBe("read errors")
   })
 })
 

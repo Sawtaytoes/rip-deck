@@ -64,6 +64,8 @@ const buildFixtureJob = (input: {
   evidence?: string[]
   progress?: Partial<JobProgress>
   readErrorCount?: number
+  /** Sentences a `completed` rip carries anyway. */
+  warnings?: string[]
   elapsedMs?: number
   /**
    * Adopted from the bay ledger rather than watched.
@@ -90,6 +92,7 @@ const buildFixtureJob = (input: {
     evidence = [],
     progress = {},
     readErrorCount = 0,
+    warnings = [],
     elapsedMs = 8 * 60_000,
     isAdopted = false,
   } = input
@@ -152,6 +155,7 @@ const buildFixtureJob = (input: {
       ? `/media/Disc-Rips/[BACKUP] ${title}`
       : `/media/Disc-Rips/${title}`,
     readErrorCount,
+    warnings,
     isAdopted,
     isKeepTryingRequested: false,
   }
@@ -644,6 +648,73 @@ const buildUsbFlap = (nowMs: number): TowerSnapshot => {
   })
 }
 
+/**
+ * Pass, warning and fail, side by side.
+ *
+ * The three states of a finished rip, in one rack, because they
+ * are only judgeable against each other: the question a reader
+ * has is not "is amber legible" but "can I tell these three
+ * apart at a glance from the doorway".
+ *
+ * Slot 5 is the rip this fixture was written for. A CSS DVD that
+ * rode to `Backup done`, left an 8 GB ISO, and hit one bad
+ * sector on the way. Before 2026-08-27 it wore slot 8's colours
+ * — a `fail` badge saying there was no backup, over a backup
+ * ([decision](../../../../docs/decisions/2026-08-27-a-read-error-on-a-verified-backup-is-a-warning-not-a-failure.md)).
+ */
+const buildThreeOutcomes = (nowMs: number): TowerSnapshot =>
+  createTowerSnapshot({
+    isMqttEnabled: true,
+    bays: [
+      buildFixtureBay({
+        slot: 1,
+        job: buildFixtureJob({
+          slot: 1,
+          nowMs,
+          state: "completed",
+          title: "Fixture Disc 1",
+          discType: "dvd",
+        }),
+      }),
+      ...buildIdleBays([2, 3, 4]),
+      buildFixtureBay({
+        slot: 5,
+        job: buildFixtureJob({
+          slot: 5,
+          nowMs,
+          state: "completed",
+          title: "Fixture Disc 5",
+          discType: "dvd",
+          readErrorCount: 4,
+          warnings: [
+            "4 read errors at 3.20 GB, 3.24 GB, 3.31 GB. " +
+              "The backup finished and its structure " +
+              "verified, so there IS a copy — it may have " +
+              "damage in it. MakeMKV does not report whether " +
+              "it re-read those sectors successfully or wrote " +
+              "them off, and robot mode has no message that " +
+              "would say — so Rip Deck cannot tell you which. " +
+              "Play the disc through before you throw the " +
+              "original away.",
+          ],
+        }),
+      }),
+      ...buildIdleBays([6, 7]),
+      buildFixtureBay({
+        slot: 8,
+        job: buildFixtureJob({
+          slot: 8,
+          nowMs,
+          state: "failed",
+          title: "Fixture Disc 8",
+          discType: "dvd",
+          readErrorCount: 41,
+        }),
+      }),
+      ...buildIdleBays([9]),
+    ],
+  })
+
 export const FIXTURE_NAMES = [
   "empty",
   "nine-rips",
@@ -655,6 +726,7 @@ export const FIXTURE_NAMES = [
   "held-at-startup",
   "unmeasured",
   "usb-flap",
+  "three-outcomes",
 ] as const
 
 export type FixtureName = (typeof FIXTURE_NAMES)[number]
@@ -691,5 +763,7 @@ export const createFixtureSnapshot = (input: {
       return buildUnmeasured(nowMs)
     case "usb-flap":
       return buildUsbFlap(nowMs)
+    case "three-outcomes":
+      return buildThreeOutcomes(nowMs)
   }
 }

@@ -316,6 +316,8 @@ type MockBay = {
     etaTrend?: "falling" | "steady" | "rising" | null
     throughputBytesPerSec?: number | null
     readErrorCount?: number
+    /** Sentences a rip that WORKED still carries. */
+    warnings?: string[]
     elapsedMins?: number
     /**
      * Adopted from the bay ledger rather than watched.
@@ -439,6 +441,7 @@ const projectBay = (
 
   const totalFraction = bay.job.totalFraction ?? 0.43
   const readErrorCount = bay.job.readErrorCount ?? 0
+  const warnings = bay.job.warnings ?? []
   const elapsedMins = bay.job.elapsedMins ?? 8
 
   // `??` would be wrong for these three: a scenario overriding
@@ -535,6 +538,7 @@ const projectBay = (
     eta_trend: etaTrend,
     throughput_bytes_per_sec: throughputBytesPerSec,
     read_error_count: readErrorCount,
+    warnings,
     verdict: verdict.kind,
     verdict_message: verdict.message,
     verdict_confidence: verdict.confidence,

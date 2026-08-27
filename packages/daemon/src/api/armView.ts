@@ -74,8 +74,25 @@ export type ArmRip = {
   eta_seconds: number | null
   eta_trend: "falling" | "steady" | "rising" | null
   throughput_bytes_per_sec: number | null
-  /** Non-zero blocks success. Never render this as healthy. */
+  /**
+   * Read errors seen during the copy.
+   *
+   * ⚠️ This no longer blocks success, and the comment that said
+   * it did was two facts out of date. The CSS handshake probe
+   * every protected DVD emits is not counted here at all, and a
+   * genuine read error on a backup that verified is a WARNING —
+   * see `warnings` below.
+   */
   read_error_count: number
+  /**
+   * Trouble on a rip that still worked. Empty for a clean one.
+   *
+   * The third state on the wire. A non-empty list against
+   * `status: "success"` is the `warning` badge, and it is the
+   * only field that carries it — `verdict` is the health
+   * engine's answer and stays `unknown` while its gate is shut.
+   */
+  warnings: string[]
   verdict: VerdictKind
   verdict_message: string
   verdict_confidence: string
@@ -282,6 +299,7 @@ const buildArmRip = (input: {
     throughput_bytes_per_sec:
       progress.throughputBytesPerSec,
     read_error_count: job.readErrorCount,
+    warnings: job.warnings,
     verdict: verdict.kind,
     verdict_message: verdict.message,
     verdict_confidence: verdict.confidence,

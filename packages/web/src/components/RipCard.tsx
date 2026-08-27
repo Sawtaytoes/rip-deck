@@ -48,6 +48,9 @@ function actionText(state: BayActionState): string {
 
 const CARD_BORDER: Record<string, string> = {
   done: "border-intent-success-border",
+  // The third state. Not the finished green (the copy may be
+  // damaged) and not the failed red (there IS a copy).
+  warning: "border-intent-warning-border",
   failed: "border-intent-danger-border",
   running: "border-border-subtle",
   indeterminate: "border-border-subtle",
@@ -421,17 +424,43 @@ export function RipCard({
             value={visual.fillPercent}
           />
 
-          {/* Never quiet, never green, and never behind a tap. A
-              rip with read errors is not a success no matter
-              what the exit code said. */}
+          {/* Never quiet and never behind a tap, but no longer
+              always RED. A rip with read errors that still
+              produced a verified backup is the third state: the
+              copy exists and may be damaged, which is amber, not
+              "there is no backup"
+              ([decision](https://mkdocs.octen.dev/workspace/rip-deck/docs/decisions/2026-08-27-a-read-error-on-a-verified-backup-is-a-warning-not-a-failure/)).
+              A rip that FAILED keeps the danger colour, because
+              there the errors are the cause of having nothing. */}
           {rip.read_error_count > 0 && (
-            <div className="mt-1.5 inline-block rounded-md border border-intent-danger-border bg-intent-danger-surface px-2 py-0.5 text-sm font-semibold text-intent-danger-content">
+            <div
+              className={`mt-1.5 inline-block rounded-md border px-2 py-0.5 text-sm font-semibold ${
+                rip.status === "fail"
+                  ? "border-intent-danger-border bg-intent-danger-surface text-intent-danger-content"
+                  : "border-intent-warning-border bg-intent-warning-surface text-intent-warning-content"
+              }`}
+            >
               {rip.read_error_count} read{" "}
               {rip.read_error_count === 1
                 ? "error"
                 : "errors"}
             </div>
           )}
+
+          {/* The sentences themselves. They name the count, the
+              offsets, and — the part the owner asked for — say
+              plainly that MakeMKV's robot output does not report
+              whether it recovered, rather than implying it did.
+              Not behind the collapse: a warning nobody scrolls to
+              is a warning that is not there. */}
+          {rip.warnings.map((warning) => (
+            <p
+              className="mt-1.5 rounded-md border border-intent-warning-border bg-surface-raised px-2 py-1 text-sm text-intent-warning-content"
+              key={warning}
+            >
+              {warning}
+            </p>
+          ))}
 
           {/* Everything below is what a collapsed card drops. */}
           <div className="@max-md/bay:hidden">
