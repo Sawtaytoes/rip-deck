@@ -564,6 +564,19 @@ export type TrayBayResultKind =
    */
   | "skipped_untouched"
   /**
+   * A `power_off` press cut mains while this bay was `starting`.
+   *
+   * Warned about, never refused. `starting` is the settle → type
+   * → identify window: the ripper child does not exist yet
+   * (`applyRipStarted` flips the phase *before* the spawn, on
+   * both the makemkv and cyanrip paths), so no byte has been
+   * written and the press destroys nothing. It is still said out
+   * loud, because a disc that was mid-identify when the lights
+   * went out is a disc the operator should expect to see re-read
+   * on the way back up.
+   */
+  | "skipped_starting"
+  /**
    * A rip was started on this bay because an operator asked.
    *
    * "Started", not "finished": the dispatch is queued and the reply
@@ -646,13 +659,50 @@ export const decideTrayBayAction = (input: {
     bay !== null &&
     (bay.phase === "starting" || bay.phase === "ripping")
   ) {
+    // ⚠️ The ONE exception, and it is not a softening of the rule
+    // — it is the rule applied to what `starting` actually is.
+    //
+    // The refusal protects WRITTEN BYTES. `ripping` has them.
+    // `starting` is settle → type → identify and has none: the
+    // ripper child is spawned *after* `applyRipStarted` flips the
+    // phase, on both the makemkv and the cyanrip path, so a
+    // `starting` bay has never had a ripper. Cutting mains under
+    // it costs a re-read, not 90 GB.
+    //
+    // Refusing it anyway was a deadlock, hit live on 2026-08-26.
+    // `starting` had no upper bound: a wedged USB bus left five
+    // bays there for 75 minutes, and one `starting` bay is enough
+    // to refuse the whole press. So the Tower off button — the
+    // only control in this dashboard that can clear a wedged bus —
+    // was held shut by the wedge it exists to clear, and the owner
+    // had to go and pull the plug.
+    //
+    // Tray moves are still refused for `starting`, and that is not
+    // inconsistent: opening a drawer under a live `makemkvcon`
+    // read is how the eject/insert flap-storm starts (B3), and
+    // unlike mains it fixes nothing when the bus is down.
+    const isHarmlessPowerCut =
+      request.kind === "power_off" &&
+      bay.phase === "starting"
+
+    if (!isHarmlessPowerCut) {
+      return {
+        action: "refuse",
+        resultKind: "refused_ripping",
+        detail:
+          `REFUSED — this bay is ${bay.phase}. Opening the ` +
+          "tray now would destroy the rip in progress. Nothing " +
+          "was touched.",
+      }
+    }
+
     return {
-      action: "refuse",
-      resultKind: "refused_ripping",
+      action: "skip",
+      resultKind: "skipped_starting",
       detail:
-        `REFUSED — this bay is ${bay.phase}. Opening the ` +
-        "tray now would destroy the rip in progress. Nothing " +
-        "was touched.",
+        "the tower's power was cut while this bay was still " +
+        "reading the disc. No rip had started, so nothing was " +
+        "lost; the disc is still in the drive.",
     }
   }
 

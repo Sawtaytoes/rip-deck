@@ -3908,7 +3908,14 @@ describe("startWatcher power_off", () => {
   }
 
   it("⚠️ REFUSES while a bay is ripping, and cuts nothing", () => {
-    const ripper = controllableRipper()
+    // `reportsRipStarted` is the whole point of this test, not a
+    // detail: without it the fake never calls `onRipStarted`, the
+    // bay stays `starting`, and this asserted the refusal for a
+    // phase in which NOTHING IS RIPPING — which is the bug the
+    // block below covers, passing here for the wrong reason.
+    const ripper = controllableRipper({
+      reportsRipStarted: true,
+    })
     const tower = poweredTower({
       runBayRip: ripper.runBayRip,
     })
@@ -3929,6 +3936,43 @@ describe("startWatcher power_off", () => {
       expect(report.spoken_message).toBe(
         "Not turning the optical ripper tower off. A rip is " +
           "still running, and cutting power now would lose it.",
+      )
+
+      ripper.finish(SLOT_9)
+      await tower.watcher.stop()
+    })()
+  })
+
+  it("cuts power for a bay that is only STARTING", () => {
+    // ⚠️ Regression, live 2026-08-26. `starting` is settle → type
+    // → identify: the ripper child is spawned only after
+    // `applyRipStarted` has moved the bay to `ripping`, so a
+    // `starting` bay has written nothing and a power cut loses
+    // nothing.
+    //
+    // It had no upper bound either. A wedged USB bus left five
+    // bays `starting` for 75 minutes — `identifyDisc` was waiting
+    // on a `makemkvcon` that SIGKILL could not reach — and one
+    // refused bay refuses the whole press. So the Tower off
+    // button, the only control here that clears a wedged bus, was
+    // held shut by the wedge, and the owner had to pull the plug.
+    const ripper = controllableRipper()
+    const tower = poweredTower({
+      runBayRip: ripper.runBayRip,
+    })
+
+    return (async () => {
+      await tower.watcher.tickNow()
+      await flush()
+
+      const report = await tower.watcher.runTrayCommand({
+        request: { kind: "power_off" },
+      })
+
+      expect(tower.powerOffs()).toBe(1)
+      expect(report.counts.refused).toBe(0)
+      expect(report.message).toContain(
+        "Turning the optical ripper tower off",
       )
 
       ripper.finish(SLOT_9)
