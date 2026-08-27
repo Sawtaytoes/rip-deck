@@ -5,7 +5,7 @@ PRGV:0,0,65536
 PRGV:0,0,65536
 PRGV:65536,0,65536
 PRGV:65536,65536,65536
-DRV:0,0,999,0,"BD-RE ASUS BW-16D1HT 3.02 KL7M29G4410","","/dev/sr8"
+DRV:0,0,999,0,"BD-RE ASUS BW-16D1HT 3.02 EXAMPLE00001","","/dev/sr8"
 DRV:1,256,999,0,"","",""
 DRV:2,256,999,0,"","",""
 DRV:3,256,999,0,"","",""
@@ -24,7 +24,7 @@ DRV:15,256,999,0,"","",""
 PRGV:0,65536,65536
 PRGV:0,0,65536
 MSG:1011,0,1,"Using LibreDrive mode (v06.3 id=96929CF53B04)","%1","Using LibreDrive mode (v06.3 id=96929CF53B04)"
-MSG:2003,0,3,"Error 'Scsi error - ILLEGAL REQUEST:READ OF SCRAMBLED SECTOR WITHOUT AUTHENTICATION' occurred while reading 'BD-RE ASUS BW-16D1HT 3.02 KL7M29G4410' at offset '1048576'","Error '%1' occurred while reading '%2' at offset '%3'","Scsi error - ILLEGAL REQUEST:READ OF SCRAMBLED SECTOR WITHOUT AUTHENTICATION","BD-RE ASUS BW-16D1HT 3.02 KL7M29G4410","1048576"
+MSG:2003,0,3,"Error 'Scsi error - ILLEGAL REQUEST:READ OF SCRAMBLED SECTOR WITHOUT AUTHENTICATION' occurred while reading 'BD-RE ASUS BW-16D1HT 3.02 EXAMPLE00001' at offset '1048576'","Error '%1' occurred while reading '%2' at offset '%3'","Scsi error - ILLEGAL REQUEST:READ OF SCRAMBLED SECTOR WITHOUT AUTHENTICATION","BD-RE ASUS BW-16D1HT 3.02 EXAMPLE00001","1048576"
 MSG:5072,131072,1,"Backing up disc into folder \"file:///media/Disc-Rips/.rip-deck-incomplete-00000000-0000-4000-8000-000000000000\"","Backing up disc into folder \"%1\"","file:///media/Disc-Rips/.rip-deck-incomplete-00000000-0000-4000-8000-000000000000"
 PRGT:5047,0,"Copying all files"
 PRGC:3102,0,"Processing title sets"

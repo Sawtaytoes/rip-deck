@@ -81,11 +81,11 @@ const HASH_CHECK_FAILED =
 const CSS_PROBE_ERROR =
   "MSG:2003,0,3,\"Error 'Scsi error - ILLEGAL REQUEST:READ " +
   "OF SCRAMBLED SECTOR WITHOUT AUTHENTICATION' occurred " +
-  "while reading 'BD-RE ASUS BW-16D1HT 3.02 KL7M29G4410' at " +
+  "while reading 'BD-RE ASUS BW-16D1HT 3.02 EXAMPLE00001' at " +
   "offset '1048576'\",\"Error '%1' occurred while reading " +
   "'%2' at offset '%3'\",\"Scsi error - ILLEGAL " +
   'REQUEST:READ OF SCRAMBLED SECTOR WITHOUT AUTHENTICATION",' +
-  '"BD-RE ASUS BW-16D1HT 3.02 KL7M29G4410","1048576"'
+  '"BD-RE ASUS BW-16D1HT 3.02 EXAMPLE00001","1048576"'
 
 const READ_ERROR =
   "MSG:2003,16,3,\"Error 'Scsi error - MEDIUM ERROR:" +
