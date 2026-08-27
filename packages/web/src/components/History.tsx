@@ -143,16 +143,11 @@ export function History() {
           movement than the wait it covers. */}
       {page !== undefined && rips.length === 0 && (
         <EmptyState
-          action={
-            isFiltered ? (
-              <Button
-                appearance="outline"
-                onClick={clearFilters}
-              >
-                Clear filters
-              </Button>
-            ) : undefined
-          }
+          // ⚠️ No action button. `HistoryControls` already shows
+          // "Clear filters" whenever `isFiltered` is true — which
+          // is exactly when this state would offer one — and two
+          // identical buttons on one screen is the reader working
+          // out whether they do the same thing.
           description={
             // ⚠️ Two different states, and the difference is
             // what `total_unfiltered` is for. "Your filter found
