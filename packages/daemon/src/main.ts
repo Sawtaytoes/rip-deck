@@ -7,6 +7,7 @@ import {
 import { createTowerStore } from "./api/snapshot.ts"
 import { createTowerFeed } from "./api/towerFeed.ts"
 import type { WebAssets } from "./api/webAssets.ts"
+import { loadDriveRegistry } from "./drives/registry.ts"
 import {
   HEALTH_TUNING_MIN_JOB_COUNT,
   refreshHealthGate,
@@ -17,6 +18,7 @@ import {
   createGovernor,
   resolveRipConcurrency,
 } from "./rip/governor.ts"
+import { backfillRipHistory } from "./rip/ripHistoryBackfill.ts"
 import {
   type BayOutcome,
   createWatcherConfig,
@@ -242,6 +244,35 @@ export const runWatch = async (
           `rip and saves the answer; the dashboard shows it ` +
           `once the corpus is big enough and at least one rip ` +
           `in it went badly.`,
+  )
+
+  // Fold the rips that finished BEFORE there was a history log
+  // into it, once, keyed on job id so a second boot adds
+  // nothing. It runs here — before the API is up — so the first
+  // request to `/api/history` already sees the whole corpus
+  // rather than a list that fills in behind the reader.
+  //
+  // ⚠️ A backfilled row has no disc NAME and none can be
+  // recovered; `ripHistoryBackfill.ts` records the three routes
+  // that were measured and found dead. The line below says so,
+  // because a history that silently starts nameless in July
+  // reads as a bug rather than as the limit it is.
+  const history = await backfillRipHistory({
+    stateDir: config.stateDir,
+    registry: await loadDriveRegistry(
+      config.registryPath,
+    ).catch(() => null),
+  })
+
+  console.log(
+    history.addedCount === 0
+      ? `History: ${config.stateDir}/history.jsonl — every ` +
+          `finished rip, at /api/history. Nothing to rebuild.`
+      : `History: ${config.stateDir}/history.jsonl — every ` +
+          `finished rip, at /api/history. Rebuilt ` +
+          `${history.addedCount} of ${history.jobCount} older ` +
+          `rips from their saved measurements; those rows have ` +
+          `no disc name, because nothing ever recorded one.`,
   )
 
   // The API's whole state, and the reason `readSnapshot` can be

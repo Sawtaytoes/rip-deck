@@ -22,6 +22,11 @@ build/
 .env.*
 !.env.example
 __screenshots__/
+# Vitest browser mode's per-run scratch: the DOM snapshot and the
+# failure screenshot it writes beside a failing test. Debug output
+# for the run that produced it, never a deliverable — the same
+# call `__screenshots__/` above makes.
+.vitest-attachments/
 coverage/
 .DS_Store
 .claude/settings.local.json

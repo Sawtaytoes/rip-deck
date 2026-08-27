@@ -1,4 +1,4 @@
-import { open } from "node:fs/promises"
+import { access, open } from "node:fs/promises"
 import { join } from "node:path"
 
 /**
@@ -250,3 +250,37 @@ export const createLogCaptureReader = ({
 export const readStateDir = (
   env: Record<string, string | undefined> = process.env,
 ): string => env.RIP_DECK_STATE_DIR ?? "/var/lib/rip-deck"
+
+/**
+ * Does a capture exist for this job, without reading a byte of it?
+ *
+ * `GET /api/history` needs it for every row it renders — the
+ * card's Logs button is offered only when there is something
+ * behind it — and asking `createLogCaptureReader` would mean
+ * opening and tailing a 3 MB file to answer a yes/no question,
+ * twenty-five times a page.
+ *
+ * It lives HERE rather than in the history endpoint so this
+ * module keeps its single opinion about where a capture is and
+ * what it is called. A second `join(stateDir, \`${uuid}.robot.log\`)`
+ * somewhere else is the doubled opinion this repo keeps paying
+ * for, and it would go stale the day the naming changes.
+ */
+export const createLogCaptureProbe = ({
+  stateDir,
+}: {
+  stateDir: string
+}): ((jobUuid: string) => Promise<boolean>) => {
+  return async (jobUuid) => {
+    // The same gate the reader keeps, for the same reason: a
+    // caller from anywhere must not join a bad id into a path.
+    if (!isSafeJobUuid(jobUuid)) return false
+
+    return await access(
+      join(stateDir, logCaptureFilename(jobUuid)),
+    ).then(
+      () => true,
+      () => false,
+    )
+  }
+}

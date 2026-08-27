@@ -969,6 +969,7 @@ describe("the server's own surface", () => {
     expect([...comparedNames].sort()).toEqual([
       "FIXTURES_PATHNAME",
       "HEALTH_PATHNAMES",
+      "HISTORY_PATHNAME",
       "JSON_PATHNAME",
       "LEFTOVERS_PATHNAME",
       "LOGS_PATHNAME",

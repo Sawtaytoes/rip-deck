@@ -2,6 +2,7 @@ import { apiBase } from "../env"
 import { trayReportToActionResult } from "../format"
 import type {
   ActionResult,
+  HistoryPage,
   Leftover,
   LeftoverDeleteResult,
   RipDeckDataSource,
@@ -308,7 +309,75 @@ export const httpDataSource: RipDeckDataSource = {
         `${readMessage(body) ?? response.statusText}`,
     )
   },
+
+  /**
+   * One page of the finished-rip history.
+   *
+   * Dates go over as EPOCH MILLISECONDS, never as `YYYY-MM-DD`.
+   * The daemon accepts both, and the bare-date branch resolves in
+   * the DAEMON's time zone — which is the right answer for
+   * `curl` and the wrong one here, because the person reading
+   * this page means midnight where they are. Converting in
+   * `useHistory` and sending an instant means the two never have
+   * to agree about a zone.
+   *
+   * `cache: "no-store"` for the same reason the leftovers list
+   * has it: a proxy serving a cached page would show a rip that
+   * has since been joined to a verdict, or miss the one that
+   * finished a minute ago.
+   */
+  async fetchHistory({ filters, limit, offset }) {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+    })
+
+    if (filters.fromMs !== null) {
+      params.set("from", String(filters.fromMs))
+    }
+
+    if (filters.toMs !== null) {
+      params.set("to", String(filters.toMs))
+    }
+
+    if (filters.search !== "") {
+      params.set("q", filters.search)
+    }
+
+    if (filters.outcome !== "all") {
+      params.set("outcome", filters.outcome)
+    }
+
+    const response = await fetch(
+      `${apiBase}/api/history?${params.toString()}`,
+      { cache: "no-store" },
+    )
+
+    const body = await readJsonBody(response)
+
+    if (isHistoryPage(body)) return body
+
+    throw new Error(
+      `/api/history failed: ${response.status} ` +
+        `${readMessage(body) ?? response.statusText}`,
+    )
+  },
 }
+
+/**
+ * Structural, for the same reason every other check here is: a
+ * proxy's HTML error page must not arrive as a history with
+ * every field undefined. `rips` is checked as an ARRAY rather
+ * than row by row — the rows are rendered, not branched on, and
+ * a malformed one costs a blank field instead of a wrong page.
+ */
+const isHistoryPage = (
+  body: unknown,
+): body is HistoryPage =>
+  typeof body === "object" &&
+  body !== null &&
+  Array.isArray((body as HistoryPage).rips) &&
+  typeof (body as HistoryPage).total === "number"
 
 /** The `msg` a non-answering status carries, if it has one. */
 const readMessage = (body: unknown): string | null =>
