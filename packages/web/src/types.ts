@@ -753,12 +753,23 @@ export type HistoryFilters = {
   outcome: "all" | "completed" | "failed"
 }
 
-export type LeftoverDeleteResult = {
+/**
+ * What a write to `/api/leftovers` answers with.
+ *
+ * One shape for both verbs, because the panel does one thing
+ * with it either way: render `msg` and redraw from `leftovers`.
+ * A rename that succeeds changes the list too — a renamed
+ * duplicate usually leaves it altogether, which is the point.
+ */
+export type LeftoverCommandResult = {
   ok: boolean
   msg: string
   /** The remaining leftovers, so the panel needs no refetch. */
   leftovers: Leftover[]
 }
+
+/** @deprecated The delete-only name for `LeftoverCommandResult`. */
+export type LeftoverDeleteResult = LeftoverCommandResult
 
 export type RipDeckDataSource = {
   /** `fixture` selects a server-side `?fake=` scenario. */
@@ -819,7 +830,7 @@ export type RipDeckDataSource = {
    */
   deleteLeftover: (input: {
     path: string
-  }) => Promise<LeftoverDeleteResult>
+  }) => Promise<LeftoverCommandResult>
   /**
    * One page of every rip this tower has finished.
    *
@@ -833,4 +844,21 @@ export type RipDeckDataSource = {
     limit: number
     offset: number
   }) => Promise<HistoryPage>
+  /**
+   * Rename one leftover, in place.
+   *
+   * The other half of clearing one, and the half the owner asked
+   * for on 2026-08-27: a disc whose UDF volume label is wrong is
+   * a rip with a wrong name, and two discs that share a label
+   * make the second one a duplicate landing. Deleting is not the
+   * answer to either.
+   *
+   * Resolves for a REFUSAL as well as a success, exactly like
+   * `deleteLeftover`. "That name is already taken" is the
+   * sentence this endpoint exists to be able to say.
+   */
+  renameLeftover: (input: {
+    path: string
+    newName: string
+  }) => Promise<LeftoverCommandResult>
 }

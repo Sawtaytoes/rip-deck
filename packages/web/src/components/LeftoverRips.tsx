@@ -1,4 +1,5 @@
-import { Alert, Button } from "@charcuterie/ui"
+import { Alert, Button, Field } from "@charcuterie/ui"
+import { useState } from "react"
 
 import { useLeftovers } from "../hooks/useLeftovers"
 import type { Leftover } from "../types"
@@ -48,6 +49,40 @@ import type { Leftover } from "../types"
  * many bytes landed. Recomposing that here would be a second
  * opinion that drifts. Same rule `LoadedDiscsBanner` keeps.
  *
+ * ## Why Rename is beside Delete, and not instead of it
+ *
+ * The owner, 2026-08-27, looking at a Teenage Mutant Ninja
+ * Turtles box set:
+ *
+ * > *"We need to be able to delete (which you added) AND also
+ * > rename the rip, so it doesn't conflict."*
+ *
+ * The tower names a rip from the disc's own UDF volume label, and
+ * on that box set the labels are wrong and inconsistent — one
+ * disc whose menu reads SEASON 4 / Disc Two is labelled
+ * `…_V7_Disc_2`, and two discs share one label outright, so the
+ * second landed marked as a duplicate. None of that is litter.
+ * Deleting is the wrong answer to a rip that is fine apart from
+ * its name, and it is the ONLY answer this panel had.
+ *
+ * ## Why the form is a real `<form>`
+ *
+ * Enter submits and Escape is the only key that needs handling.
+ * A `<div>` with an `onKeyDown` would have to re-implement the
+ * first one, and would get it wrong for anybody driving this
+ * from a keyboard — which, on a nine-bay tower being cleaned up
+ * one folder at a time, is how it is actually driven.
+ *
+ * ## Why the suggested name drops the duplicate marker
+ *
+ * `occupied_name` is the name this rip WANTED, which is the name
+ * with `(rip-deck-duplicate-…)` taken off. Starting there is the
+ * one edit that is always correct to have begun, and pressing
+ * Save on it unchanged is answered honestly — the daemon refuses
+ * a name that is already taken, and says so. That refusal is
+ * information, not a dead end: it tells him the other disc has
+ * not been renamed yet.
+ *
  * ## Why a duplicate's Delete is not styled as safe
  *
  * `is_safe_to_delete` is FALSE for every duplicate, because a
@@ -62,10 +97,19 @@ export function LeftoverRips() {
     isLoading,
     loadError,
     clear,
+    rename,
     pendingPath,
     lastMessage,
     isLastRefused,
+    lastCommand,
   } = useLeftovers()
+
+  // Which row has its form open. A path rather than a boolean per
+  // row, because only one may be open: two half-typed names for
+  // two folders is a way to press Save on the wrong one.
+  const [renamingPath, setRenamingPath] = useState<
+    string | null
+  >(null)
 
   // Silent while loading, too. A panel that flashes "no leftover
   // rips" on every page load is noise about a state that is
@@ -105,9 +149,10 @@ export function LeftoverRips() {
       {lastMessage === null ? null : (
         <Alert
           description={lastMessage}
-          heading={
-            isLastRefused ? "Not cleared" : "Cleared"
-          }
+          heading={headingFor({
+            command: lastCommand,
+            isRefused: isLastRefused,
+          })}
           intent={isLastRefused ? "warning" : "success"}
           label="Leftover rips"
         />
@@ -118,9 +163,17 @@ export function LeftoverRips() {
         {leftovers.map((leftover) => (
           <LeftoverRow
             isPending={pendingPath === leftover.path}
+            isRenaming={renamingPath === leftover.path}
             key={leftover.path}
             leftover={leftover}
+            onCancelRename={() => setRenamingPath(null)}
             onClear={() => clear(leftover.path)}
+            onRename={(newName) =>
+              rename({ newName, path: leftover.path })
+            }
+            onStartRename={() =>
+              setRenamingPath(leftover.path)
+            }
           />
         ))}
       </ul>
@@ -131,56 +184,223 @@ export function LeftoverRips() {
 function LeftoverRow({
   leftover,
   isPending,
+  isRenaming,
+  onCancelRename,
   onClear,
+  onRename,
+  onStartRename,
 }: {
   leftover: Leftover
   isPending: boolean
+  isRenaming: boolean
+  onCancelRename: () => void
   onClear: () => void
+  onRename: (newName: string) => void
+  onStartRename: () => void
 }) {
   return (
-    <li className="border-border bg-surface flex flex-col gap-2 rounded-lg border p-3 @md/leftovers:flex-row @md/leftovers:items-start @md/leftovers:justify-between">
-      <div className="flex min-w-0 flex-col gap-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={
-              leftover.kind === "duplicate"
-                ? "bg-intent-warning-subtle text-intent-warning rounded px-2 py-0.5 text-xs font-semibold uppercase"
-                : "bg-surface-raised text-content-muted rounded px-2 py-0.5 text-xs font-semibold uppercase"
-            }
-          >
-            {leftover.kind === "duplicate"
-              ? "Finished — duplicate"
-              : "Unfinished"}
-          </span>
-          <span className="text-content-muted text-xs">
-            {formatSize(leftover.size_bytes)}
-          </span>
+    <li className="border-border bg-surface flex flex-col gap-2 rounded-lg border p-3">
+      <div className="flex flex-col gap-2 @md/leftovers:flex-row @md/leftovers:items-start @md/leftovers:justify-between">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={
+                leftover.kind === "duplicate"
+                  ? "bg-intent-warning-subtle text-intent-warning rounded px-2 py-0.5 text-xs font-semibold uppercase"
+                  : "bg-surface-raised text-content-muted rounded px-2 py-0.5 text-xs font-semibold uppercase"
+              }
+            >
+              {leftover.kind === "duplicate"
+                ? "Finished — duplicate"
+                : "Unfinished"}
+            </span>
+            <span className="text-content-muted text-xs">
+              {formatSize(leftover.size_bytes)}
+            </span>
+          </div>
+
+          {/* `break-all`: these names are 60 characters of uuid
+              and must not push the buttons off a narrow view. */}
+          <p className="text-content font-mono text-sm break-all">
+            {leftover.name}
+          </p>
+
+          <p className="text-content-muted text-sm">
+            {leftover.detail}
+          </p>
         </div>
 
-        {/* `break-all`: these names are 60 characters of uuid and
-            must not push the Delete button off a narrow view. */}
-        <p className="text-content font-mono text-sm break-all">
-          {leftover.name}
-        </p>
+        {/* `shrink-0`: the two buttons keep their width while the
+            60-character name beside them wraps. */}
+        <div className="flex shrink-0 gap-2">
+          <Button
+            appearance="outline"
+            intent="neutral"
+            isDisabled={isPending || isRenaming}
+            onClick={onStartRename}
+            size="sm"
+          >
+            Rename
+          </Button>
 
-        <p className="text-content-muted text-sm">
-          {leftover.detail}
-        </p>
+          <Button
+            appearance="outline"
+            intent={
+              leftover.is_safe_to_delete
+                ? "neutral"
+                : "danger"
+            }
+            // Disabled while the form is open: deleting the
+            // folder you are in the middle of renaming is not a
+            // press anybody means to make.
+            isDisabled={isPending || isRenaming}
+            onClick={onClear}
+            size="sm"
+          >
+            {isPending && !isRenaming
+              ? "Clearing…"
+              : "Delete"}
+          </Button>
+        </div>
       </div>
 
-      <Button
-        appearance="outline"
-        intent={
-          leftover.is_safe_to_delete ? "neutral" : "danger"
-        }
-        isDisabled={isPending}
-        onClick={onClear}
-        size="sm"
-      >
-        {isPending ? "Clearing…" : "Delete"}
-      </Button>
+      {isRenaming ? (
+        <RenameForm
+          isPending={isPending}
+          // Remounted per row, so the draft always starts from
+          // THIS folder's suggested name.
+          key={leftover.path}
+          onCancel={onCancelRename}
+          onSubmit={onRename}
+          suggestedName={
+            leftover.occupied_name ?? leftover.name
+          }
+        />
+      ) : null}
     </li>
   )
+}
+
+/**
+ * Type the name this rip should have had.
+ *
+ * ## Why the control is a plain `<input>` inside a `Field`
+ *
+ * Charcuterie has no text-input component. `Field` is the
+ * label-and-wiring half and it CLONES the control it is given —
+ * its own stories pass a bare `<input>` with a local class
+ * constant, and points-market spells the same constant three
+ * times. That is a shared shape and it belongs in the library,
+ * so the class below is a copy with a known home to move to, not
+ * a house style invented here. Nothing about it is a native
+ * `<select>`, which is the element Charcuterie deprecates.
+ *
+ * ## Why Save can be pressed on an unchanged name
+ *
+ * The suggested name is a duplicate's `occupied_name`, which is
+ * by definition taken — that is what made it a duplicate. The
+ * daemon answers "already taken" and the panel shows it. Greying
+ * the button out instead would hide the one fact the operator
+ * needs, which is that the OTHER disc still has that name.
+ */
+function RenameForm({
+  isPending,
+  onCancel,
+  onSubmit,
+  suggestedName,
+}: {
+  isPending: boolean
+  onCancel: () => void
+  onSubmit: (newName: string) => void
+  suggestedName: string
+}) {
+  const [draft, setDraft] = useState(suggestedName)
+
+  return (
+    <form
+      // Stacked, not a row: the hint under the input is two lines
+      // wide, and a `items-end` row puts Save level with the HINT
+      // rather than with the control it submits.
+      className="border-border flex flex-col gap-3 border-t pt-3"
+      onSubmit={(event) => {
+        event.preventDefault()
+        onSubmit(draft)
+      }}
+    >
+      <Field
+        className="min-w-0"
+        description={
+          "One folder name, no slashes. A DVD rip is a single " +
+          "ISO file and keeps its .iso — you do not have to " +
+          "type it."
+        }
+        label="New name"
+      >
+        <input
+          className={TEXT_INPUT_CLASS}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") onCancel()
+          }}
+          value={draft}
+        />
+      </Field>
+
+      <div className="flex justify-end gap-2">
+        <Button
+          appearance="ghost"
+          intent="neutral"
+          isDisabled={isPending}
+          onClick={onCancel}
+          size="sm"
+          type="button"
+        >
+          Cancel
+        </Button>
+
+        <Button
+          appearance="solid"
+          intent="accent"
+          isDisabled={isPending || draft.trim() === ""}
+          size="sm"
+          type="submit"
+        >
+          {isPending ? "Renaming…" : "Save name"}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+/**
+ * The text control's look, until Charcuterie owns one.
+ *
+ * Copied from `Field`'s own stories rather than invented, and
+ * every value is a token — `border-border`, `bg-surface-raised`,
+ * `text-content`, and the focus ring's three `--focus-ring-*`
+ * variables — so it follows the colour scheme and the density
+ * axis the same way a `Button` does.
+ */
+const TEXT_INPUT_CLASS =
+  "border-border bg-surface-raised text-content w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-solid focus-visible:outline-(length:--focus-ring-width) focus-visible:outline-offset-(--focus-ring-offset) focus-visible:outline-focus-ring"
+
+/**
+ * The heading over the daemon's sentence.
+ *
+ * Named for the VERB, because "Not cleared" over a refused
+ * rename contradicts the sentence beneath it — and that sentence
+ * ("that name is already taken") is the most useful thing this
+ * endpoint produces.
+ */
+const headingFor = (input: {
+  command: "delete" | "rename" | null
+  isRefused: boolean
+}): string => {
+  if (input.command === "rename") {
+    return input.isRefused ? "Not renamed" : "Renamed"
+  }
+
+  return input.isRefused ? "Not cleared" : "Cleared"
 }
 
 /**
