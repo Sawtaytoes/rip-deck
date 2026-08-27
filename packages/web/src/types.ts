@@ -481,6 +481,12 @@ export type TrayBayResultKind =
   | "rip_started"
   /** A `power_off` press moved no drawer here. */
   | "skipped_untouched"
+  /**
+   * A `power_off` press cut mains while this bay was still
+   * settling / typing / identifying. Warned about, not refused:
+   * no rip had started, so nothing was lost.
+   */
+  | "skipped_starting"
   | "failed"
 
 /**

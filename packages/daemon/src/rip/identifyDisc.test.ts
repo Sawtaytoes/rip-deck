@@ -114,6 +114,82 @@ describe("telling a dead binary apart from a nameless disc", () => {
 })
 
 /**
+ * The bound on one read, and why signalling the child is not one.
+ *
+ * ⚠️ Regression, measured on the live tower 2026-08-26. The
+ * timeout used to send SIGKILL and then keep waiting for `close`.
+ * That is not a bound against the one failure it was written for:
+ * a `makemkvcon` talking to a drive in SCSI error recovery sits in
+ * uninterruptible sleep, where a signal is queued and not
+ * delivered, so the child does not die, `close` never fires, and
+ * the read never returns. Five bays stayed `starting` for 75
+ * minutes — and a `starting` bay refused the Tower off press that
+ * would have cleared the bus.
+ */
+describe("bounding a read the drive never returns from", () => {
+  it("answers on its own timeout, not on the child's death", async () => {
+    // D state cannot be created from a test, so this reproduces
+    // the observable half: a child whose `close` is LATE. The
+    // backgrounded `sleep` inherits the stdout pipe, so the pipe
+    // does not reach EOF — and `close` does not fire — until long
+    // after the shell itself has exited. Before the fix this call
+    // took as long as the `sleep`; now it takes `timeoutMs`.
+    const startedAtMs = Date.now()
+
+    const identified = await identifyDisc({
+      devPath: "/dev/null",
+      makemkv: {
+        command: "sh",
+        prefixArgs: [
+          "-c",
+          "printf 'CINFO:2,0,\"TMNT SEASON 1\"\\n'; " +
+            "sleep 4 & exit 0",
+        ],
+        wrapperArgs: null,
+      },
+      timeoutMs: 300,
+      maxAttempts: 1,
+    })
+
+    expect(Date.now() - startedAtMs).toBeLessThan(2_000)
+
+    // And it answers with what it HAD, not with an empty result:
+    // the line that arrived before the timeout is still evidence,
+    // and calling a timed-out read a spawn failure would send the
+    // owner to the deployment instead of the bus.
+    expect(identified.spawnFailure).toBeNull()
+    expect(identified.discName).toBe("TMNT SEASON 1")
+  })
+
+  it("reports a timed-out silent read as a disc never read", async () => {
+    // The case that actually happened: nothing came back at all.
+    // It must land as "not read" — retryable, then held — and
+    // never as "read, and blank", which is final and would latch
+    // the bay on a bus fault. Timed the same way as above: the
+    // shape is only half the contract, and it was already right
+    // before the fix — what was wrong was how long it took to say
+    // so.
+    const startedAtMs = Date.now()
+
+    const identified = await identifyDisc({
+      devPath: "/dev/null",
+      makemkv: {
+        command: "sh",
+        prefixArgs: ["-c", "sleep 4"],
+        wrapperArgs: null,
+      },
+      timeoutMs: 300,
+      maxAttempts: 1,
+    })
+
+    expect(Date.now() - startedAtMs).toBeLessThan(2_000)
+    expect(identified.spawnFailure).toBeNull()
+    expect(identified.discName).toBeNull()
+    expect(wasDiscRead(identified.events)).toBe(false)
+  })
+})
+
+/**
  * The signal that decides whether a no-name read is worth
  * retrying: did makemkvcon actually READ the disc, or only see the
  * drive? A `CINFO` block appears only once the disc is open, so its

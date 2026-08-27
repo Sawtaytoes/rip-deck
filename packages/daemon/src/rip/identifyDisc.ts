@@ -65,9 +65,16 @@ import type { MakemkvCommand } from "./ripCommand.ts"
  *
  * The retry is bounded (`IDENTIFY_TUNING.maxAttempts`) and each
  * attempt keeps its own timeout, so a wedged drive costs at most
- * `maxAttempts × timeoutMs` — and this never runs on the poll
+ * `maxAttempts x timeoutMs` — and this never runs on the poll
  * loop, only on the dispatch pipeline, so a longer identify
  * freezes no other bay.
+ *
+ * ⚠️ That bound is enforced by the timeout RESOLVING, not by the
+ * SIGKILL it sends. Until 2026-08-26 it only signalled, which is
+ * not a bound at all against the one failure it was written for:
+ * a child in uninterruptible sleep does not die when signalled,
+ * so the read never returned and the bound was infinite. See the
+ * comment on the timeout itself.
  */
 
 /** CINFO attribute id 2 is the disc name. */
@@ -242,6 +249,7 @@ const identifyDiscOnce = async (input: {
     spawnFailure: string | null
   }>((resolve) => {
     const collected: MakemkvEvent[] = []
+    let isSettled = false
     const child = spawn(input.makemkv.command, args, {
       stdio: ["ignore", "pipe", "ignore"],
     })
@@ -250,9 +258,47 @@ const identifyDiscOnce = async (input: {
     // block on a drive in SCSI error recovery. Bounded, because
     // an unbounded identification step would reintroduce the
     // exact hang `--noscan` exists to prevent.
+    //
+    // ⚠️ **The timeout RESOLVES. Signalling the child is not a
+    // bound.** SIGKILL is only delivered when the kernel returns
+    // from the call the process is blocked in, and a `makemkvcon`
+    // talking to a drive in SCSI error recovery is in
+    // uninterruptible sleep — so the signal is queued, the child
+    // does not die, `close` never fires, and this promise never
+    // settles. The bay it belongs to then stays `starting` for as
+    // long as the bus stays down, which is unbounded.
+    //
+    // Measured on the live tower 2026-08-26: five `makemkvcon`
+    // children signalled and still unreaped, three `scsi_eh_*`
+    // threads in D state, and five bays held `starting` for 75
+    // minutes with nothing running. A `starting` bay refuses every
+    // tray command *and* the Tower off press, so the one control
+    // that clears a wedged bus was disabled by the wedge.
+    //
+    // The signal is still sent — it lands if the process is
+    // killable and costs nothing if it is not — but the ANSWER no
+    // longer waits for the child to admit it died. `unref()` goes
+    // with it: an unkillable child's handle would otherwise hold
+    // the event loop open and block the daemon's own shutdown.
     const timeout = setTimeout(() => {
       child.kill("SIGKILL")
+      child.unref()
+      settle({ events: collected, spawnFailure: null })
     }, input.timeoutMs ?? 120_000)
+
+    // Whoever answers first wins, and the losers are no-ops: a
+    // child that finally closes minutes after the timeout gave up
+    // must not resolve a promise the caller has long since acted
+    // on.
+    const settle = (outcome: {
+      events: MakemkvEvent[]
+      spawnFailure: string | null
+    }): void => {
+      if (isSettled) return
+      isSettled = true
+      clearTimeout(timeout)
+      resolve(outcome)
+    }
 
     createInterface({ input: child.stdout }).on(
       "line",
@@ -263,15 +309,13 @@ const identifyDiscOnce = async (input: {
     // binary is missing (ENOENT), not executable (EACCES), or the
     // fork itself fails — none of which are facts about the disc.
     child.once("error", (error) => {
-      clearTimeout(timeout)
-      resolve({
+      settle({
         events: [],
         spawnFailure: `${input.makemkv.command}: ${error.message}`,
       })
     })
     child.once("close", () => {
-      clearTimeout(timeout)
-      resolve({ events: collected, spawnFailure: null })
+      settle({ events: collected, spawnFailure: null })
     })
   })
 
