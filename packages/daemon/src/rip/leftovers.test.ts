@@ -17,6 +17,7 @@ import {
   renameLeftover,
   scanLeftovers,
 } from "./leftovers.ts"
+import { type LiveRips, NO_LIVE_RIPS } from "./liveRips.ts"
 
 describe("telling a leftover from a finished rip", () => {
   it("reads an unfinished rip's job uuid out of its name", () => {
@@ -87,6 +88,7 @@ describe("saying whether a rip finished", () => {
     // Rip Deck had pre-created, exited 0 and wrote nothing. Four
     // of these appeared on 2026-08-26.
     const described = describeLeftover({
+      lockReason: null,
       kind: "incomplete",
       occupiedName: null,
       sizeBytes: 0,
@@ -101,6 +103,7 @@ describe("saying whether a rip finished", () => {
     // D4: a killed rip keeps what it wrote. Half a disc might
     // still be worth something, and the operator decides.
     const described = describeLeftover({
+      lockReason: null,
       kind: "incomplete",
       occupiedName: null,
       sizeBytes: 4_000_000_000,
@@ -118,6 +121,7 @@ describe("saying whether a rip finished", () => {
     // a folder — and calling it "a directory" on the card would
     // send the operator looking for something that is not there.
     const described = describeLeftover({
+      lockReason: null,
       kind: "incomplete",
       occupiedName: null,
       sizeBytes: 8_203_894_784,
@@ -133,6 +137,7 @@ describe("saying whether a rip finished", () => {
     // Bytes on disk, but no VIDEO_TS/BDMV — no player or scanner
     // can open it, so the size alone would mislead.
     const described = describeLeftover({
+      lockReason: null,
       kind: "incomplete",
       occupiedName: null,
       sizeBytes: 600_000_000,
@@ -149,6 +154,7 @@ describe("saying whether a rip finished", () => {
 
   it("⚠️ never blesses a duplicate — it is a FINISHED rip", () => {
     const described = describeLeftover({
+      lockReason: null,
       kind: "duplicate",
       occupiedName: "Ivanhoe (1952) - Blu-ray",
       sizeBytes: 22_000_000_000,
@@ -169,6 +175,7 @@ describe("refusing a dangerous delete", () => {
   it("allows a leftover in the destination root", () => {
     expect(
       refusalToDeleteLeftover({
+        liveRips: NO_LIVE_RIPS,
         rootPath: root,
         path: `${root}/.rip-deck-incomplete-abc-123`,
       }),
@@ -180,6 +187,7 @@ describe("refusing a dangerous delete", () => {
     // and it must never become one by accident.
     expect(
       refusalToDeleteLeftover({
+        liveRips: NO_LIVE_RIPS,
         rootPath: root,
         path: `${root}/[BACKUP] Ivanhoe (1952) - Blu-ray`,
       }),
@@ -189,6 +197,7 @@ describe("refusing a dangerous delete", () => {
   it("⚠️ refuses a path that climbs out of the root", () => {
     expect(
       refusalToDeleteLeftover({
+        liveRips: NO_LIVE_RIPS,
         rootPath: root,
         path: `${root}/../../etc/.rip-deck-incomplete-x`,
       }),
@@ -198,6 +207,7 @@ describe("refusing a dangerous delete", () => {
   it("⚠️ refuses the destination root itself", () => {
     expect(
       refusalToDeleteLeftover({
+        liveRips: NO_LIVE_RIPS,
         rootPath: root,
         path: root,
       }),
@@ -209,10 +219,138 @@ describe("refusing a dangerous delete", () => {
     // nested, so a nested one is somebody else's directory.
     expect(
       refusalToDeleteLeftover({
+        liveRips: NO_LIVE_RIPS,
         rootPath: root,
         path: `${root}/Some Film/.rip-deck-incomplete-abc`,
       }),
     ).toContain("direct child")
+  })
+})
+
+/**
+ * ⚠️ **This is the LIVE DATA LOSS case, and it is the reason this
+ * rule exists at all.**
+ *
+ * A rip in progress writes into `<root>/.rip-deck-incomplete-<uuid>`
+ * from `prepareDestination` until the atomic rename at the end.
+ * That folder is byte-for-byte the same shape as one an abandoned
+ * rip left behind, so the panel listed it as a deletable leftover
+ * with its bytes still arriving — and, once rename shipped, as a
+ * renamable one. `reaper.ts` has refused exactly this since it
+ * was written; these four rules did not.
+ *
+ * Both verbs, because renaming a directory out from under a
+ * running `makemkvcon` strands the rip just as deleting it does.
+ */
+describe("refusing to touch a rip that is RUNNING", () => {
+  const root = "/media/Disc-Rips"
+  const jobUuid = "4d37d72e-7f72-4cee-a82b-7af82c10bfd3"
+  const path = `${root}/.rip-deck-incomplete-${jobUuid}`
+
+  const live: LiveRips = {
+    isKnown: true,
+    jobUuids: new Set([jobUuid]),
+  }
+
+  it("⚠️ refuses to DELETE a folder a live job claims", () => {
+    const refusal = refusalToDeleteLeftover({
+      liveRips: live,
+      path,
+      rootPath: root,
+    })
+
+    expect(refusal).toContain("writing into this folder")
+    expect(refusal).toContain(jobUuid)
+  })
+
+  it("⚠️ refuses to RENAME a folder a live job claims", () => {
+    // Same loss, friendlier verb. `makemkvcon` holds a path it
+    // was handed before it started.
+    expect(
+      refusalToRenameLeftover({
+        liveRips: live,
+        newName: "[BACKUP] Anything Else",
+        path,
+        rootPath: root,
+      }),
+    ).toContain("writing into this folder")
+  })
+
+  it("allows both once the job is gone", () => {
+    expect(
+      refusalToDeleteLeftover({
+        liveRips: NO_LIVE_RIPS,
+        path,
+        rootPath: root,
+      }),
+    ).toBeNull()
+
+    expect(
+      refusalToRenameLeftover({
+        liveRips: NO_LIVE_RIPS,
+        newName: "[BACKUP] Anything Else",
+        path,
+        rootPath: root,
+      }),
+    ).toBeNull()
+  })
+
+  it("leaves the OTHER eight bays' folders alone", () => {
+    // Nine rips run at once. A guard that locked the whole panel
+    // whenever anything was ripping would be useless, and would
+    // teach the operator to ignore it.
+    expect(
+      refusalToDeleteLeftover({
+        liveRips: live,
+        path: `${root}/.rip-deck-incomplete-a-different-uuid`,
+        rootPath: root,
+      }),
+    ).toBeNull()
+  })
+
+  it("⚠️ refuses when the live set could not be READ", () => {
+    // Reaper guard 2. "No job claims this uuid" and "we do not
+    // know which jobs exist" are different facts, and reading
+    // the second as the first is how a live rip becomes a
+    // deletable row.
+    const refusal = refusalToDeleteLeftover({
+      liveRips: {
+        isKnown: false,
+        reason:
+          "the disc watcher has not finished starting",
+      },
+      path,
+      rootPath: root,
+    })
+
+    expect(refusal).toContain("cannot tell which rips")
+  })
+
+  it("⚠️ does NOT lock a duplicate landing", () => {
+    // `(rip-deck-duplicate-…)` is written by the rename that
+    // ENDS a rip, so a folder wearing it is never being written
+    // to. Locking one would take away the only control the
+    // operator has for resolving the collision.
+    expect(
+      refusalToDeleteLeftover({
+        liveRips: live,
+        path: `${root}/[BACKUP] Ivanhoe (1952) - Blu-ray (rip-deck-duplicate-${jobUuid.slice(0, 8)})`,
+        rootPath: root,
+      }),
+    ).toBeNull()
+  })
+
+  it("⚠️ still refuses a finished rip first", () => {
+    // The live rule is added to the other four, not instead of
+    // them. A name the classifier does not claim is refused
+    // before anything asks the watcher about it.
+    expect(
+      refusalToDeleteLeftover({
+        liveRips: live,
+        path: `${root}/[BACKUP] Real Rip - DVD`,
+        rootPath: root,
+      }),
+    ).toContain("not a Rip Deck leftover")
   })
 })
 
@@ -231,6 +369,7 @@ describe("refusing a rename", () => {
   it("allows a plain new name for a leftover in the root", () => {
     expect(
       refusalToRenameLeftover({
+        liveRips: NO_LIVE_RIPS,
         newName: "[BACKUP] TMNT Season 4 Disc 2 - DVD.iso",
         path: leftover,
         rootPath: root,
@@ -244,6 +383,7 @@ describe("refusing a rename", () => {
     // to look like a leftover could never do it.
     expect(
       refusalToRenameLeftover({
+        liveRips: NO_LIVE_RIPS,
         newName: "[BACKUP] TMNT Season 4 Disc 2 - DVD",
         path: leftover,
         rootPath: root,
@@ -257,6 +397,7 @@ describe("refusing a rename", () => {
     // and `../../etc/passwd` is the same request spelled worse.
     expect(
       refusalToRenameLeftover({
+        liveRips: NO_LIVE_RIPS,
         newName: "../../etc/passwd",
         path: leftover,
         rootPath: root,
@@ -267,6 +408,7 @@ describe("refusing a rename", () => {
   it("⚠️ refuses a Windows-style separator too", () => {
     expect(
       refusalToRenameLeftover({
+        liveRips: NO_LIVE_RIPS,
         newName: "sub\\folder",
         path: leftover,
         rootPath: root,
@@ -278,6 +420,7 @@ describe("refusing a rename", () => {
     // `rename(x, "..")` is a question with no good answer.
     expect(
       refusalToRenameLeftover({
+        liveRips: NO_LIVE_RIPS,
         newName: "..",
         path: leftover,
         rootPath: root,
@@ -288,6 +431,7 @@ describe("refusing a rename", () => {
   it("⚠️ refuses `.` as the whole new name", () => {
     expect(
       refusalToRenameLeftover({
+        liveRips: NO_LIVE_RIPS,
         newName: ".",
         path: leftover,
         rootPath: root,
@@ -298,6 +442,7 @@ describe("refusing a rename", () => {
   it("refuses an empty new name", () => {
     expect(
       refusalToRenameLeftover({
+        liveRips: NO_LIVE_RIPS,
         newName: "",
         path: leftover,
         rootPath: root,
@@ -308,6 +453,7 @@ describe("refusing a rename", () => {
   it("refuses a new name that is only whitespace", () => {
     expect(
       refusalToRenameLeftover({
+        liveRips: NO_LIVE_RIPS,
         newName: "   \t  ",
         path: leftover,
         rootPath: root,
@@ -318,6 +464,7 @@ describe("refusing a rename", () => {
   it("refuses a new name with a control character in it", () => {
     expect(
       refusalToRenameLeftover({
+        liveRips: NO_LIVE_RIPS,
         newName: "TMNT\u0000Disc 2",
         path: leftover,
         rootPath: root,
@@ -328,6 +475,7 @@ describe("refusing a rename", () => {
   it("⚠️ refuses a SOURCE that climbs out of the root", () => {
     expect(
       refusalToRenameLeftover({
+        liveRips: NO_LIVE_RIPS,
         newName: "anything",
         path: `${root}/../../etc/.rip-deck-incomplete-x`,
         rootPath: root,
@@ -338,6 +486,7 @@ describe("refusing a rename", () => {
   it("⚠️ refuses the destination root itself as the source", () => {
     expect(
       refusalToRenameLeftover({
+        liveRips: NO_LIVE_RIPS,
         newName: "anything",
         path: root,
         rootPath: root,
@@ -350,6 +499,7 @@ describe("refusing a rename", () => {
     // renamer, and it must never become one by accident.
     expect(
       refusalToRenameLeftover({
+        liveRips: NO_LIVE_RIPS,
         newName: "Ivanhoe (1952)",
         path: `${root}/[BACKUP] Ivanhoe (1952) - Blu-ray`,
         rootPath: root,
@@ -360,6 +510,7 @@ describe("refusing a rename", () => {
   it("⚠️ refuses a nested source even when the name looks right", () => {
     expect(
       refusalToRenameLeftover({
+        liveRips: NO_LIVE_RIPS,
         newName: "anything",
         path: `${root}/Some Film/.rip-deck-incomplete-abc`,
         rootPath: root,
@@ -373,6 +524,7 @@ describe("refusing a rename", () => {
     // show somebody who pressed Rename.
     expect(
       refusalToRenameLeftover({
+        liveRips: NO_LIVE_RIPS,
         newName: "x",
         path: `${root}/[BACKUP] Ivanhoe (1952) - Blu-ray`,
         rootPath: root,
@@ -468,7 +620,10 @@ describe("scanning and clearing, on a real filesystem", () => {
       recursive: true,
     })
 
-    const found = await scanLeftovers({ rootPath: tmpRoot })
+    const found = await scanLeftovers({
+      liveRips: NO_LIVE_RIPS,
+      rootPath: tmpRoot,
+    })
 
     expect(found.map((one) => one.name).sort()).toEqual([
       ".rip-deck-incomplete-empty-1",
@@ -502,7 +657,10 @@ describe("scanning and clearing, on a real filesystem", () => {
     bytes.write("CD001", 32_769, "latin1")
     await writeFile(image, bytes)
 
-    const found = await scanLeftovers({ rootPath: tmpRoot })
+    const found = await scanLeftovers({
+      liveRips: NO_LIVE_RIPS,
+      rootPath: tmpRoot,
+    })
     const listed = found.find(
       (one) => one.name === ".rip-deck-incomplete-image-3",
     )
@@ -516,12 +674,14 @@ describe("scanning and clearing, on a real filesystem", () => {
 
   it("clears one, and refuses the finished rip beside it", async () => {
     const cleared = await deleteLeftover({
+      liveRips: NO_LIVE_RIPS,
       rootPath: tmpRoot,
       path: join(tmpRoot, ".rip-deck-incomplete-empty-1"),
     })
     expect(cleared.isDeleted).toBe(true)
 
     const refused = await deleteLeftover({
+      liveRips: NO_LIVE_RIPS,
       rootPath: tmpRoot,
       path: join(tmpRoot, "[BACKUP] Real Rip - DVD"),
     })
@@ -531,11 +691,124 @@ describe("scanning and clearing, on a real filesystem", () => {
     )
 
     const remaining = await scanLeftovers({
+      liveRips: NO_LIVE_RIPS,
       rootPath: tmpRoot,
     })
     expect(remaining.map((one) => one.name)).toEqual([
       ".rip-deck-incomplete-partial-2",
     ])
+  })
+})
+
+/**
+ * ⚠️ **The same rule, with real bytes on a real disk.** The pure
+ * tests above prove the refusal is decided correctly. These prove
+ * that a refused verb LEAVES THE FOLDER THERE — which is the only
+ * thing the operator actually cares about.
+ */
+describe("a live rip, on a real filesystem", () => {
+  const tmpRoot = join(
+    tmpdir(),
+    `rip-deck-live-${process.pid}`,
+  )
+  const jobUuid = "4d37d72e-7f72-4cee-a82b-7af82c10bfd3"
+  const name = `.rip-deck-incomplete-${jobUuid}`
+  const path = join(tmpRoot, name)
+
+  const live: LiveRips = {
+    isKnown: true,
+    jobUuids: new Set([jobUuid]),
+  }
+
+  afterAll(async () => {
+    await rm(tmpRoot, { recursive: true, force: true })
+  })
+
+  it("lists it, LOCKED, rather than hiding it", async () => {
+    // Hiding it was the alternative and it is worse: the panel
+    // would then disagree with the bay grid about what is on
+    // disk, and an operator who cannot see the folder cannot
+    // tell "no leftover" from "the panel is not listing one".
+    await mkdir(join(path, "BDMV", "STREAM"), {
+      recursive: true,
+    })
+    await writeFile(
+      join(path, "BDMV", "STREAM", "00000.m2ts"),
+      "x".repeat(2048),
+      "utf8",
+    )
+
+    const found = await scanLeftovers({
+      liveRips: live,
+      rootPath: tmpRoot,
+    })
+    const listed = found.find((one) => one.name === name)
+
+    expect(listed?.isLocked).toBe(true)
+    expect(listed?.isSafeToDelete).toBe(false)
+    expect(listed?.lockReason).toContain(jobUuid)
+    expect(listed?.detail).toContain(
+      "writing into this folder right now",
+    )
+  })
+
+  it("⚠️ refuses the delete and the bytes SURVIVE", async () => {
+    const refused = await deleteLeftover({
+      liveRips: live,
+      path,
+      rootPath: tmpRoot,
+    })
+
+    expect(refused.isDeleted).toBe(false)
+    expect(refused.message).toContain("Refused to delete")
+
+    const stillThere = await scanLeftovers({
+      liveRips: live,
+      rootPath: tmpRoot,
+    })
+    expect(
+      stillThere.find((one) => one.name === name)
+        ?.sizeBytes,
+    ).toBe(2048)
+  })
+
+  it("⚠️ refuses the rename and the folder KEEPS its name", async () => {
+    const refused = await renameLeftover({
+      liveRips: live,
+      newName: "[BACKUP] Renamed Mid-Rip",
+      path,
+      rootPath: tmpRoot,
+    })
+
+    expect(refused.isRenamed).toBe(false)
+    expect(refused.path).toBeNull()
+
+    expect(
+      (
+        await scanLeftovers({
+          liveRips: live,
+          rootPath: tmpRoot,
+        })
+      ).map((one) => one.name),
+    ).toEqual([name])
+  })
+
+  it("clears once the rip has landed", async () => {
+    // The lock is about the JOB, not about the folder. When the
+    // rip is over the same folder is ordinary litter again.
+    const cleared = await deleteLeftover({
+      liveRips: NO_LIVE_RIPS,
+      path,
+      rootPath: tmpRoot,
+    })
+
+    expect(cleared.isDeleted).toBe(true)
+    expect(
+      await scanLeftovers({
+        liveRips: NO_LIVE_RIPS,
+        rootPath: tmpRoot,
+      }),
+    ).toEqual([])
   })
 })
 
@@ -566,6 +839,7 @@ describe("renaming, on a real filesystem", () => {
     })
 
     const renamed = await renameLeftover({
+      liveRips: NO_LIVE_RIPS,
       newName: "[BACKUP] TMNT Season 4 Disc 2 - DVD",
       path: marked,
       rootPath: tmpRoot,
@@ -579,6 +853,7 @@ describe("renaming, on a real filesystem", () => {
     // It is out of the panel now, because the new name is not a
     // leftover's — which is the whole point of the control.
     const remaining = await scanLeftovers({
+      liveRips: NO_LIVE_RIPS,
       rootPath: tmpRoot,
     })
     expect(remaining.map((one) => one.name)).toEqual([])
@@ -599,6 +874,7 @@ describe("renaming, on a real filesystem", () => {
     await mkdir(marked, { recursive: true })
 
     const refused = await renameLeftover({
+      liveRips: NO_LIVE_RIPS,
       newName: "[BACKUP] Kept - DVD",
       path: marked,
       rootPath: tmpRoot,
@@ -610,9 +886,12 @@ describe("renaming, on a real filesystem", () => {
     // Both are still there, and the good copy is untouched.
     expect(await readdir(occupied)).toEqual(["keep-me"])
     expect(
-      (await scanLeftovers({ rootPath: tmpRoot })).map(
-        (one) => one.name,
-      ),
+      (
+        await scanLeftovers({
+          liveRips: NO_LIVE_RIPS,
+          rootPath: tmpRoot,
+        })
+      ).map((one) => one.name),
     ).toEqual([
       "[BACKUP] Kept - DVD (rip-deck-duplicate-01234567)",
     ])
@@ -633,6 +912,7 @@ describe("renaming, on a real filesystem", () => {
     await writeFile(image, bytes)
 
     const renamed = await renameLeftover({
+      liveRips: NO_LIVE_RIPS,
       newName: "[BACKUP] TMNT Season 4 Disc 1 - DVD",
       path: image,
       rootPath: tmpRoot,
@@ -654,6 +934,7 @@ describe("renaming, on a real filesystem", () => {
     await mkdir(finished, { recursive: true })
 
     const refused = await renameLeftover({
+      liveRips: NO_LIVE_RIPS,
       newName: "Something Else",
       path: finished,
       rootPath: tmpRoot,
@@ -676,6 +957,7 @@ describe("renaming, on a real filesystem", () => {
     await mkdir(marked, { recursive: true })
 
     const refused = await renameLeftover({
+      liveRips: NO_LIVE_RIPS,
       newName: "../escaped",
       path: marked,
       rootPath: tmpRoot,
@@ -691,6 +973,7 @@ describe("renaming, on a real filesystem", () => {
 
   it("says so rather than renaming a leftover that is gone", async () => {
     const refused = await renameLeftover({
+      liveRips: NO_LIVE_RIPS,
       newName: "Anything",
       path: join(tmpRoot, ".rip-deck-incomplete-vanished"),
       rootPath: tmpRoot,
@@ -708,6 +991,7 @@ describe("renaming, on a real filesystem", () => {
     await mkdir(marked, { recursive: true })
 
     const refused = await renameLeftover({
+      liveRips: NO_LIVE_RIPS,
       newName: ".rip-deck-incomplete-same-1",
       path: marked,
       rootPath: tmpRoot,

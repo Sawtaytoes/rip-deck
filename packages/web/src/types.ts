@@ -663,6 +663,18 @@ export type Leftover = {
   /** The daemon's own sentence. Rendered, never rewritten. */
   detail: string
   is_safe_to_delete: boolean
+  /**
+   * A rip is writing into this folder, so NEITHER control works.
+   *
+   * Distinct from `is_safe_to_delete`, which is advice the
+   * operator may take or leave — a duplicate is "not safe" and
+   * he deletes one on purpose. This is the daemon refusing: both
+   * verbs answer 400, so the panel disables both buttons rather
+   * than letting him find out by pressing one.
+   */
+  is_locked: boolean
+  /** Why it is locked, in the daemon's words. */
+  lock_reason: string | null
 }
 
 /**

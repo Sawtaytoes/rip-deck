@@ -38,7 +38,12 @@ import { parseProcCmdline } from "./orphan.ts"
  *     second one must never be read as the first. Unknown means
  *     reap nothing at all.
  *  3. **No job claims the uuid.** Neither running (would be a
- *     live rip) nor kept (would be D4 evidence).
+ *     live rip) nor kept (would be D4 evidence). `liveJobUuids`
+ *     comes from `liveRips.ts`, which is the ONE answer to "is
+ *     this rip live" — the leftovers panel asks it too, and two
+ *     implementations of that question is how the panel came to
+ *     offer a running rip as a deletable row
+ *     ([decision](../../../../docs/decisions/2026-08-27-a-leftover-control-refuses-a-live-rip.md)).
  *  4. **No running process has the uuid in its argv.** This is
  *     the guard that survives a daemon restart which lost its
  *     job table: it asks the kernel, not our bookkeeping, and

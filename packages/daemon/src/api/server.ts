@@ -5,6 +5,7 @@ import {
 } from "node:http"
 import type { AddressInfo } from "node:net"
 import type { TopicConfig } from "../mqtt/topics.ts"
+import type { LiveRipsReader } from "../rip/liveRips.ts"
 import {
   createLogCaptureProbe,
   createLogCaptureReader,
@@ -151,6 +152,7 @@ export const createApiServer = ({
   // name is all it needs, so it can be defaulted honestly.
   readLogExists = createLogCaptureProbe({ stateDir }),
   destinationRoot = null,
+  readLiveRips,
 }: {
   readSnapshot: () => TowerSnapshot
   port?: number
@@ -171,6 +173,15 @@ export const createApiServer = ({
    * guess a directory to delete inside.
    */
   destinationRoot?: string | null
+  /**
+   * Which rips are running — see `rip/liveRips.ts`.
+   *
+   * Undefined leaves the router on its UNKNOWN default, which
+   * refuses to delete or rename an unfinished rip folder. That
+   * is the right answer for a server brought up without a
+   * watcher: it can see the folders and cannot see the rips.
+   */
+  readLiveRips?: LiveRipsReader
 }): ApiServer => {
   const router = createApiRouter({
     readSnapshot,
@@ -181,6 +192,7 @@ export const createApiServer = ({
     readLogCapture,
     readLogExists,
     destinationRoot,
+    readLiveRips,
     // The SAME directory `/logs` reads captures from, passed
     // rather than re-read, so the history log and the per-job
     // files it joins can never be looked for in two places.
