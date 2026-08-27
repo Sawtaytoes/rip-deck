@@ -7,13 +7,13 @@ import {
 import { createTowerStore } from "./api/snapshot.ts"
 import { createTowerFeed } from "./api/towerFeed.ts"
 import type { WebAssets } from "./api/webAssets.ts"
+import { loadDriveRegistry } from "./drives/registry.ts"
 import {
   HEALTH_TUNING_MIN_JOB_COUNT,
   refreshHealthGate,
 } from "./health/publish.ts"
 import { createTopicConfig } from "./mqtt/config.ts"
 import { createWatchMqtt } from "./mqtt/watchMqtt.ts"
-import { loadDriveRegistry } from "./drives/registry.ts"
 import {
   createGovernor,
   resolveRipConcurrency,

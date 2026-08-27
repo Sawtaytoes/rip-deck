@@ -52,12 +52,6 @@ import {
   writeBayLedger,
 } from "./bayLedger.ts"
 import {
-  appendRipHistory,
-  RIP_HISTORY_VERSION,
-  type RipHistoryRecord,
-  ripHistoryPath,
-} from "./ripHistory.ts"
-import {
   buildCyanripInvocation,
   buildCyanripKillArgs,
   type CyanripCommand,
@@ -98,6 +92,12 @@ import {
   resolveMakemkvCommand,
   resolveRipIsolation,
 } from "./ripCommand.ts"
+import {
+  appendRipHistory,
+  RIP_HISTORY_VERSION,
+  type RipHistoryRecord,
+  ripHistoryPath,
+} from "./ripHistory.ts"
 import { runRipJob } from "./ripJob.ts"
 import { waitForSettledMedia } from "./settle.ts"
 import {
@@ -2536,7 +2536,10 @@ export const startWatcher = (
         // nuisance; delaying the eight other bays' supervision
         // behind a disk write is the failure this architecture
         // exists to prevent.
-        if (current !== undefined && outcome.kind !== "no_media") {
+        if (
+          current !== undefined &&
+          outcome.kind !== "no_media"
+        ) {
           void deps.appendHistory({
             path: ripHistoryPath(input.config.stateDir),
             record: {

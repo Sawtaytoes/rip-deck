@@ -162,7 +162,9 @@ export const createApiServer = ({
   stateDir?: string
   readLogCapture?: LogCaptureReader | null
   /** Does a capture exist for this job? See `logCapture.ts`. */
-  readLogExists?: ((jobUuid: string) => Promise<boolean>) | null
+  readLogExists?:
+    | ((jobUuid: string) => Promise<boolean>)
+    | null
   /**
    * Where finished rips land. Null when this process was not
    * told, which makes `/api/leftovers` answer 503 rather than

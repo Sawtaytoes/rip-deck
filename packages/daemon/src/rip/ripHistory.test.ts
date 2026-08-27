@@ -1,14 +1,19 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import {
+  mkdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
 import {
   appendRipHistory,
   appendRipHistoryBatch,
-  readRipHistory,
-  readRipHistoryJobUuids,
   RIP_HISTORY_VERSION,
   type RipHistoryRecord,
+  readRipHistory,
+  readRipHistoryJobUuids,
   ripHistoryPath,
 } from "./ripHistory.ts"
 
@@ -70,7 +75,10 @@ describe("the history log", () => {
     })
     await appendRipHistory({
       path,
-      record: record({ jobUuid: "second", finishedAtMs: 2 }),
+      record: record({
+        jobUuid: "second",
+        finishedAtMs: 2,
+      }),
     })
 
     expect(
@@ -198,8 +206,8 @@ describe("the history log", () => {
       ],
     })
 
-    expect(
-      await readRipHistoryJobUuids({ path }),
-    ).toEqual(new Set(["a", "b"]))
+    expect(await readRipHistoryJobUuids({ path })).toEqual(
+      new Set(["a", "b"]),
+    )
   })
 })

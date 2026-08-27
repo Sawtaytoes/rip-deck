@@ -4,8 +4,8 @@ import { join } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
 import {
   appendRipHistory,
-  readRipHistory,
   RIP_HISTORY_VERSION,
+  readRipHistory,
   ripHistoryPath,
 } from "./ripHistory.ts"
 import { backfillRipHistory } from "./ripHistoryBackfill.ts"
@@ -76,7 +76,10 @@ describe("rebuilding history from the job files", () => {
     await writeVector({ jobUuid: "job-b" })
 
     expect(
-      await backfillRipHistory({ stateDir: tmpRoot, registry }),
+      await backfillRipHistory({
+        stateDir: tmpRoot,
+        registry,
+      }),
     ).toEqual({ jobCount: 2, addedCount: 2 })
 
     expect(
@@ -89,10 +92,16 @@ describe("rebuilding history from the job files", () => {
   it("⚠️ adds nothing on a second run, so every boot is safe", async () => {
     await writeVector({ jobUuid: "job-a" })
 
-    await backfillRipHistory({ stateDir: tmpRoot, registry })
+    await backfillRipHistory({
+      stateDir: tmpRoot,
+      registry,
+    })
 
     expect(
-      await backfillRipHistory({ stateDir: tmpRoot, registry }),
+      await backfillRipHistory({
+        stateDir: tmpRoot,
+        registry,
+      }),
     ).toEqual({ jobCount: 1, addedCount: 0 })
   })
 
@@ -116,12 +125,18 @@ describe("rebuilding history from the job files", () => {
         sizeSectors: 1,
         startedAtMs: 1,
         finishedAtMs: 2,
-        outcome: { kind: "completed", detail: "Backup at …" },
+        outcome: {
+          kind: "completed",
+          detail: "Backup at …",
+        },
         source: "live",
       },
     })
 
-    await backfillRipHistory({ stateDir: tmpRoot, registry })
+    await backfillRipHistory({
+      stateDir: tmpRoot,
+      registry,
+    })
 
     const rows = await readRipHistory({
       path: ripHistoryPath(tmpRoot),
@@ -139,7 +154,10 @@ describe("rebuilding history from the job files", () => {
     // module header. A name on the wrong rip is worse than none.
     await writeVector({ jobUuid: "job-a" })
 
-    await backfillRipHistory({ stateDir: tmpRoot, registry })
+    await backfillRipHistory({
+      stateDir: tmpRoot,
+      registry,
+    })
 
     const [row] = await readRipHistory({
       path: ripHistoryPath(tmpRoot),
@@ -154,7 +172,10 @@ describe("rebuilding history from the job files", () => {
   it("names the bay when the registry still knows that port path", async () => {
     await writeVector({ jobUuid: "job-a" })
 
-    await backfillRipHistory({ stateDir: tmpRoot, registry })
+    await backfillRipHistory({
+      stateDir: tmpRoot,
+      registry,
+    })
 
     const [row] = await readRipHistory({
       path: ripHistoryPath(tmpRoot),
@@ -174,7 +195,10 @@ describe("rebuilding history from the job files", () => {
       driveId: "2-2.3.4.4.4",
     })
 
-    await backfillRipHistory({ stateDir: tmpRoot, registry })
+    await backfillRipHistory({
+      stateDir: tmpRoot,
+      registry,
+    })
 
     const [row] = await readRipHistory({
       path: ripHistoryPath(tmpRoot),
@@ -192,7 +216,10 @@ describe("rebuilding history from the job files", () => {
       failureReason: "empty_output",
     })
 
-    await backfillRipHistory({ stateDir: tmpRoot, registry })
+    await backfillRipHistory({
+      stateDir: tmpRoot,
+      registry,
+    })
 
     const [row] = await readRipHistory({
       path: ripHistoryPath(tmpRoot),
@@ -203,10 +230,19 @@ describe("rebuilding history from the job files", () => {
   })
 
   it("writes rows oldest first", async () => {
-    await writeVector({ jobUuid: "later", endedAtMs: 9_000 })
-    await writeVector({ jobUuid: "earlier", endedAtMs: 1_000 })
+    await writeVector({
+      jobUuid: "later",
+      endedAtMs: 9_000,
+    })
+    await writeVector({
+      jobUuid: "earlier",
+      endedAtMs: 1_000,
+    })
 
-    await backfillRipHistory({ stateDir: tmpRoot, registry })
+    await backfillRipHistory({
+      stateDir: tmpRoot,
+      registry,
+    })
 
     expect(
       (
@@ -227,7 +263,10 @@ describe("rebuilding history from the job files", () => {
     )
 
     expect(
-      await backfillRipHistory({ stateDir: tmpRoot, registry }),
+      await backfillRipHistory({
+        stateDir: tmpRoot,
+        registry,
+      }),
     ).toEqual({ jobCount: 2, addedCount: 1 })
   })
 

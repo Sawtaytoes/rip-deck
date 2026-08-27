@@ -5,17 +5,17 @@ import type {
   VerdictKind,
 } from "@rip-deck/contracts"
 import {
-  computedVerdictPath,
-  featureVectorPath,
-} from "../health/sampleStore.ts"
-import {
   hedged,
   isHealthVerdictPublished,
 } from "../health/publish.ts"
 import {
-  readRipHistory,
+  computedVerdictPath,
+  featureVectorPath,
+} from "../health/sampleStore.ts"
+import {
   type RipHistoryRecord,
   type RipHistorySource,
+  readRipHistory,
   ripHistoryPath,
 } from "../rip/ripHistory.ts"
 import { isSafeJobUuid } from "./logCapture.ts"
@@ -294,7 +294,7 @@ export const parseHistoryQuery = (
     fromMs,
     toMs,
     search: (params.get("q") ?? "").trim().toLowerCase(),
-    outcome: (rawOutcome ?? "all") as HistoryOutcomeFilter,
+    outcome: rawOutcome ?? "all",
   }
 }
 
@@ -350,7 +350,10 @@ const matchesFilters = (input: {
     return false
   }
 
-  if (query.outcome === "completed" && !isSuccessful(record)) {
+  if (
+    query.outcome === "completed" &&
+    !isSuccessful(record)
+  ) {
     return false
   }
 
@@ -368,10 +371,10 @@ const matchesFilters = (input: {
   return true
 }
 
-const readJson = async (
-  path: string,
-): Promise<unknown | null> => {
-  const text = await readFile(path, "utf8").catch(() => null)
+const readJson = async (path: string): Promise<unknown> => {
+  const text = await readFile(path, "utf8").catch(
+    () => null,
+  )
 
   if (text === null) return null
 
@@ -424,7 +427,9 @@ const EMPTY_JOIN: JobJoin = {
 const joinJob = async (input: {
   stateDir: string | null
   record: RipHistoryRecord
-  readLogExists: ((jobUuid: string) => Promise<boolean>) | null
+  readLogExists:
+    | ((jobUuid: string) => Promise<boolean>)
+    | null
 }): Promise<JobJoin> => {
   const { stateDir, record } = input
 
@@ -440,7 +445,8 @@ const joinJob = async (input: {
       : input.readLogExists(record.jobUuid),
   ])
 
-  const vector = features as Partial<JobFeatureVector> | null
+  const vector =
+    features as Partial<JobFeatureVector> | null
 
   const sizeBytes =
     typeof vector?.discBytes === "number" &&
@@ -574,7 +580,9 @@ export const handleHistoryList = async (input: {
    * process serves no captures, and every row then reports
    * `has_log: false`, which is exactly true of it.
    */
-  readLogExists: ((jobUuid: string) => Promise<boolean>) | null
+  readLogExists:
+    | ((jobUuid: string) => Promise<boolean>)
+    | null
 }): Promise<HistoryEndpointResult> => {
   if (input.stateDir === null) {
     return {
@@ -592,7 +600,10 @@ export const handleHistoryList = async (input: {
   const query = parseHistoryQuery(input.params)
 
   if (typeof query === "string") {
-    return { status: 400, payload: { ok: false, msg: query } }
+    return {
+      status: 400,
+      payload: { ok: false, msg: query },
+    }
   }
 
   const records = await readRipHistory({

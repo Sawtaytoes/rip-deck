@@ -9,8 +9,8 @@ import {
   ripHistoryPath,
 } from "../rip/ripHistory.ts"
 import {
-  handleHistoryList,
   type HistoryListPayload,
+  handleHistoryList,
   parseHistoryQuery,
 } from "./historyEndpoint.ts"
 
@@ -108,7 +108,9 @@ describe("reading a history query", () => {
 
   it("refuses a limit that is not a positive integer", () => {
     expect(
-      parseHistoryQuery(new URLSearchParams({ limit: "0" })),
+      parseHistoryQuery(
+        new URLSearchParams({ limit: "0" }),
+      ),
     ).toContain("positive integer")
   })
 
@@ -343,7 +345,10 @@ describe("listing the history over HTTP", () => {
     await writeFile(
       join(tmpRoot, `${uuid("bbbbbbbb")}.verdict.json`),
       JSON.stringify({
-        verdict: { kind: "very_slow", message: "Crawling." },
+        verdict: {
+          kind: "very_slow",
+          message: "Crawling.",
+        },
       }),
       "utf8",
     )
@@ -426,9 +431,7 @@ describe("listing the history over HTTP", () => {
     // The same traversal gate `/logs` keeps. A hand-edited log
     // line must not be able to name a file outside the state
     // directory.
-    await seed([
-      record({ jobUuid: "../../etc/passwd" }),
-    ])
+    await seed([record({ jobUuid: "../../etc/passwd" })])
 
     const [row] = (await list()).rips
 
