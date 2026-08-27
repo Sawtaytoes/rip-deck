@@ -254,6 +254,47 @@ export type TowerFeed = {
  *    all, so they get none. A card is better absent than
  *    invented.
  */
+/**
+ * Has this bay been re-armed by its disc leaving?
+ *
+ * `phase: "idle"` with no size is the watcher saying two things
+ * at once: the tray read empty for `rearmEmptyObservations`
+ * consecutive polls, and nothing is claiming the drive. A bay
+ * still HOLDING a finished disc is `phase: "done"`, and a drive
+ * that has dropped off the bus never reaches either — the poll
+ * loop holds a missing drive rather than deciding about it, so a
+ * powered-off tower keeps its cards.
+ *
+ * Exported for its tests, and named rather than inlined because
+ * it is the one condition that says a `BayRecord` has outlived
+ * the thing it describes.
+ *
+ * ## Why the record needs this at all
+ *
+ * `liveRecordOf` keeps a record alive past its outcome on
+ * purpose: *"a record outlives its outcome so the finished card
+ * stays on the dashboard; the next event from that bay is a new
+ * disc and therefore a new run"*. That is correct while the disc
+ * is in the tray. It has no stopping condition when the disc is
+ * simply TAKEN OUT — no next event ever comes, because an empty
+ * bay is quiet, so the finished card stays forever.
+ *
+ * Measured on the tower 2026-08-27, with all nine trays empty:
+ * the `size` attribute under `/sys/block` read the 2097151-sector empty sentinel on
+ * every drive and `/json` agreed (`has_disc: false`,
+ * `disc_size_sectors: null`) — while slots 1-4 still published
+ * `needs_attention` and slots 8-9 still published `completed`,
+ * each with its job id, its progress and, on slot 8, a health
+ * ALERT about a disc that was no longer in the building.
+ *
+ * The bays that cleared correctly are the tell: slots 5-7 read
+ * `idle`, and those are exactly the bays whose last outcome came
+ * from startup ADOPTION, which emits a note and deliberately
+ * never an outcome. No outcome event, no record to go stale.
+ */
+export const hasBayReArmed = (bay: BayState): boolean =>
+  bay.phase === "idle" && bay.sizeSectors === null
+
 export const toJobState = (input: {
   phase: BayPhase | null
   outcome: BayOutcome | null
@@ -862,9 +903,25 @@ export const createTowerFeed = ({
    */
   const syncRoster = (): void => {
     for (const bay of readBays?.() ?? []) {
+      const existing = records.get(bay.driveId)
+
+      // An empty tray retires the finished run. See
+      // `hasBayReArmed`: the record deliberately outlives its
+      // outcome so a finished card survives until the next
+      // disc, and that is right while the disc is still IN the
+      // tray — but a bay whose disc has been taken out has
+      // nothing left to describe. The label and slot carry over
+      // because they belong to the DRIVE, not to the run.
       const record =
-        records.get(bay.driveId) ??
-        createRecord({ driveId: bay.driveId })
+        existing === undefined
+          ? createRecord({ driveId: bay.driveId })
+          : hasBayReArmed(bay) && existing.outcome !== null
+            ? createRecord({
+                driveId: bay.driveId,
+                label: existing.label,
+                slot: existing.slot,
+              })
+            : existing
 
       records.set(bay.driveId, record)
       publish(record)
