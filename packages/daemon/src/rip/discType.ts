@@ -143,6 +143,23 @@ export type DiscTypeDecision =
  * and must not be collapsed into it.
  */
 export type UdevMedia = {
+  /**
+   * Whether `cdrom_id` recorded ANY `ID_CDROM_MEDIA*` property.
+   *
+   * ⚠️ This is not the same question as `hasMedia`, and treating
+   * it as the same is what put four bays into needs-attention on
+   * 2026-08-27. `cdrom_id` emits **nothing** media-related when
+   * it cannot describe the medium — there is no
+   * `ID_CDROM_MEDIA=0` to find — so an absent property means
+   * either "the tray is empty" or "the probe never got an
+   * answer", and only the capacity can tell those apart.
+   *
+   * On this rig the second case is routine: the four MT1959
+   * drives time out for 30 s reading a dual-layer DVD's
+   * lead-out, `cdrom_id` gives up, and the record is left
+   * carrying only the DRIVE's capabilities.
+   */
+  hasMediaEvidence: boolean
   hasMedia: boolean
   /** Recordable media with nothing written to it yet. */
   isBlank: boolean
@@ -214,6 +231,7 @@ export const readUdevMedia = (
   if (properties.get("ID_CDROM") !== "1") return null
 
   return {
+    hasMediaEvidence: hasAnyMediaProperty(properties),
     hasMedia: properties.get("ID_CDROM_MEDIA") === "1",
     // `ID_CDROM_MEDIA_STATE` is "blank", "appendable" or
     // "complete". Only "blank" means there is nothing on it.
@@ -311,6 +329,28 @@ const readMediaFamily = (
   return null
 }
 
+/**
+ * Did `cdrom_id` say anything at all about the MEDIUM?
+ *
+ * ⚠️ The prefix has to be `ID_CDROM_MEDIA`, not
+ * `ID_CDROM_MEDIA_`. `ID_CDROM_MEDIA` itself is the property
+ * that matters most, and requiring the trailing underscore
+ * would miss it.
+ *
+ * Every `ID_CDROM_*` key WITHOUT `MEDIA` describes the drive and
+ * is present on all nine bays at all times, disc or no disc —
+ * see `readUdevMedia`. Those must not count as evidence.
+ */
+const hasAnyMediaProperty = (
+  properties: ReadonlyMap<string, string>,
+): boolean => {
+  for (const key of properties.keys()) {
+    if (key.startsWith("ID_CDROM_MEDIA")) return true
+  }
+
+  return false
+}
+
 const readCount = (
   properties: ReadonlyMap<string, string>,
   key: string,
@@ -379,15 +419,44 @@ export const decideDiscType = (input: {
   }
 
   if (!media.hasMedia) {
-    // udev says empty. If sysfs also says empty they agree and
-    // there is simply no disc. If sysfs is showing a real
-    // capacity, one of them is stale — and quietly believing
-    // "empty" would leave a real disc sitting in the bay with
-    // nothing reported, which is the silent version of the
-    // failure B3 exists to prevent.
-    return isEmptyTray || input.sizeSectors <= 0
-      ? { kind: "no_media" }
-      : attention("conflicting_evidence", capacityBytes)
+    // If sysfs also says empty they agree and there is simply
+    // no disc.
+    if (isEmptyTray || input.sizeSectors <= 0) {
+      return { kind: "no_media" }
+    }
+
+    // sysfs is showing a real capacity, so something IS in the
+    // bay. Two different states hide behind "udev did not say
+    // there is media", and collapsing them is what held slots
+    // 1-4 on 2026-08-27:
+    //
+    //  - `cdrom_id` recorded media facts and they say the tray
+    //    is empty. That is a real contradiction — one of the two
+    //    sources is stale — and it stays needs-attention.
+    //  - `cdrom_id` recorded NOTHING about the medium. That is
+    //    not a contradiction, it is SILENCE, and it is the same
+    //    evidential position as having no udev record at all.
+    //
+    // The comment on `UdevMedia` says null from `readUdevMedia`
+    // means "udev has nothing to say", which "must not be
+    // collapsed into" udev saying the tray is empty. That was
+    // right, and this branch was breaking it: a record listing
+    // only the DRIVE's capabilities carries exactly as much
+    // information about the disc as no record does.
+    //
+    // Falling through to capacity cannot start a wrong rip. The
+    // one genuinely ambiguous tier is CD, and
+    // `decideFromCapacityAlone` refuses that — a video-sized
+    // disc has no audio-CD reading to be wrong about.
+    if (!media.hasMediaEvidence) {
+      return decideFromCapacityAlone({
+        sizeSectors: input.sizeSectors,
+        capacityBytes,
+        isEmptyTray,
+      })
+    }
+
+    return attention("conflicting_evidence", capacityBytes)
   }
 
   if (isEmptyTray) {

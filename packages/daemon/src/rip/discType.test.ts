@@ -478,14 +478,34 @@ describe("failing closed", () => {
     expect(decision.reason).toBe("conflicting_evidence")
   })
 
-  it("flags a disc udev says is there and sysfs does not", () => {
+  it("flags a partial record that contradicts sysfs", () => {
+    // `cdrom_id` got far enough to record something about the
+    // MEDIUM, and what it recorded does not say there is one,
+    // while sysfs reports a full Blu-ray. That is a genuine
+    // contradiction rather than silence, so it stays closed.
     const decision = decideDiscType({
       sizeSectors: SECTORS.bluray,
-      udevProperties: emptyDrive,
+      udevProperties: udev({
+        ID_CDROM: "1",
+        ID_CDROM_BD: "1",
+        ID_CDROM_MEDIA_STATE: "complete",
+      }),
     })
 
     assertAttention(decision)
     expect(decision.reason).toBe("conflicting_evidence")
+  })
+
+  it("still refuses a CD-sized disc udev never described", () => {
+    // The safety rule survives the change below: silence plus a
+    // CD-sized capacity is still not enough to start cyanrip.
+    const decision = decideDiscType({
+      sizeSectors: SECTORS.audioCd,
+      udevProperties: emptyDrive,
+    })
+
+    assertAttention(decision)
+    expect(decision.reason).toBe("audio_cd_unconfirmed")
   })
 
   it("flags optical media of a kind we cannot rip", () => {
@@ -600,3 +620,127 @@ function assertAttention(
 > {
   expect(decision.kind).toBe("needs_attention")
 }
+
+describe("a udev record that never described the medium", () => {
+  /**
+   * What `/run/udev/data/b11:8` actually held on 2026-08-27
+   * while a dual-layer DVD sat in slot 1.
+   *
+   * Every key describes the DRIVE. There is not one
+   * `ID_CDROM_MEDIA*` property and not one `ID_FS_*` property,
+   * because `cdrom_id` timed out for 30 s reading the disc's
+   * lead-out and gave up, and `blkid` never got a label either.
+   * All four MT1959 bays looked exactly like this.
+   */
+  const probeTimedOut = udev({
+    ID_CDROM: "1",
+    ID_CDROM_CD: "1",
+    ID_CDROM_CD_R: "1",
+    ID_CDROM_CD_RW: "1",
+    ID_CDROM_DVD: "1",
+    ID_CDROM_DVD_R: "1",
+    ID_CDROM_DVD_PLUS_R_DL: "1",
+    ID_CDROM_BD: "1",
+    ID_CDROM_BD_RE: "1",
+    ID_CDROM_RW_REMOVABLE: "1",
+  })
+
+  /** The DVD-9 in slot 1, as sysfs sized it. */
+  const dualLayerDvdSectors = 16_011_328
+
+  it("rips it rather than holding the bay", () => {
+    // THE regression. This returned
+    // `needs_attention: conflicting_evidence` and parked four
+    // of nine bays, while the five Pioneer bays completed seven
+    // DVDs of this exact size in the same session.
+    //
+    // Silence is not contradiction. A record carrying only the
+    // drive's capabilities says as much about the disc as no
+    // record at all, and the no-record path has always ripped
+    // a video-sized disc.
+    expect(
+      decideDiscType({
+        sizeSectors: dualLayerDvdSectors,
+        udevProperties: probeTimedOut,
+      }),
+    ).toEqual({
+      kind: "rip",
+      discType: "dvd",
+      ripper: "makemkv",
+      capacityBytes: dualLayerDvdSectors * 512,
+      hasDataTracks: false,
+      // No `ID_FS_LABEL` was recorded either, so the name has to
+      // come from somewhere else. Null is "ask makemkvcon",
+      // never "this disc has no name".
+      volumeLabel: null,
+    })
+  })
+
+  it("decides exactly as a missing record does", () => {
+    // The claim in one assertion: these two inputs carry the
+    // same information about the disc, so they must not produce
+    // different answers.
+    expect(
+      decideDiscType({
+        sizeSectors: dualLayerDvdSectors,
+        udevProperties: probeTimedOut,
+      }),
+    ).toEqual(
+      decideDiscType({
+        sizeSectors: dualLayerDvdSectors,
+        udevProperties: null,
+      }),
+    )
+  })
+
+  it("does not mistake drive capabilities for media facts", () => {
+    // Every bay in this tower is a Blu-ray writer, so all nine
+    // permanently report ID_CDROM_BD, ID_CDROM_DVD and
+    // ID_CDROM_CD whether or not anything is inserted. Counting
+    // any of those as evidence would make the fix above
+    // unreachable.
+    const media = readUdevMedia(probeTimedOut)
+
+    expect(media?.hasMediaEvidence).toBe(false)
+    expect(media?.hasMedia).toBe(false)
+  })
+
+  it("counts ID_CDROM_MEDIA itself as evidence", () => {
+    // The prefix test has to be `ID_CDROM_MEDIA`, not
+    // `ID_CDROM_MEDIA_`: the bare property is the one that
+    // matters most, and a trailing underscore would miss it.
+    expect(
+      readUdevMedia(
+        udev({ ID_CDROM: "1", ID_CDROM_MEDIA: "1" }),
+      )?.hasMediaEvidence,
+    ).toBe(true)
+
+    expect(
+      readUdevMedia(
+        udev({
+          ID_CDROM: "1",
+          ID_CDROM_MEDIA_TRACK_COUNT_DATA: "1",
+        }),
+      )?.hasMediaEvidence,
+    ).toBe(true)
+  })
+
+  it("still reports an empty tray as empty", () => {
+    // The bay really is empty far more often than a probe times
+    // out, and capacity is what separates the two. Getting this
+    // wrong would start a rip against an open tray.
+    expect(
+      decideDiscType({
+        sizeSectors: EMPTY_TRAY_SECTORS,
+        udevProperties: probeTimedOut,
+      }),
+    ).toEqual({ kind: "no_media" })
+
+    expect(
+      decideDiscType({
+        sizeSectors: 0,
+        udevProperties: probeTimedOut,
+      }),
+    ).toEqual({ kind: "no_media" })
+  })
+})
