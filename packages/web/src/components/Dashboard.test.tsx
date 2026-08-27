@@ -518,17 +518,32 @@ describe("finished rips that nothing measured", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("keeps the unmeasured caveat, quietly, on the card", async () => {
+  it("drops the caveat and keeps what the rip did", async () => {
     showFixture("unmeasured")
 
-    // Still said — the owner should know nothing judged these —
-    // just not as the headline.
+    await screen.findAllByText(/completed/)
+
+    // ⚠️ This used to assert the OPPOSITE — that "Not enough
+    // information to judge this rip yet." stayed on the card,
+    // quietly. The owner's answer was that it should not stay at
+    // all: it is a statement about rip-deck's own build state,
+    // it repeated on every finished bay, and there is nothing he
+    // can do about it. `health/publish.ts` now decides when a
+    // real verdict may replace it.
     expect(
-      await screen.findAllByText(
+      screen.queryByText(
         /Not enough information to judge this rip yet/,
       ),
+    ).not.toBeInTheDocument()
+
+    // What the rip itself did is a different thing and survives.
+    expect(
+      await screen.findAllByText(
+        /held on startup: the bay ledger already had this disc/,
+      ),
     ).toHaveLength(3)
-    // And with no invitation to re-rip attached to it.
+
+    // And still with no invitation to re-rip attached to it.
     expect(
       screen.queryByText(
         /retry in another drive to confirm/,

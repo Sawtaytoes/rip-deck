@@ -7,6 +7,10 @@ import {
 import { createTowerStore } from "./api/snapshot.ts"
 import { createTowerFeed } from "./api/towerFeed.ts"
 import type { WebAssets } from "./api/webAssets.ts"
+import {
+  HEALTH_TUNING_MIN_JOB_COUNT,
+  refreshHealthGate,
+} from "./health/publish.ts"
 import { createTopicConfig } from "./mqtt/config.ts"
 import { createWatchMqtt } from "./mqtt/watchMqtt.ts"
 import {
@@ -217,6 +221,29 @@ export const runWatch = async (
       `that file says it was finished with.`,
   )
 
+  // Count the tuning corpus once, at start, before anything can
+  // ask whether a verdict may be shown. The gate is latched and
+  // refreshed after each rip seals its vector, so this is the
+  // only place it is read from a cold process.
+  const health = await refreshHealthGate({
+    stateDir: config.stateDir,
+  })
+
+  console.log(
+    health.isReady
+      ? `Health verdicts: ON — ${health.jobCount} rips of ` +
+          `tuning data, ${health.troubledJobCount} of them ` +
+          `with trouble in. Thresholds are still guesses, so ` +
+          `every verdict is marked "suspected" and none of ` +
+          `them announces over MQTT.`
+      : `Health verdicts: OFF — ${health.jobCount} of ` +
+          `${HEALTH_TUNING_MIN_JOB_COUNT} rips of tuning data ` +
+          `in ${config.stateDir}. The engine still judges every ` +
+          `rip and saves the answer; the dashboard shows it ` +
+          `once the corpus is big enough and at least one rip ` +
+          `in it went badly.`,
+  )
+
   // The API's whole state, and the reason `readSnapshot` can be
   // a pure memory read: the watcher already knows when something
   // changed, so the API never has to go and ask a drive. A
@@ -289,6 +316,11 @@ export const runWatch = async (
   // tested.
   const feed = createTowerFeed({
     store,
+    // The watcher's own directory, passed rather than re-read
+    // from the environment, so the feed can never look for
+    // `<uuid>.verdict.json` somewhere the sampler is not writing
+    // it.
+    stateDir: config.stateDir,
     handlers: {
       onNote: (message) => console.log(message),
 

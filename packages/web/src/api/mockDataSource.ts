@@ -1110,8 +1110,6 @@ const buildUnmeasuredBay = (slot: number): MockBay => ({
     evidence: [
       "held on startup: the bay ledger already had this " +
         "disc",
-      "`rip-deck watch` does not run the health engine yet, " +
-        "so nothing has judged this rip.",
     ],
     totalFraction: 1,
     // The ledger recorded no stage. The default would put
