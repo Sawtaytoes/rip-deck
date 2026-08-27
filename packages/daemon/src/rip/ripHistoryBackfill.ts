@@ -4,9 +4,9 @@ import type { JobFeatureVector } from "@rip-deck/contracts"
 import type { DriveRegistry } from "../drives/registry.ts"
 import {
   appendRipHistoryBatch,
-  readRipHistoryJobUuids,
   RIP_HISTORY_VERSION,
   type RipHistoryRecord,
+  readRipHistoryJobUuids,
   ripHistoryPath,
 } from "./ripHistory.ts"
 

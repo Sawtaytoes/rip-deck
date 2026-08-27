@@ -1,4 +1,8 @@
-import { appendFile, mkdir, readFile } from "node:fs/promises"
+import {
+  appendFile,
+  mkdir,
+  readFile,
+} from "node:fs/promises"
 import { dirname, join } from "node:path"
 import type { DiscType } from "@rip-deck/contracts"
 import type { BayOutcome } from "./watcher.ts"
@@ -149,9 +153,9 @@ export const appendRipHistory = async (input: {
   path: string
   record: RipHistoryRecord
 }): Promise<void> => {
-  await mkdir(dirname(input.path), { recursive: true }).catch(
-    () => {},
-  )
+  await mkdir(dirname(input.path), {
+    recursive: true,
+  }).catch(() => {})
 
   await appendFile(
     input.path,
@@ -167,9 +171,9 @@ export const appendRipHistoryBatch = async (input: {
 }): Promise<void> => {
   if (input.records.length === 0) return
 
-  await mkdir(dirname(input.path), { recursive: true }).catch(
-    () => {},
-  )
+  await mkdir(dirname(input.path), {
+    recursive: true,
+  }).catch(() => {})
 
   await appendFile(
     input.path,
@@ -192,7 +196,8 @@ export const appendRipHistoryBatch = async (input: {
 const isRipHistoryRecord = (
   value: unknown,
 ): value is RipHistoryRecord => {
-  if (typeof value !== "object" || value === null) return false
+  if (typeof value !== "object" || value === null)
+    return false
 
   const record = value as Partial<RipHistoryRecord>
 
@@ -228,7 +233,8 @@ export const readRipHistory = async (input: {
   path: string
   read?: (path: string) => Promise<string>
 }): Promise<RipHistoryRecord[]> => {
-  const read = input.read ?? ((path) => readFile(path, "utf8"))
+  const read =
+    input.read ?? ((path) => readFile(path, "utf8"))
 
   const text = await read(input.path).catch(() => "")
 

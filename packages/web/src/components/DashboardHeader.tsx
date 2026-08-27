@@ -1,3 +1,5 @@
+import { Link } from "react-router"
+
 import type { ColumnChoice } from "../hooks/useLayoutColumns"
 import { ColumnPicker } from "./ColumnPicker"
 import { SchemeSwitcher } from "./SchemeSwitcher"
@@ -56,6 +58,19 @@ export function DashboardHeader({
       </div>
 
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
+        {/* ⚠️ A real `<Link>`, never a `#/` and never a button
+            that pushes history by hand. The fleet routes with
+            path URLs
+            ([decision](docs/decisions/2026-08-16-owned-web-apps-use-react-router-with-path-urls.md)),
+            and a link is what lets the owner open the history in
+            a second tab beside the running tower — which is the
+            normal way to use it. */}
+        <Link
+          className="text-base underline underline-offset-2"
+          to="/history"
+        >
+          History
+        </Link>
         {hasBays && <TrayControls />}
         <ColumnPicker
           choice={choice}

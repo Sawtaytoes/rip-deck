@@ -558,7 +558,9 @@ export const createApiRouter = ({
    * means this process serves no captures, and every history row
    * then reports `has_log: false` — which is exactly true of it.
    */
-  readLogExists?: ((jobUuid: string) => Promise<boolean>) | null
+  readLogExists?:
+    | ((jobUuid: string) => Promise<boolean>)
+    | null
   /**
    * Where finished rips land, so leftovers can be found in it.
    *

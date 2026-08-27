@@ -21,6 +21,8 @@ import type {
   BayView,
   Drive,
   DriveAlertPayload,
+  HistoryFilters,
+  HistoryRip,
   Host,
   Leftover,
   LoadedDiscsView,
@@ -1882,6 +1884,40 @@ export const mockDataSource: RipDeckDataSource = {
       150,
     )
   },
+
+  /**
+   * A month of finished rips, filtered and paged as the daemon
+   * would. See `mockHistory` for why the six rows are the six
+   * they are.
+   */
+  fetchHistory: ({ filters, limit, offset }) => {
+    const matched = mockHistory
+      .filter((rip) => matchesMockFilters({ rip, filters }))
+      // Newest first, exactly as the endpoint answers. Sorted on
+      // a copy — `mockHistory` is module state and the page is
+      // allowed to be asked for twice.
+      .toSorted(
+        (first, second) =>
+          second.finished_at_ms - first.finished_at_ms,
+      )
+
+    const finishedTimes = mockHistory.map(
+      (rip) => rip.finished_at_ms,
+    )
+
+    return delay(
+      {
+        total: matched.length,
+        total_unfiltered: mockHistory.length,
+        offset,
+        limit,
+        rips: matched.slice(offset, offset + limit),
+        oldest_at_ms: Math.min(...finishedTimes),
+        newest_at_ms: Math.max(...finishedTimes),
+      },
+      150,
+    )
+  },
 }
 
 /**
@@ -1926,3 +1962,245 @@ let mockLeftovers: Leftover[] = [
     is_safe_to_delete: false,
   },
 ]
+
+/**
+ * A month of finished rips, for `VITE_MOCK=1` and for the
+ * history page's own stories.
+ *
+ * Deliberately mixed, because every one of these states is on
+ * the real tower and each one renders differently:
+ *
+ *  - a clean Blu-ray with a name, a destination and a verdict;
+ *  - a UHD that succeeded while the drive logged read errors —
+ *    the case that must NEVER paint as healthy;
+ *  - a DVD that failed with `empty_output` after 12 minutes;
+ *  - a bay flagged `needs_attention`, which is not a success;
+ *  - two rebuilt rows from before the history log existed, with
+ *    no disc name and no slot, because the tower was re-cabled.
+ *
+ * The dates are spread across three weeks so the date filter has
+ * something to narrow.
+ */
+const MOCK_HISTORY_DAY = 24 * 60 * 60 * 1_000
+
+const mockHistoryFinishedAt = (daysAgo: number): number =>
+  Date.now() - daysAgo * MOCK_HISTORY_DAY
+
+const mockHistory: HistoryRip[] = [
+  {
+    job_uuid: "a1659124-308c-4f16-be4f-e0be021fee87",
+    drive_id: "2-1.1.2.4.2",
+    slot: 5,
+    bay_name: "05 - Pioneer BDR-212U",
+    disc_name: "THE MUMMY",
+    is_named: true,
+    disctype: "bluray",
+    destination_path:
+      "/media/Disc-Rips/The Mummy - Blu-ray",
+    size_bytes: 45_400_000_000,
+    started_at_ms: mockHistoryFinishedAt(1) - 1_830_000,
+    finished_at_ms: mockHistoryFinishedAt(1),
+    duration_ms: 1_830_000,
+    outcome_kind: "completed",
+    outcome_detail:
+      "Backup at /media/Disc-Rips/The Mummy - Blu-ray.",
+    is_successful: true,
+    failure_reason: null,
+    verdict: "ok",
+    verdict_message: "Reading normally.",
+    read_error_count: 0,
+    throughput_bytes_per_sec: 24_800_000,
+    has_log: true,
+    source: "live",
+  },
+  {
+    job_uuid: "3d27e46a-2ecf-49c5-ba66-0acb4478633c",
+    drive_id: "2-1.1.2.4.1",
+    slot: 6,
+    bay_name: "06 - Pioneer BDR-211M",
+    disc_name: "EYES WIDE SHUT - 4K",
+    is_named: true,
+    disctype: "uhd",
+    destination_path:
+      "/media/Disc-Rips/EYES WIDE SHUT - 4K",
+    size_bytes: 89_100_000_000,
+    started_at_ms: mockHistoryFinishedAt(2) - 5_120_000,
+    finished_at_ms: mockHistoryFinishedAt(2),
+    duration_ms: 5_120_000,
+    outcome_kind: "completed",
+    outcome_detail:
+      "Backup at /media/Disc-Rips/EYES WIDE SHUT - 4K.",
+    // ⚠️ Successful AND dirty. `read_error_count` is the field
+    // that must never be swallowed by the green chip beside it.
+    is_successful: true,
+    failure_reason: null,
+    verdict: "disc_marginal_slow",
+    verdict_message:
+      "Read speed fell below this drive's own baseline.",
+    read_error_count: 14,
+    throughput_bytes_per_sec: 17_400_000,
+    has_log: true,
+    source: "live",
+  },
+  {
+    job_uuid: "68fa9004-1da7-4596-a29a-eea75eaa6465",
+    drive_id: "2-1.1.2.3",
+    slot: 7,
+    bay_name: "07 - Pioneer BDR-211M",
+    disc_name: "Teenage_Mutant_Ninja_Turtle_V6",
+    is_named: true,
+    disctype: "dvd",
+    destination_path: null,
+    size_bytes: 7_640_000_000,
+    started_at_ms: mockHistoryFinishedAt(3) - 726_000,
+    finished_at_ms: mockHistoryFinishedAt(3),
+    duration_ms: 726_000,
+    outcome_kind: "failed",
+    outcome_detail:
+      "empty_output (makemkvcon exited 0 — the silent-success " +
+      "case ARM reports as a completed rip). Partial output " +
+      "KEPT at /media/Disc-Rips/.rip-deck-incomplete-68fa9004.",
+    is_successful: false,
+    failure_reason: "empty_output",
+    verdict: "unknown",
+    verdict_message: null,
+    read_error_count: 0,
+    throughput_bytes_per_sec: null,
+    has_log: true,
+    source: "live",
+  },
+  {
+    job_uuid: "947b817e-93b2-4e62-aede-5c8c7ecad073",
+    drive_id: "2-1.1.2.2",
+    slot: 8,
+    bay_name: "08 - Pioneer BDR-211M",
+    disc_name: null,
+    is_named: true,
+    disctype: null,
+    destination_path: null,
+    size_bytes: 8_190_000_000,
+    started_at_ms: mockHistoryFinishedAt(9) - 42_000,
+    finished_at_ms: mockHistoryFinishedAt(9),
+    duration_ms: 42_000,
+    outcome_kind: "needs_attention",
+    outcome_detail:
+      "udev and sysfs disagree about what is in this drive, so " +
+      "typing it would be a guess.",
+    is_successful: false,
+    failure_reason: null,
+    verdict: "unknown",
+    verdict_message: null,
+    read_error_count: null,
+    throughput_bytes_per_sec: null,
+    has_log: false,
+    source: "live",
+  },
+  {
+    job_uuid: "021d7450-0e7d-463a-a5bf-4662394e2785",
+    drive_id: "2-2.3.4.2",
+    slot: null,
+    bay_name: "2-2.3.4.2",
+    disc_name: null,
+    is_named: false,
+    disctype: null,
+    destination_path: null,
+    size_bytes: 96_930_000_000,
+    started_at_ms: mockHistoryFinishedAt(18) - 5_622_000,
+    finished_at_ms: mockHistoryFinishedAt(18),
+    duration_ms: 5_622_000,
+    outcome_kind: "completed",
+    outcome_detail:
+      "Rebuilt from this rip's saved measurements. It finished.",
+    is_successful: true,
+    failure_reason: null,
+    verdict: "unknown",
+    verdict_message: null,
+    read_error_count: 0,
+    throughput_bytes_per_sec: 17_200_000,
+    has_log: true,
+    source: "backfill",
+  },
+  {
+    job_uuid: "2b2eca98-85f0-4c83-9c24-2cf38f9ba415",
+    drive_id: "2-1.3.1",
+    slot: null,
+    bay_name: "2-1.3.1",
+    disc_name: null,
+    is_named: false,
+    disctype: null,
+    destination_path: null,
+    size_bytes: 87_660_000_000,
+    started_at_ms: mockHistoryFinishedAt(24) - 2_610_000,
+    finished_at_ms: mockHistoryFinishedAt(24),
+    duration_ms: 2_610_000,
+    outcome_kind: "failed",
+    outcome_detail:
+      "Rebuilt from this rip's saved measurements. It failed — " +
+      "empty_output.",
+    is_successful: false,
+    failure_reason: "empty_output",
+    verdict: "unknown",
+    verdict_message: null,
+    read_error_count: 0,
+    throughput_bytes_per_sec: null,
+    has_log: true,
+    source: "backfill",
+  },
+]
+
+/**
+ * The daemon's filtering, repeated here.
+ *
+ * ⚠️ Repeated rather than shared, and that is the same call
+ * every other member of this file makes: the mock exists to
+ * answer WITHOUT a daemon, so importing the daemon's filter
+ * would defeat it. What it must not do is disagree — the search
+ * covers the same fields and `needs_attention` is a failure on
+ * both sides, because the mock is what the page's tests drive.
+ */
+const matchesMockFilters = (input: {
+  rip: HistoryRip
+  filters: HistoryFilters
+}): boolean => {
+  const { rip, filters } = input
+
+  if (
+    filters.fromMs !== null &&
+    rip.finished_at_ms < filters.fromMs
+  ) {
+    return false
+  }
+
+  if (
+    filters.toMs !== null &&
+    rip.finished_at_ms > filters.toMs
+  ) {
+    return false
+  }
+
+  if (
+    filters.outcome === "completed" &&
+    !rip.is_successful
+  ) {
+    return false
+  }
+
+  if (filters.outcome === "failed" && rip.is_successful) {
+    return false
+  }
+
+  if (filters.search === "") return true
+
+  return [
+    rip.disc_name ?? "",
+    rip.bay_name,
+    rip.drive_id,
+    rip.job_uuid,
+    rip.destination_path ?? "",
+    rip.disctype ?? "",
+    rip.outcome_kind,
+  ]
+    .join(" ")
+    .toLowerCase()
+    .includes(filters.search.toLowerCase())
+}

@@ -122,6 +122,40 @@ must run where `/sys/block/sr*` is real.
 > disc is placed at `/config/data/keydb.cfg`. That file is third-party data, is
 > not shipped in this repo or image, and is not required for BD/DVD/CD.
 
+## History — every rip, not just the last one per bay
+
+`bays.json` in the state directory holds **one record per bay and
+overwrites it**. It is bay memory — *"this disc is already done, do not re-rip
+it"* — so a rip becomes unfindable the moment the next disc lands in that tray.
+
+`$RIP_DECK_STATE_DIR/history.jsonl` is the permanent record beside it: one JSON
+line per finished rip, appended at the outcome latch and never edited. That
+instant is the only one where the disc's NAME, its type, its destination and the
+outcome all exist together — the name reaches rip-deck from udev, and no job file
+records it.
+
+```sh
+curl -s 'http://host:3007/api/history?limit=25'
+curl -s 'http://host:3007/api/history?from=2026-08-25&to=2026-08-26&outcome=failed'
+curl -s 'http://host:3007/api/history?q=mummy'
+```
+
+`from` / `to` take a `YYYY-MM-DD` (resolved in the DAEMON's time zone) or epoch
+milliseconds. The dashboard sends milliseconds, so the browser's zone governs
+what a picked day means. The dashboard's own view is at `/history`.
+
+Bytes, duration, read errors and the health verdict are **not** in the log. They
+are already written per job as `<uuid>.features.json` and `<uuid>.verdict.json`,
+and the endpoint joins them back in — for the page it is about to return only.
+`?limit=` caps at 200 for that reason: it bounds file opens, not bytes.
+
+Nothing is pruned. Rips that finished before this shipped are rebuilt from their
+feature vectors at start-up, keyed on job id so a live row always wins. ⚠️ A
+rebuilt row has **no disc name and none can be recovered** — the reasons, all
+three measured, are in
+[`ripHistoryBackfill.ts`](packages/daemon/src/rip/ripHistoryBackfill.ts) and the
+[decision](docs/decisions/2026-08-27-rip-history-is-an-append-only-log-beside-the-job-files.md).
+
 ## Drive identity — the thing every other project gets wrong
 
 `/dev/srN` is **not** an identity. It reshuffles on every USB re-enumeration,
