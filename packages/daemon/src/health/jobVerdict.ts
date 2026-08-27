@@ -11,7 +11,7 @@ import {
   type DriveObservation,
   evaluateHealth,
 } from "./engine.ts"
-import { IS_HEALTH_VERDICT_PUBLISHED } from "./publish.ts"
+import { isHealthVerdictPublished } from "./publish.ts"
 
 /**
  * What the engine would have said about one finished job.
@@ -81,9 +81,16 @@ export type ComputedJobVerdict = {
   /** The instant the job ended, which is when this was judged. */
   computedAtMs: number
   /**
-   * Whether this verdict was reported anywhere, or merely
-   * recorded. `false` for every job until `HEALTH_THRESHOLDS` is
-   * tuned — see `IS_HEALTH_VERDICT_PUBLISHED`.
+   * Whether the gate was open when this verdict was computed.
+   *
+   * A record of the moment, not a permission slip. The gate
+   * counts the corpus in the state directory and opens itself
+   * once it qualifies (`publish.ts`), so a job judged before it
+   * opened is stamped `false` here and its verdict is still
+   * shown on the card afterwards — `api/towerFeed.ts` asks the
+   * LIVE gate rather than this field. Kept because "was this
+   * reported at the time" is a real question about a corpus
+   * that spans the day the gate opened.
    */
   isPublished: boolean
   verdict: Verdict
@@ -173,11 +180,10 @@ export const buildDriveObservation = (input: {
 /**
  * Run the engine over one finished job.
  *
- * `isPublished` defaults to the gate constant, so production
- * gets the closed gate without asking. It is a parameter so a
- * test can prove the wire genuinely carries the engine's answer
- * when the gate opens — the switch is tested before it is ever
- * thrown.
+ * `isPublished` defaults to the live gate, so production needs
+ * no wiring: whatever `refreshHealthGate` last counted is what
+ * this records. It stays a parameter so a test can drive both
+ * sides of the switch without touching a state directory.
  */
 export const evaluateJobHealth = (input: {
   vector: JobFeatureVector
@@ -217,7 +223,7 @@ export const evaluateJobHealth = (input: {
     driveId: vector.driveId,
     computedAtMs: vector.endedAtMs,
     isPublished:
-      input.isPublished ?? IS_HEALTH_VERDICT_PUBLISHED,
+      input.isPublished ?? isHealthVerdictPublished(),
     // `evaluateHealth` always answers for every observation it
     // was given, so the fallback is unreachable — but a `Map`
     // lookup is optional at the type level and a thrown error

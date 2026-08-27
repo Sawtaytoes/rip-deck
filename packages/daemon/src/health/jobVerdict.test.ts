@@ -5,7 +5,7 @@ import {
   type JobFeatureVector,
   type VerdictKind,
 } from "@rip-deck/contracts"
-import { describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it } from "vitest"
 import { createBaseline } from "./baseline.ts"
 import {
   buildDriveObservation,
@@ -13,7 +13,8 @@ import {
 } from "./jobVerdict.ts"
 import {
   HEALTH_TUNING_MIN_JOB_COUNT,
-  IS_HEALTH_VERDICT_PUBLISHED,
+  isHealthVerdictPublished,
+  resetHealthGate,
 } from "./publish.ts"
 
 /**
@@ -93,14 +94,20 @@ const vector = (
 })
 
 describe("the publish gate", () => {
-  it("is shut", () => {
-    // ⚠️ This assertion is the guard, not a tautology. Flipping
-    // `IS_HEALTH_VERDICT_PUBLISHED` must be a deliberate act that
-    // breaks a test and makes someone read `publish.ts` — which
-    // names the ~30-job condition and cites `AGENTS.md`. There
-    // were THREE feature vectors on the tower when this was
-    // written.
-    expect(IS_HEALTH_VERDICT_PUBLISHED).toBe(false)
+  // The gate is process state, latched by `refreshHealthGate`.
+  // A test that left it open would open it for every test file
+  // sharing the worker.
+  beforeEach(() => {
+    resetHealthGate()
+  })
+
+  it("is shut until something counts the corpus", () => {
+    // ⚠️ Not a tautology. A cold process has looked at no state
+    // directory, so it knows of no corpus, so no verdict may be
+    // reported. Anything that made this true by default would
+    // publish guessed thresholds on a tower with three rips on
+    // it.
+    expect(isHealthVerdictPublished()).toBe(false)
     expect(HEALTH_TUNING_MIN_JOB_COUNT).toBe(30)
   })
 

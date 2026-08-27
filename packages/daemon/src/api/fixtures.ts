@@ -571,11 +571,16 @@ const buildUnmeasured = (nowMs: number): TowerSnapshot => {
             isAdopted: true,
             verdictKind: "unknown",
             confidence: "suspected",
+            // The bay's own outcome sentence, and nothing
+            // else. The second line here used to explain that
+            // the health engine did not run — it does, and its
+            // answer is shown once `health/publish.ts` counts
+            // enough corpus to allow it. A note about
+            // rip-deck's build state was never a fact about
+            // these discs.
             evidence: [
               "held on startup: the bay ledger already had " +
                 "this disc",
-              "`rip-deck watch` does not run the health " +
-                "engine yet, so nothing has judged this rip.",
             ],
             progress: {
               totalFraction: 1,
