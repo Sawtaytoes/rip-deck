@@ -1,6 +1,16 @@
-import { open, readdir, rm, stat } from "node:fs/promises"
+import {
+  open,
+  readdir,
+  rename,
+  rm,
+  stat,
+} from "node:fs/promises"
 import { basename, join, resolve, sep } from "node:path"
-import { incompleteDirName } from "./destination.ts"
+import {
+  ISO_SUFFIX,
+  incompleteDirName,
+  pathExists,
+} from "./destination.ts"
 
 /**
  * The folders a rip leaves behind when it does not land cleanly,
@@ -77,15 +87,47 @@ export const classifyLeftover = (
       : { kind: "incomplete", jobUuid }
   }
 
-  const marker = name.lastIndexOf(` ${DUPLICATE_MARKER}`)
+  const duplicate = DUPLICATE_PATTERN.exec(name)
 
-  return marker === -1 || !name.endsWith(")")
+  return duplicate === null
     ? null
     : {
         kind: "duplicate",
-        occupiedName: name.slice(0, marker),
+        // The `.iso` belongs to the name it COLLIDED with, not
+        // to the marker — `finaliseDestination` puts the marker
+        // before the extension, so the occupied file is
+        // `<title>.iso` and not `<title>`.
+        occupiedName: `${duplicate[1]}${duplicate[2] ?? ""}`,
       }
 }
+
+/**
+ * A duplicate landing's name, with an OPTIONAL `.iso` after the
+ * closing bracket.
+ *
+ * ⚠️ **The suffix is why this is a pattern and not `endsWith(")")`.**
+ * A DVD backup is a single ISO FILE, and `finaliseDestination`
+ * publishes a collided one as
+ * `<title> (rip-deck-duplicate-01234567).iso` — the marker goes
+ * BEFORE the extension, on purpose, so the copy stays an ISO to
+ * anything that reads extensions
+ * ([decision](../../../../docs/decisions/2026-08-26-a-dvd-backup-is-one-iso-file-not-a-directory.md)).
+ * The first version of `classifyLeftover` tested `endsWith(")")`,
+ * which is true of every Blu-ray duplicate and false of every DVD
+ * one — so the panel that exists to resolve collisions could not
+ * see the DVD collisions at all. The owner has one on the shelf
+ * right now: two Ninja Turtles discs carry the same UDF volume
+ * label, so the second landed marked, and it is an `.iso`.
+ *
+ * Built from `DUPLICATE_MARKER` rather than spelled twice, so the
+ * marker has exactly one definition. `[^)]+` for the uuid because
+ * the slice is 8 hex characters today and the pattern should not
+ * be the thing that breaks if that ever changes.
+ */
+const DUPLICATE_PATTERN = new RegExp(
+  `^(.+) ${DUPLICATE_MARKER.replace("(", "\\(")}[^)]+\\)` +
+    `(\\${ISO_SUFFIX})?$`,
+)
 
 export type Leftover = {
   /** Absolute path, for the delete command to name back. */
@@ -264,6 +306,36 @@ export const scanLeftovers = async (input: {
 export const refusalToDeleteLeftover = (input: {
   rootPath: string
   path: string
+}): string | null =>
+  refusalToTouchLeftover({
+    ...input,
+    permitted:
+      "only a folder in the destination root may be cleared",
+    scope:
+      "This clears unfinished rips and duplicate landings " +
+      "only; a finished rip is not deletable from here.",
+  })
+
+/**
+ * The four rules, shared by the two verbs that act on a leftover.
+ *
+ * Extracted when rename arrived, and NOT copied: a second spelling
+ * of "is this path safe to act on" is a second thing to keep in
+ * step, and the one that drifts is the one nobody tested. The two
+ * closing sentences differ because they are what the operator
+ * reads, and "not deletable from here" is the wrong sentence to
+ * show somebody who pressed Rename.
+ */
+const refusalToTouchLeftover = (input: {
+  rootPath: string
+  path: string
+  /**
+   * How the direct-child sentence ends — the clause after the
+   * em dash, verb included.
+   */
+  permitted: string
+  /** What this endpoint is for, said to whoever aimed it wrong. */
+  scope: string
 }): string | null => {
   const root = resolve(input.rootPath)
   const target = resolve(input.path)
@@ -281,16 +353,12 @@ export const refusalToDeleteLeftover = (input: {
   if (join(root, name) !== target) {
     return (
       `${target} is not a direct child of ${root} — ` +
-      "only a folder in the destination root may be cleared"
+      input.permitted
     )
   }
 
   if (classifyLeftover(name) === null) {
-    return (
-      `"${name}" is not a Rip Deck leftover. This clears ` +
-      "unfinished rips and duplicate landings only; a finished " +
-      "rip is not deletable from here."
-    )
+    return `"${name}" is not a Rip Deck leftover. ${input.scope}`
   }
 
   return null
@@ -326,6 +394,240 @@ export const deleteLeftover = async (input: {
   return {
     isDeleted: true,
     message: `Cleared ${basename(input.path)}.`,
+  }
+}
+
+/**
+ * Why a rename was refused, or null when the NAME is allowed.
+ *
+ * The owner, 2026-08-27, looking at a Ninja Turtles box set whose
+ * discs carry wrong and inconsistent UDF volume labels — one disc
+ * whose own menu reads *SEASON 4 / Disc Two* is labelled
+ * `Teenage_Mutant_Ninja_Turtles_V7_Disc_2`, and two more share
+ * one label outright so the second landed marked as a duplicate:
+ *
+ * > *"We need to be able to delete (which you added) AND also
+ * > rename the rip, so it doesn't conflict."*
+ *
+ * ⚠️ **This checks the SOURCE and the NAME, and cannot check the
+ * DESTINATION.** "Is something already there" is a filesystem
+ * fact, so it lives in `renameLeftover` — see the note there
+ * about why refusing to clobber is the rule that matters most.
+ * Everything that can be decided from two strings is decided
+ * here, so it is testable without a filesystem, exactly like the
+ * delete refusal beside it.
+ *
+ * The source rules are `refusalToDeleteLeftover`'s four, shared
+ * rather than restated. On top of them the new name must be ONE
+ * PATH SEGMENT:
+ *
+ *  1. Not empty, and not only whitespace.
+ *  2. No `/` and no `\`. A rename moves nothing; it renames in
+ *    place, and a name with a separator in it is a caller asking
+ *    for something this endpoint does not do.
+ *  3. Not `.` and not `..`. Both resolve to a directory that is
+ *    not the leftover, and `rename(x, "..")` is a question with
+ *    no good answer.
+ *  4. The result still lands as a direct child of the root. A
+ *    belt-and-braces re-check of rule 1 above, against the
+ *    resolved path rather than against the characters — so a
+ *    separator this platform recognises and the list above does
+ *    not is caught anyway.
+ *
+ * What it deliberately does NOT check is whether the new name is
+ * one `classifyLeftover` claims. Removing the
+ * `(rip-deck-duplicate-…)` marker is the main reason to rename at
+ * all, and a rename whose result had to still look like a
+ * leftover could never do it.
+ */
+export const refusalToRenameLeftover = (input: {
+  rootPath: string
+  path: string
+  newName: string
+}): string | null => {
+  const sourceRefusal = refusalToTouchLeftover({
+    path: input.path,
+    permitted:
+      "only a folder in the destination root may be renamed",
+    rootPath: input.rootPath,
+    scope:
+      "This renames unfinished rips and duplicate landings " +
+      "only; a finished rip is not renamable from here.",
+  })
+
+  if (sourceRefusal !== null) return sourceRefusal
+
+  const name = input.newName.trim()
+
+  if (name === "") {
+    return "the new name is empty"
+  }
+
+  if (name.includes("/") || name.includes("\\")) {
+    return (
+      `"${name}" is a path, not a name. A rename renames in ` +
+      "place, so the new name is one folder name with no " +
+      "slashes in it."
+    )
+  }
+
+  if (name === "." || name === "..") {
+    return `"${name}" is a directory traversal, not a name.`
+  }
+
+  // Spelled as a codepoint test rather than as a regex: a
+  // character class holding literal control characters is what
+  // `noControlCharactersInRegex` exists to catch, and silencing
+  // that rule to say "no control characters" reads badly.
+  const hasControlCharacter = [...name].some(
+    (character) => (character.codePointAt(0) ?? 0) < 0x20,
+  )
+
+  if (hasControlCharacter) {
+    return (
+      "the new name has a control character in it, which no " +
+      "filesystem this runs on will store."
+    )
+  }
+
+  const root = resolve(input.rootPath)
+  const destination = resolve(join(root, name))
+
+  if (join(root, basename(destination)) !== destination) {
+    return (
+      `${destination} is not a direct child of ${root} — ` +
+      "a rename may not move a leftover out of the " +
+      "destination root"
+    )
+  }
+
+  return null
+}
+
+/**
+ * The name a rename ACTUALLY lands under.
+ *
+ * ⚠️ **A DVD backup is one ISO FILE, and it keeps its extension.**
+ * `finaliseDestination` decides the suffix from what is on disk
+ * rather than from the disc type, and publishes a file-shaped rip
+ * as `<name>.iso`
+ * ([decision](../../../../docs/decisions/2026-08-26-a-dvd-backup-is-one-iso-file-not-a-directory.md)).
+ * An operator retyping a name has no reason to remember that, and
+ * an 8 GB extension-less ISO is the exact thing that decision
+ * exists to stop — Windows offers to open it in a text editor and
+ * no scanner recognises it. So the suffix is appended for him.
+ *
+ * A Blu-ray backup is a DIRECTORY and takes no suffix, which is
+ * why this needs `isFile` and cannot read the disc type.
+ *
+ * Case-insensitive, because a name typed as `… .ISO` already has
+ * the extension and gaining a second one would be worse than
+ * having none.
+ */
+export const renamedLeftoverName = (input: {
+  newName: string
+  isFile: boolean
+}): string => {
+  const name = input.newName.trim()
+
+  return input.isFile &&
+    !name.toLowerCase().endsWith(ISO_SUFFIX)
+    ? `${name}${ISO_SUFFIX}`
+    : name
+}
+
+/**
+ * Rename one leftover, in place, in the destination root.
+ *
+ * ⚠️ **It REFUSES rather than clobbers, and that is the whole
+ * point of the feature.** The reason to rename is a name
+ * collision; resolving one by silently overwriting an 8 GB ISO
+ * with another 8 GB ISO would be the worst failure this code
+ * could have. `finaliseDestination` makes the same promise on the
+ * rip path and for the same reason — a rip that lands on a taken
+ * name goes beside it, marked, and a human chooses.
+ *
+ * The exists-check and the `rename` are two syscalls, so a rip
+ * finalising into that exact name in between would still be
+ * clobbered. The window is microseconds against a control a
+ * person presses, `finaliseDestination` refuses the same
+ * collision from its side, and Node exposes no atomic
+ * `RENAME_NOREPLACE`. Stated rather than hidden.
+ */
+export const renameLeftover = async (input: {
+  rootPath: string
+  path: string
+  newName: string
+}): Promise<{
+  isRenamed: boolean
+  message: string
+  /** Where it landed, or null when nothing moved. */
+  path: string | null
+}> => {
+  const refusal = refusalToRenameLeftover(input)
+
+  if (refusal !== null) {
+    return {
+      isRenamed: false,
+      message: `Refused to rename: ${refusal}.`,
+      path: null,
+    }
+  }
+
+  const source = resolve(input.path)
+  const info = await stat(source).catch(() => null)
+
+  if (info === null) {
+    return {
+      isRenamed: false,
+      message:
+        `Refused to rename: ${basename(source)} is no longer ` +
+        "there. Something else may have cleared it already.",
+      path: null,
+    }
+  }
+
+  const name = renamedLeftoverName({
+    isFile: info.isFile(),
+    newName: input.newName,
+  })
+  const destination = join(resolve(input.rootPath), name)
+
+  if (destination === source) {
+    return {
+      isRenamed: false,
+      message: `Refused to rename: "${name}" is the name it already has.`,
+      path: null,
+    }
+  }
+
+  if (await pathExists(destination)) {
+    return {
+      isRenamed: false,
+      message:
+        `Refused to rename: "${name}" is already taken. Rip ` +
+        "Deck never overwrites a rip, so pick a name nothing " +
+        "in the destination root is using.",
+      path: null,
+    }
+  }
+
+  try {
+    await rename(source, destination)
+  } catch (error) {
+    return {
+      isRenamed: false,
+      message:
+        `Could not rename ${basename(source)}: ` +
+        `${error instanceof Error ? error.message : String(error)}`,
+      path: null,
+    }
+  }
+
+  return {
+    isRenamed: true,
+    message: `Renamed to ${name}.`,
+    path: destination,
   }
 }
 

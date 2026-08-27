@@ -37,6 +37,8 @@ export const createStubDataSource = (
   },
   fetchHistory: () => {
     throw new Error("stub: fetchHistory not provided")
+  renameLeftover: () => {
+    throw new Error("stub: renameLeftover not provided")
   },
   ...overrides,
 })

@@ -15,6 +15,12 @@ import { LeftoverRips } from "./LeftoverRips"
  * last one is the failure `ClearLoadedButton` was built to stop
  * repeating: a button that looks dead because the daemon's answer
  * went into a variable nobody rendered.
+ *
+ * ⚠️ And for rename: the form starts from the name WITHOUT the
+ * `(rip-deck-duplicate-…)` marker, the daemon is sent exactly
+ * what was typed, and a refused rename leaves the folder listed
+ * under its old name. That last one is the clobber guard seen
+ * from the panel's side.
  */
 
 const buildLeftover = (
@@ -147,5 +153,162 @@ describe("LeftoverRips", () => {
     expect(
       screen.getByText(".rip-deck-incomplete-abc-123"),
     ).toBeInTheDocument()
+  })
+
+  it("⚠️ starts the rename from the name WITHOUT the duplicate marker", async () => {
+    // Dropping `(rip-deck-duplicate-…)` is the main reason to
+    // rename, so the operator should not have to delete it by
+    // hand from a 70-character name.
+    renderWithProviders(
+      <LeftoverRips />,
+      createStubDataSource({
+        fetchLeftovers: () =>
+          Promise.resolve([
+            buildLeftover({
+              path: "/media/Disc-Rips/TMNT - DVD (rip-deck-duplicate-68fa9004).iso",
+              name: "TMNT - DVD (rip-deck-duplicate-68fa9004).iso",
+              kind: "duplicate",
+              occupied_name: "TMNT - DVD.iso",
+              size_bytes: 8_203_894_784,
+              disc_structure: "ISO",
+              detail: "A FINISHED rip that landed beside…",
+              is_safe_to_delete: false,
+            }),
+          ]),
+      }),
+    )
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Rename" }),
+    )
+
+    expect(
+      screen.getByRole("textbox", { name: /New name/ }),
+    ).toHaveValue("TMNT - DVD.iso")
+  })
+
+  it("sends the daemon exactly the name that was typed", async () => {
+    const renameLeftover = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        msg: "Renamed to TMNT Season 4 Disc 2 - DVD.iso.",
+        leftovers: [],
+      }),
+    )
+
+    renderWithProviders(
+      <LeftoverRips />,
+      createStubDataSource({
+        fetchLeftovers: () =>
+          Promise.resolve([buildLeftover()]),
+        renameLeftover,
+      }),
+    )
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Rename" }),
+    )
+
+    const field = screen.getByRole("textbox", {
+      name: /New name/,
+    })
+    await userEvent.clear(field)
+    await userEvent.type(
+      field,
+      "TMNT Season 4 Disc 2 - DVD",
+    )
+    await userEvent.click(
+      screen.getByRole("button", { name: "Save name" }),
+    )
+
+    await waitFor(() => {
+      expect(renameLeftover).toHaveBeenCalledWith({
+        newName: "TMNT Season 4 Disc 2 - DVD",
+        path: "/media/Disc-Rips/.rip-deck-incomplete-abc-123",
+      })
+    })
+  })
+
+  it("⚠️ RENDERS a refused rename and keeps the old name listed", async () => {
+    // "That name is already taken" is the sentence the whole
+    // feature exists to be able to say. Nothing moved, so the
+    // folder must still be on screen under its old name.
+    renderWithProviders(
+      <LeftoverRips />,
+      createStubDataSource({
+        fetchLeftovers: () =>
+          Promise.resolve([buildLeftover()]),
+        renameLeftover: () =>
+          Promise.resolve({
+            ok: false,
+            msg: 'Refused to rename: "TMNT - DVD.iso" is already taken.',
+            leftovers: [buildLeftover()],
+          }),
+      }),
+    )
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Rename" }),
+    )
+    await userEvent.click(
+      screen.getByRole("button", { name: "Save name" }),
+    )
+
+    expect(
+      await screen.findByText(
+        'Refused to rename: "TMNT - DVD.iso" is already taken.',
+      ),
+    ).toBeInTheDocument()
+
+    expect(
+      screen.getByText(".rip-deck-incomplete-abc-123"),
+    ).toBeInTheDocument()
+  })
+
+  it("closes the form on Cancel without calling the daemon", async () => {
+    const renameLeftover = vi.fn(() =>
+      Promise.resolve({ ok: true, msg: "", leftovers: [] }),
+    )
+
+    renderWithProviders(
+      <LeftoverRips />,
+      createStubDataSource({
+        fetchLeftovers: () =>
+          Promise.resolve([buildLeftover()]),
+        renameLeftover,
+      }),
+    )
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Rename" }),
+    )
+    await userEvent.click(
+      screen.getByRole("button", { name: "Cancel" }),
+    )
+
+    expect(
+      screen.queryByRole("textbox", { name: /New name/ }),
+    ).not.toBeInTheDocument()
+    expect(renameLeftover).not.toHaveBeenCalled()
+  })
+
+  it("⚠️ disables Delete while the rename form is open", async () => {
+    // Deleting the folder you are in the middle of renaming is
+    // not a press anybody means to make.
+    renderWithProviders(
+      <LeftoverRips />,
+      createStubDataSource({
+        fetchLeftovers: () =>
+          Promise.resolve([buildLeftover()]),
+      }),
+    )
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Rename" }),
+    )
+
+    expect(
+      screen.getByRole("button", { name: "Delete" }),
+    ).toBeDisabled()
   })
 })

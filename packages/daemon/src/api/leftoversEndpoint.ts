@@ -1,12 +1,22 @@
 import {
   deleteLeftover,
   type Leftover,
+  renameLeftover,
   scanLeftovers,
 } from "../rip/leftovers.ts"
 
 /**
  * `GET /api/leftovers` and `POST /api/leftovers` — the folders a
- * rip left behind, and the button that clears one.
+ * rip left behind, and the two controls that resolve one.
+ *
+ * ## One route, two verbs
+ *
+ * `POST` carries a `command`, which is `"delete"` or `"rename"`.
+ * A second pathname was the alternative and it buys nothing: both
+ * verbs take the same target, answer with the same remaining
+ * list, and share every one of their refusal rules. `POST
+ * /api/tray` already reads its verb out of a `command` field, so
+ * this is the shape a reader of this server has already met.
  *
  * ## Why this is not on `/json`
  *
@@ -80,18 +90,30 @@ export type LeftoversListPayload = {
   leftovers: LeftoverView[]
 }
 
-export type LeftoversDeletePayload = {
+/**
+ * What a write answers with, whichever verb it was.
+ *
+ * One shape for both, because the panel does one thing with it
+ * either way: render `msg` and redraw from `leftovers`. A rename
+ * that succeeds still changes the list — the row keeps its place
+ * but not its name — so it carries the fresh list for the same
+ * reason a delete does.
+ */
+export type LeftoversWritePayload = {
   ok: boolean
   msg: string
   /** The remaining leftovers, so the panel needs no refetch. */
   leftovers: LeftoverView[]
 }
 
+/** @deprecated The delete-only name for `LeftoversWritePayload`. */
+export type LeftoversDeletePayload = LeftoversWritePayload
+
 export type LeftoversEndpointResult = {
   status: number
   payload:
     | LeftoversListPayload
-    | LeftoversDeletePayload
+    | LeftoversWritePayload
     | { ok: false; msg: string }
 }
 
@@ -140,6 +162,168 @@ export const handleLeftoversDelete = async (input: {
       leftovers: await listLeftovers(input.destinationRoot),
     },
   }
+}
+
+/**
+ * Rename one leftover, in place.
+ *
+ * ⚠️ **Every rule is in `renameLeftover`, not here.** This reads
+ * a body and hands two strings over; it decides nothing about
+ * what may be renamed or what the result may be called. Same
+ * split as the delete above it, and it matters for the same
+ * reason — the target dataset holds 700-odd finished rips.
+ */
+export const handleLeftoversRename = async (input: {
+  body: string
+  destinationRoot: string
+}): Promise<LeftoversEndpointResult> => {
+  const parsed = parseRenameBody(input.body)
+
+  if (typeof parsed === "string") {
+    return {
+      status: 400,
+      payload: { ok: false, msg: parsed },
+    }
+  }
+
+  const outcome = await renameLeftover({
+    newName: parsed.new_name,
+    path: parsed.path,
+    rootPath: input.destinationRoot,
+  })
+
+  return {
+    // A refusal is 400 for the same reason a refused delete is:
+    // the request was understood and answered, and the answer is
+    // "not to that name".
+    status: outcome.isRenamed ? 200 : 400,
+    payload: {
+      ok: outcome.isRenamed,
+      msg: outcome.message,
+      leftovers: await listLeftovers(input.destinationRoot),
+    },
+  }
+}
+
+/**
+ * Which verb a POST names, or the sentence explaining why none.
+ *
+ * Wrapped in an object rather than returned bare, so the failure
+ * branch is a plain `string` and the success branch is not — the
+ * same `T | string` idiom every `parse*Body` below uses, and the
+ * only spelling a union of two literals and `string` does not
+ * collapse into.
+ *
+ * A peek, on purpose. Each `parse*Body` still parses the whole
+ * body and still refuses a command that is not its own, so a
+ * caller reaching `handleLeftoversDelete` directly — a test, a
+ * future route — keeps the guarantee it had before rename
+ * existed. The cost is parsing a few hundred bytes of JSON
+ * twice, once per operator button press.
+ */
+export const readLeftoversCommand = (
+  body: string,
+): { command: "delete" | "rename" } | string => {
+  let payload: unknown
+
+  try {
+    payload = JSON.parse(body === "" ? "{}" : body)
+  } catch {
+    return "the body is not JSON."
+  }
+
+  if (typeof payload !== "object" || payload === null) {
+    return "the body is not a JSON object."
+  }
+
+  const command = (payload as Record<string, unknown>)
+    .command
+
+  return command === "delete" || command === "rename"
+    ? { command }
+    : 'no `command: "delete"` or `command: "rename"` in the ' +
+        "payload. Those are the only commands this endpoint " +
+        "accepts."
+}
+
+/**
+ * Dispatch one POST to its verb.
+ *
+ * The router calls this rather than either handler, so adding a
+ * third verb never touches the router again.
+ */
+export const handleLeftoversWrite = async (input: {
+  body: string
+  destinationRoot: string
+}): Promise<LeftoversEndpointResult> => {
+  const read = readLeftoversCommand(input.body)
+
+  if (typeof read === "string") {
+    return {
+      status: 400,
+      payload: { ok: false, msg: read },
+    }
+  }
+
+  return read.command === "delete"
+    ? handleLeftoversDelete(input)
+    : handleLeftoversRename(input)
+}
+
+/**
+ * The parsed rename body, or the sentence explaining why not.
+ *
+ * `new_name` is snake_case like every other field this server
+ * reads and writes. `LeftoverView` sets that convention and a
+ * second style on one origin is a trap for whoever writes the
+ * next consumer.
+ */
+export const parseRenameBody = (
+  body: string,
+): { path: string; new_name: string } | string => {
+  let payload: unknown
+
+  try {
+    payload = JSON.parse(body === "" ? "{}" : body)
+  } catch {
+    return "the body is not JSON."
+  }
+
+  if (typeof payload !== "object" || payload === null) {
+    return "the body is not a JSON object."
+  }
+
+  const record = payload as Record<string, unknown>
+
+  if (record.command !== "rename") {
+    return (
+      'no `command: "rename"` in the payload. That is the ' +
+      "only command this endpoint accepts."
+    )
+  }
+
+  const path = record.path
+
+  if (typeof path !== "string" || path.trim() === "") {
+    return (
+      "no `path` in the payload. Name the leftover to " +
+      "rename, exactly as `GET /api/leftovers` reported it."
+    )
+  }
+
+  const newName = record.new_name
+
+  if (
+    typeof newName !== "string" ||
+    newName.trim() === ""
+  ) {
+    return (
+      "no `new_name` in the payload. Say what the leftover " +
+      "should be called."
+    )
+  }
+
+  return { new_name: newName, path }
 }
 
 /** The parsed body, or the sentence explaining why not. */

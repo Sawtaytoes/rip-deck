@@ -1922,7 +1922,82 @@ export const mockDataSource: RipDeckDataSource = {
       150,
     )
   },
+  /**
+   * Rename one, and REFUSE a name something already has.
+   *
+   * The refusal is modelled rather than assumed away, because it
+   * is the case the control exists for: the operator is renaming
+   * a duplicate landing, so the name it collided with is by
+   * definition taken. Pressing Save on the suggested name before
+   * the other disc is renamed must show him why, not appear to
+   * work.
+   */
+  renameLeftover: ({ newName, path }) => {
+    const target = mockLeftovers.find(
+      (one) => one.path === path,
+    )
+
+    if (target === undefined) {
+      return delay(
+        {
+          ok: false,
+          msg: `Refused to rename: "${path}" is not a Rip Deck leftover.`,
+          leftovers: [...mockLeftovers],
+        },
+        150,
+      )
+    }
+
+    const name = newName.trim()
+
+    if (
+      mockLeftovers.some(
+        (one) => one.path !== path && one.name === name,
+      ) ||
+      MOCK_LIBRARY_NAMES.includes(name)
+    ) {
+      return delay(
+        {
+          ok: false,
+          msg:
+            `Refused to rename: "${name}" is already taken. ` +
+            "Rip Deck never overwrites a rip, so pick a name " +
+            "nothing in the destination root is using.",
+          leftovers: [...mockLeftovers],
+        },
+        150,
+      )
+    }
+
+    // A renamed leftover is usually no longer a leftover at all
+    // — dropping the `(rip-deck-duplicate-…)` marker is the
+    // whole point — so it leaves the list.
+    mockLeftovers = mockLeftovers.filter(
+      (one) => one.path !== path,
+    )
+
+    return delay(
+      {
+        ok: true,
+        msg: `Renamed to ${name}.`,
+        leftovers: [...mockLeftovers],
+      },
+      150,
+    )
+  },
 }
+
+/**
+ * The finished rips the mock's destination root already holds.
+ *
+ * Only the names a fixture rename could collide with. Renaming a
+ * duplicate back onto the name it collided with is the press an
+ * operator makes first, so the mock has to answer it honestly.
+ */
+const MOCK_LIBRARY_NAMES = [
+  "[BACKUP] Ivanhoe (1952) - Blu-ray",
+  "[BACKUP] Teenage Mutant Ninja Turtles - DVD.iso",
+]
 
 /**
  * The fixture leftovers, and both are real shapes:
@@ -1963,6 +2038,28 @@ let mockLeftovers: Leftover[] = [
       "never overwrites, so both copies were kept. Delete " +
       "whichever one you do not want — this is a real rip, not " +
       "a leftover.",
+    is_safe_to_delete: false,
+  },
+  {
+    // ⚠️ A DVD duplicate, which is one ISO FILE and therefore
+    // ends in `.iso` AFTER the marker. It is the shape the
+    // rename control was built for: two discs in one box set
+    // carry the same UDF volume label, so the second landed
+    // marked, and neither name says which disc it is.
+    path: "/media/Disc-Rips/[BACKUP] Teenage Mutant Ninja Turtles - DVD (rip-deck-duplicate-68fa9004).iso",
+    name: "[BACKUP] Teenage Mutant Ninja Turtles - DVD (rip-deck-duplicate-68fa9004).iso",
+    kind: "duplicate",
+    occupied_name:
+      "[BACKUP] Teenage Mutant Ninja Turtles - DVD.iso",
+    size_bytes: 8_203_894_784,
+    disc_structure: "ISO",
+    modified_at_ms: 1_787_500_000_000,
+    detail:
+      'A FINISHED rip that landed beside "[BACKUP] Teenage ' +
+      'Mutant Ninja Turtles - DVD.iso", which was already ' +
+      "there. Rip Deck never overwrites, so both copies were " +
+      "kept. Delete whichever one you do not want — this is a " +
+      "real rip, not a leftover.",
     is_safe_to_delete: false,
   },
 ]

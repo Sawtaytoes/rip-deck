@@ -77,6 +77,7 @@ const buildDataSource = (
   deleteLeftover: () =>
     Promise.reject(new Error("not used in this test")),
   fetchHistory: () =>
+  renameLeftover: () =>
     Promise.reject(new Error("not used in this test")),
   runTrayCommand,
 })
