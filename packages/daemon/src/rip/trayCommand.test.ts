@@ -314,6 +314,68 @@ describe("decideTrayBayAction", () => {
     }
   })
 
+  it("⚠️ still REFUSES power_off on a bay that is ripping", () => {
+    // The half of the rule that does not move. Mains is the one
+    // press that cannot be taken back mid-rip.
+    expect(
+      decideTrayBayAction({
+        request: { kind: "power_off" },
+        bay: bay({ phase: "ripping" }),
+        observation: loaded(),
+      }),
+    ).toMatchObject({
+      action: "refuse",
+      resultKind: "refused_ripping",
+    })
+  })
+
+  it("lets power_off through a bay that is only STARTING", () => {
+    // ⚠️ Regression, live 2026-08-26. `starting` is settle → type
+    // → identify and owns no ripper: `applyRipStarted` flips the
+    // phase before the child is spawned, so not a byte has been
+    // written and cutting mains destroys nothing.
+    //
+    // Refusing it anyway was a deadlock. `starting` has no upper
+    // bound — a wedged USB bus held five bays there for 75 minutes
+    // — and one refused bay refuses the whole press, so the Tower
+    // off button was disabled by exactly the fault it clears. The
+    // owner had to go and pull the plug by hand.
+    expect(
+      decideTrayBayAction({
+        request: { kind: "power_off" },
+        bay: bay({ phase: "starting" }),
+        observation: loaded(),
+      }),
+    ).toMatchObject({
+      action: "skip",
+      resultKind: "skipped_starting",
+    })
+  })
+
+  it("still refuses to MOVE A TRAY on a starting bay", () => {
+    // The exception above is about mains, and only mains. Opening
+    // a drawer under a live `makemkvcon` read is how the
+    // eject/insert flap-storm starts (B3), and unlike a power cut
+    // it fixes nothing when the bus is down.
+    for (const request of [
+      { kind: "open_trays" },
+      { kind: "close_trays" },
+      { kind: "open_bay", target: { slot: 7 } },
+      { kind: "close_bay", target: { slot: 7 } },
+    ] as const) {
+      expect(
+        decideTrayBayAction({
+          request,
+          bay: bay({ phase: "starting" }),
+          observation: loaded(),
+        }),
+      ).toMatchObject({
+        action: "refuse",
+        resultKind: "refused_ripping",
+      })
+    }
+  })
+
   it("refuses a ripping bay even with an empty-looking tray", () => {
     // A disc that vanishes mid-rip is `ripJob`'s business. Two
     // opinions about one device is how a drive gets two
