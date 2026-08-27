@@ -67,6 +67,8 @@ export function useLeftovers(): {
   pendingPath: string | null
   lastMessage: string | null
   isLastRefused: boolean
+  /** Which verb `lastMessage` is about, so it can be headed. */
+  lastCommand: "delete" | "rename" | null
 } {
   const dataSource = useDataSource()
   const queryClient = useQueryClient()
@@ -74,6 +76,13 @@ export function useLeftovers(): {
     string | null
   >(null)
   const [isLastRefused, setIsLastRefused] = useState(false)
+  // Which verb produced `lastMessage`. The panel has one place
+  // for a sentence and needs to head it correctly — "Not
+  // cleared" over a refused RENAME is a heading that contradicts
+  // the sentence under it.
+  const [lastCommand, setLastCommand] = useState<
+    "delete" | "rename" | null
+  >(null)
   const [pendingPath, setPendingPath] = useState<
     string | null
   >(null)
@@ -89,6 +98,7 @@ export function useLeftovers(): {
     onMutate: (path: string) => {
       setPendingPath(path)
       setLastMessage(null)
+      setLastCommand("delete")
     },
     onSuccess: (result) => {
       // The daemon's own words, whichever way it went.
@@ -124,6 +134,7 @@ export function useLeftovers(): {
     }) => {
       setPendingPath(input.path)
       setLastMessage(null)
+      setLastCommand("rename")
     },
     onSuccess: (result) => {
       setLastMessage(result.msg)
@@ -159,5 +170,6 @@ export function useLeftovers(): {
     pendingPath,
     lastMessage,
     isLastRefused,
+    lastCommand,
   }
 }
