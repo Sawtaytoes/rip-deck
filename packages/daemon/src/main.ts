@@ -292,6 +292,11 @@ export const runWatch = async (
     // from the environment, so `/logs` can never look somewhere
     // the captures are not.
     stateDir: config.stateDir,
+    // Same argument as `stateDir`: passed from the watcher's own
+    // config rather than re-read from the environment, so the
+    // folder that lists leftovers can never be a different
+    // folder from the one rips land in.
+    destinationRoot: config.destinationRoot,
   })
 
   const api = await startApiServer({

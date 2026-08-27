@@ -2,6 +2,8 @@ import { apiBase } from "../env"
 import { trayReportToActionResult } from "../format"
 import type {
   ActionResult,
+  Leftover,
+  LeftoverDeleteResult,
   RipDeckDataSource,
   RipDeckState,
   TrayCommandReport,
@@ -249,4 +251,105 @@ export const httpDataSource: RipDeckDataSource = {
       `/api/tray failed: ${response.status} ${detail}`,
     )
   },
+
+  /**
+   * List the folders a rip left behind.
+   *
+   * `cache: "no-store"` here where the tray POST does not need
+   * it: this is a GET, and a browser or proxy serving a cached
+   * list would show a leftover that was cleared a moment ago —
+   * with a Delete button beside it that then 400s on a path
+   * nothing is at.
+   */
+  async fetchLeftovers() {
+    const response = await fetch(
+      `${apiBase}/api/leftovers`,
+      { cache: "no-store" },
+    )
+
+    const body = await readJsonBody(response)
+
+    if (isLeftoverList(body)) return body.leftovers
+
+    throw new Error(
+      `/api/leftovers failed: ${response.status} ` +
+        `${readMessage(body) ?? response.statusText}`,
+    )
+  },
+
+  /**
+   * Clear one, by the exact path the list reported.
+   *
+   * ⚠️ NO retry, for the same reason the tray POST has none —
+   * this deletes a directory, and a retry on a timeout is a
+   * second delete aimed at whatever took the name next.
+   *
+   * A 400 RESOLVES rather than throwing. "That is a finished
+   * rip, not a leftover" is the most important sentence this
+   * endpoint produces, and it belongs on screen rather than
+   * stringified into a catch block.
+   */
+  async deleteLeftover({ path }) {
+    const response = await fetch(
+      `${apiBase}/api/leftovers`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ command: "delete", path }),
+      },
+    )
+
+    const body = await readJsonBody(response)
+
+    if (isLeftoverDeleteResult(body)) return body
+
+    throw new Error(
+      `/api/leftovers failed: ${response.status} ` +
+        `${readMessage(body) ?? response.statusText}`,
+    )
+  },
 }
+
+/** The `msg` a non-answering status carries, if it has one. */
+const readMessage = (body: unknown): string | null =>
+  typeof (body as { msg?: unknown })?.msg === "string"
+    ? (body as { msg: string }).msg
+    : null
+
+/**
+ * Structural checks, for the same reason `isTrayCommandReport`
+ * is one: a proxy's HTML error page must not arrive as a list of
+ * leftovers with every field undefined.
+ */
+const isLeftoverArray = (
+  value: unknown,
+): value is Leftover[] =>
+  Array.isArray(value) &&
+  value.every(
+    (one) =>
+      typeof one === "object" &&
+      one !== null &&
+      typeof (one as Leftover).path === "string" &&
+      typeof (one as Leftover).name === "string" &&
+      typeof (one as Leftover).detail === "string",
+  )
+
+const isLeftoverList = (
+  body: unknown,
+): body is { leftovers: Leftover[] } =>
+  typeof body === "object" &&
+  body !== null &&
+  isLeftoverArray(
+    (body as { leftovers?: unknown }).leftovers,
+  )
+
+const isLeftoverDeleteResult = (
+  body: unknown,
+): body is LeftoverDeleteResult =>
+  typeof body === "object" &&
+  body !== null &&
+  typeof (body as LeftoverDeleteResult).ok === "boolean" &&
+  typeof (body as LeftoverDeleteResult).msg === "string" &&
+  isLeftoverArray(
+    (body as { leftovers?: unknown }).leftovers,
+  )

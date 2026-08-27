@@ -13,6 +13,7 @@ import { useRipDeckState } from "../hooks/useRipDeckState"
 import type { Rip } from "../types"
 import { DashboardHeader } from "./DashboardHeader"
 import { HostSection } from "./HostSection"
+import { LeftoverRips } from "./LeftoverRips"
 import { LogModal, type LogTarget } from "./LogModal"
 
 /**
@@ -126,6 +127,20 @@ export function Dashboard({
       {!data && !isError && (
         <div className="text-content-muted">loading…</div>
       )}
+
+      {/* BELOW the bays, and hidden when there is nothing in it.
+          A leftover folder is a chore, not a fault — the tower is
+          working and the only thing outstanding is a decision
+          about disk space. Putting it above the rips would rank a
+          tidy-up over what the rack is doing now, which is the
+          ordering rule `HostSection` already keeps for held bays.
+
+          Its own `@container` so the row can go two-up on a wide
+          window without consulting the window's width — the same
+          rule the bay grid follows. */}
+      <div className="@container/leftovers mt-6">
+        <LeftoverRips />
+      </div>
 
       <LogModal
         target={logTarget}

@@ -72,6 +72,10 @@ const buildDataSource = (
   fetchLog: () => Promise.resolve(""),
   runBayAction: () =>
     Promise.reject(new Error("not used in this test")),
+  fetchLeftovers: () =>
+    Promise.reject(new Error("not used in this test")),
+  deleteLeftover: () =>
+    Promise.reject(new Error("not used in this test")),
   runTrayCommand,
 })
 

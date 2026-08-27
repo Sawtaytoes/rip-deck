@@ -447,6 +447,10 @@ describe("a failing daemon", () => {
         Promise.resolve({ ok: false, msg: "" }),
       runTrayCommand: () =>
         Promise.reject(new Error("not used in this test")),
+      fetchLeftovers: () =>
+        Promise.reject(new Error("not used in this test")),
+      deleteLeftover: () =>
+        Promise.reject(new Error("not used in this test")),
     }
 
     renderWithProviders(
