@@ -146,6 +146,7 @@ export const createApiServer = ({
   // own `config.stateDir` so the two can never diverge.
   stateDir = readStateDir(),
   readLogCapture = createLogCaptureReader({ stateDir }),
+  destinationRoot = null,
 }: {
   readSnapshot: () => TowerSnapshot
   port?: number
@@ -156,6 +157,12 @@ export const createApiServer = ({
   readTrayRunner?: () => TrayCommandRunner | null
   stateDir?: string
   readLogCapture?: LogCaptureReader | null
+  /**
+   * Where finished rips land. Null when this process was not
+   * told, which makes `/api/leftovers` answer 503 rather than
+   * guess a directory to delete inside.
+   */
+  destinationRoot?: string | null
 }): ApiServer => {
   const router = createApiRouter({
     readSnapshot,
@@ -164,6 +171,7 @@ export const createApiServer = ({
     webAssets,
     readTrayRunner,
     readLogCapture,
+    destinationRoot,
   })
 
   const server: Server = createServer(

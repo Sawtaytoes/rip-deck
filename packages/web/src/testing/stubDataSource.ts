@@ -29,6 +29,12 @@ export const createStubDataSource = (
   runTrayCommand: () => {
     throw new Error("stub: runTrayCommand not provided")
   },
+  fetchLeftovers: () => {
+    throw new Error("stub: fetchLeftovers not provided")
+  },
+  deleteLeftover: () => {
+    throw new Error("stub: deleteLeftover not provided")
+  },
   ...overrides,
 })
 
