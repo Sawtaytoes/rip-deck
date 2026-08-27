@@ -11,6 +11,7 @@ import {
   incompleteDirName,
   pathExists,
 } from "./destination.ts"
+import type { LiveRips } from "./liveRips.ts"
 
 /**
  * The folders a rip leaves behind when it does not land cleanly,
@@ -50,6 +51,26 @@ import {
  * nothing. That is fixed, but the shape is worth naming when it
  * recurs, because "0 bytes" and "half a disc" want opposite
  * decisions.
+ *
+ * ## ⚠️ A RUNNING rip lives in one of these folders too
+ *
+ * `.rip-deck-incomplete-<uuid>` is not only where a rip that
+ * failed is left. It is where a rip that is HAPPENING writes,
+ * from `prepareDestination` until the atomic rename at the end,
+ * and on a nine-drive tower there can be nine of them filling up
+ * at once. Everything above says "a rip that did not finish",
+ * and that sentence is true of a rip that has not finished YET.
+ *
+ * The name cannot tell the two apart, and neither can the bytes:
+ * a 40 GB half-written UHD rip looks the same whether the process
+ * writing it died an hour ago or is writing it right now. Only
+ * the LIVE JOB SET can tell, so every rule here takes a
+ * `LiveRips` (`liveRips.ts`) and refuses on it — for both verbs,
+ * and shown in the panel as a locked row rather than discovered
+ * by pressing a button. `reaper.ts` has guarded exactly this
+ * since it was written; this file did not, which meant the
+ * operator's Delete button could do what the reaper refuses to
+ * ([decision](../../../../docs/decisions/2026-08-27-a-leftover-control-refuses-a-live-rip.md)).
  */
 
 /** How `finaliseDestination` marks a collision landing. */
@@ -148,6 +169,20 @@ export type Leftover = {
   detail: string
   /** Whether deleting this can lose a finished rip. */
   isSafeToDelete: boolean
+  /**
+   * Neither verb may touch this one, and the panel says so.
+   *
+   * True when a rip is writing into it right now, and true when
+   * Rip Deck cannot rule that out. Separate from
+   * `isSafeToDelete`, which is a JUDGEMENT the operator may
+   * overrule — a duplicate is "not safe" and he deletes one on
+   * purpose. This is a REFUSAL: the API answers 400 either way,
+   * so the button is disabled rather than armed with a trap
+   * behind it.
+   */
+  isLocked: boolean
+  /** Why it is locked, for the panel. Null when it is not. */
+  lockReason: string | null
 }
 
 /**
@@ -168,7 +203,21 @@ export const describeLeftover = (input: {
   occupiedName: string | null
   sizeBytes: number
   discStructure: string | null
+  /** `refusalForLiveRip`'s answer, or null when it allowed. */
+  lockReason: string | null
 }): { detail: string; isSafeToDelete: boolean } => {
+  // First, and above every other sentence this function can
+  // produce: the other branches all describe a rip that is OVER
+  // and weigh up what deleting it costs. None of that applies to
+  // one that is still running, and offering the operator that
+  // trade-off at all would be the bug.
+  if (input.lockReason !== null) {
+    return {
+      detail: `${capitalise(input.lockReason)}.`,
+      isSafeToDelete: false,
+    }
+  }
+
   if (input.kind === "duplicate") {
     return {
       detail:
@@ -226,6 +275,21 @@ export const describeLeftover = (input: {
  */
 export const scanLeftovers = async (input: {
   rootPath: string
+  /**
+   * Which rips are running, so a live one is LISTED AND LOCKED.
+   *
+   * ⚠️ **A live rip stays in the list on purpose.** Hiding it was
+   * the alternative and it is worse: the dashboard shows nine
+   * bays ripping while the panel shows nothing on disk, and the
+   * two views of the same rip then disagree. An operator who
+   * cannot see the folder cannot tell "no leftover" from "the
+   * panel is not listing one", and the next time a rip really
+   * does strand output he has no reason to trust the empty
+   * panel. So it is shown, with both controls disabled and a
+   * sentence saying which job owns it
+   * ([decision](../../../../docs/decisions/2026-08-27-a-leftover-control-refuses-a-live-rip.md)).
+   */
+  liveRips: LiveRips
 }): Promise<Leftover[]> => {
   const entries = await readdir(input.rootPath, {
     withFileTypes: true,
@@ -261,6 +325,16 @@ export const scanLeftovers = async (input: {
         ? classified.occupiedName
         : null
 
+    // The SAME function the two write verbs refuse on, so the
+    // row's locked state and the API's answer can never differ.
+    // A disabled button that the endpoint would have allowed —
+    // or worse, an armed one it refuses — is the drift this
+    // sharing exists to make impossible.
+    const lockReason = refusalForLiveRip({
+      classified,
+      liveRips: input.liveRips,
+    })
+
     found.push({
       path,
       name: entry.name,
@@ -269,11 +343,14 @@ export const scanLeftovers = async (input: {
       sizeBytes,
       discStructure,
       modifiedAtMs,
+      isLocked: lockReason !== null,
+      lockReason,
       ...describeLeftover({
         kind: classified.kind,
         occupiedName,
         sizeBytes,
         discStructure,
+        lockReason,
       }),
     })
   }
@@ -286,12 +363,67 @@ export const scanLeftovers = async (input: {
 }
 
 /**
+ * Why NEITHER verb may touch this leftover, or null.
+ *
+ * ⚠️ **The fifth rule, and the only one that asks the watcher
+ * rather than the filesystem.** The other four decide what a PATH
+ * is; this one decides what is HAPPENING to it, and nothing on
+ * disk can answer that. A `.rip-deck-incomplete-<uuid>` that is
+ * being written to right now is byte-for-byte the same shape as
+ * one abandoned last week.
+ *
+ * Two rules, in the order `reaper.ts` puts them:
+ *
+ *  1. **Unknown refuses.** `isKnown: false` means the live set
+ *    could not be read, and "no job claims this uuid" and "we do
+ *    not know which jobs exist" must never be read as the same
+ *    thing. Reaper guard 2, said again here.
+ *  2. **A live job's uuid refuses.** Reaper guard 3.
+ *
+ * ## Why a duplicate landing is exempt
+ *
+ * `(rip-deck-duplicate-…)` is applied by `finaliseDestination`
+ * and `publishAlbum` when the rip is OVER — the marker exists
+ * because the finished output could not take the name it wanted,
+ * and it is written by the same rename that ends the rip. So a
+ * folder wearing that marker is never being written to, and
+ * locking one would take away the control the operator has to use
+ * to resolve the collision. Only the incomplete prefix names a
+ * job that can still be live.
+ *
+ * Pure, so nine concurrent rips are a unit test rather than
+ * something we find out about on the pool.
+ */
+export const refusalForLiveRip = (input: {
+  classified: LeftoverKind
+  liveRips: LiveRips
+}): string | null => {
+  if (input.classified.kind !== "incomplete") return null
+
+  if (!input.liveRips.isKnown) {
+    return (
+      "Rip Deck cannot tell which rips are running right " +
+      `now (${input.liveRips.reason}), so it will not touch ` +
+      "an unfinished rip folder"
+    )
+  }
+
+  return input.liveRips.jobUuids.has(
+    input.classified.jobUuid,
+  )
+    ? `a rip is writing into this folder right now — job ` +
+        `${input.classified.jobUuid} is live. Wait for it to ` +
+        `land, or cancel it from its bay`
+    : null
+}
+
+/**
  * Why a delete was refused, or null when it is allowed.
  *
  * ⚠️ **The validation is the whole point of this function.** The
  * endpoint takes a path from an HTTP body and this is the only
  * thing standing between that and `rm -rf` on a dataset holding
- * 700 finished rips. Three rules, all of which must hold:
+ * 700 finished rips. Five rules, all of which must hold:
  *
  *  1. The resolved path is a DIRECT child of the destination
  *    root. `resolve` first, so `../` cannot climb out and a
@@ -300,12 +432,21 @@ export const scanLeftovers = async (input: {
  *    is not deletable through this endpoint at all — the button
  *    exists to clear leftovers, not to manage the library.
  *  3. It is not the destination root itself.
+ *  4. No live rip claims it. See `refusalForLiveRip`.
  *
- * Pure, so all three can be tested without a filesystem.
+ * Pure, so all of them can be tested without a filesystem.
  */
 export const refusalToDeleteLeftover = (input: {
   rootPath: string
   path: string
+  /**
+   * Which rips are running. REQUIRED, with no default.
+   *
+   * A default of "nothing is running" is the one value that
+   * turns a forgotten argument into a deleted rip, so the
+   * argument is visible at every call site instead.
+   */
+  liveRips: LiveRips
 }): string | null =>
   refusalToTouchLeftover({
     ...input,
@@ -317,7 +458,7 @@ export const refusalToDeleteLeftover = (input: {
   })
 
 /**
- * The four rules, shared by the two verbs that act on a leftover.
+ * The five rules, shared by the two verbs that act on a leftover.
  *
  * Extracted when rename arrived, and NOT copied: a second spelling
  * of "is this path safe to act on" is a second thing to keep in
@@ -325,10 +466,17 @@ export const refusalToDeleteLeftover = (input: {
  * closing sentences differ because they are what the operator
  * reads, and "not deletable from here" is the wrong sentence to
  * show somebody who pressed Rename.
+ *
+ * ⚠️ **A third verb gets these by construction, and must.** The
+ * live-rip rule arrived because rename had been added WITHOUT it
+ * — renaming a directory out from under a running `makemkvcon` is
+ * the same class of loss as deleting it, and the four rules that
+ * were shared did not include the one that mattered.
  */
 const refusalToTouchLeftover = (input: {
   rootPath: string
   path: string
+  liveRips: LiveRips
   /**
    * How the direct-child sentence ends — the clause after the
    * em dash, verb included.
@@ -357,16 +505,24 @@ const refusalToTouchLeftover = (input: {
     )
   }
 
-  if (classifyLeftover(name) === null) {
+  const classified = classifyLeftover(name)
+
+  if (classified === null) {
     return `"${name}" is not a Rip Deck leftover. ${input.scope}`
   }
 
-  return null
+  // Last, because it is the only rule that needs the name to
+  // have been claimed first — it reads the uuid out of it.
+  return refusalForLiveRip({
+    classified,
+    liveRips: input.liveRips,
+  })
 }
 
 export const deleteLeftover = async (input: {
   rootPath: string
   path: string
+  liveRips: LiveRips
 }): Promise<{ isDeleted: boolean; message: string }> => {
   const refusal = refusalToDeleteLeftover(input)
 
@@ -417,7 +573,14 @@ export const deleteLeftover = async (input: {
  * here, so it is testable without a filesystem, exactly like the
  * delete refusal beside it.
  *
- * The source rules are `refusalToDeleteLeftover`'s four, shared
+ * ⚠️ **Renaming a live rip's folder is the same loss as deleting
+ * it.** `makemkvcon` holds an open handle on a path it was given
+ * before it started; moving that directory out from under it
+ * strands every byte it has written and every byte it is about
+ * to. The live-rip rule is therefore shared with delete rather
+ * than being a delete-only guard — see `refusalForLiveRip`.
+ *
+ * The source rules are `refusalToDeleteLeftover`'s five, shared
  * rather than restated. On top of them the new name must be ONE
  * PATH SEGMENT:
  *
@@ -444,8 +607,11 @@ export const refusalToRenameLeftover = (input: {
   rootPath: string
   path: string
   newName: string
+  /** Which rips are running. Required, as delete's is. */
+  liveRips: LiveRips
 }): string | null => {
   const sourceRefusal = refusalToTouchLeftover({
+    liveRips: input.liveRips,
     path: input.path,
     permitted:
       "only a folder in the destination root may be renamed",
@@ -558,6 +724,7 @@ export const renameLeftover = async (input: {
   rootPath: string
   path: string
   newName: string
+  liveRips: LiveRips
 }): Promise<{
   isRenamed: boolean
   message: string
@@ -736,6 +903,19 @@ const measureTree = async (
 
   return total
 }
+
+/**
+ * A refusal clause, promoted to a sentence.
+ *
+ * `refusalForLiveRip` writes a lower-case clause because its
+ * first reader is `Refused to delete: <clause>.`, and the panel's
+ * second reader wants the same words standing alone. Sharing the
+ * string rather than writing it twice is the point — two
+ * spellings of "a rip is running in here" is two things to keep
+ * in step.
+ */
+const capitalise = (sentence: string): string =>
+  sentence.charAt(0).toUpperCase() + sentence.slice(1)
 
 const formatBytes = (bytes: number): string => {
   const gb = bytes / 1_000_000_000

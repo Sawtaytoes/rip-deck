@@ -18,6 +18,7 @@ import {
   createGovernor,
   resolveRipConcurrency,
 } from "./rip/governor.ts"
+import { createLiveRipsReader } from "./rip/liveRips.ts"
 import { backfillRipHistory } from "./rip/ripHistoryBackfill.ts"
 import {
   type BayOutcome,
@@ -334,6 +335,21 @@ export const runWatch = async (
     // folder that lists leftovers can never be a different
     // folder from the one rips land in.
     destinationRoot: config.destinationRoot,
+    // ⚠️ The guard that stops the leftovers panel deleting a rip
+    // that is still running. `.rip-deck-incomplete-<uuid>` is
+    // where a LIVE rip writes, so the panel needs the one fact
+    // the destination root cannot show it: which uuids are being
+    // written to right now. Read per request, like
+    // `readTrayRunner` and for the same reason — the API is up
+    // before the watcher is, and "no watcher yet" has to answer
+    // UNKNOWN rather than "nothing is running". See
+    // `rip/liveRips.ts`.
+    readLiveRips: createLiveRipsReader({
+      readBays: () =>
+        runningWatcher === null
+          ? null
+          : runningWatcher.getBays(),
+    }),
   })
 
   const api = await startApiServer({

@@ -1875,6 +1875,21 @@ export const mockDataSource: RipDeckDataSource = {
       )
     }
 
+    // Modelled rather than assumed away, exactly like the
+    // rename refusal below: the panel disables this button on a
+    // locked row, and a mock that would have deleted one anyway
+    // is a mock that cannot prove the disabling matters.
+    if (target.is_locked) {
+      return delay(
+        {
+          ok: false,
+          msg: `Refused to delete: ${target.lock_reason ?? "a rip is live"}.`,
+          leftovers: [...mockLeftovers],
+        },
+        150,
+      )
+    }
+
     mockLeftovers = mockLeftovers.filter(
       (one) => one.path !== path,
     )
@@ -1948,6 +1963,21 @@ export const mockDataSource: RipDeckDataSource = {
       )
     }
 
+    // Same rule as delete, and shared with it for the same
+    // reason the daemon shares it: renaming a directory out from
+    // under a running `makemkvcon` loses the rip exactly as
+    // deleting it does.
+    if (target.is_locked) {
+      return delay(
+        {
+          ok: false,
+          msg: `Refused to rename: ${target.lock_reason ?? "a rip is live"}.`,
+          leftovers: [...mockLeftovers],
+        },
+        150,
+      )
+    }
+
     const name = newName.trim()
 
     if (
@@ -2000,17 +2030,45 @@ const MOCK_LIBRARY_NAMES = [
 ]
 
 /**
- * The fixture leftovers, and both are real shapes:
+ * The fixture leftovers, and every one is a real shape:
  *
+ *  - a rip that is RUNNING RIGHT NOW, which lives in exactly the
+ *    same `.rip-deck-incomplete-<uuid>` folder an abandoned one
+ *    does and must be locked rather than offered,
  *  - an EMPTY incomplete folder, which is the MSG:5068 signature
  *    that stranded four DVDs on 2026-08-26, and
  *  - a duplicate landing, which is a FINISHED rip and must never
  *    be offered as safe.
  *
+ * The live row is first because it is the one the panel used to
+ * get wrong: the daemon listed it as a deletable leftover with
+ * its bytes still arriving. A fixture that cannot show that state
+ * cannot show the fix either
+ * ([decision](../../../../docs/decisions/2026-08-27-a-leftover-control-refuses-a-live-rip.md)).
+ *
  * `let` rather than `const` because the mock's Delete really
  * removes one; a panel whose list never changes proves nothing.
  */
 let mockLeftovers: Leftover[] = [
+  {
+    path: "/media/Disc-Rips/.rip-deck-incomplete-4d37d72e-7f72-4cee-a82b-7af82c10bfd3",
+    name: ".rip-deck-incomplete-4d37d72e-7f72-4cee-a82b-7af82c10bfd3",
+    kind: "incomplete",
+    occupied_name: null,
+    size_bytes: 31_900_000_000,
+    disc_structure: "BDMV",
+    modified_at_ms: 1_787_800_000_000,
+    detail:
+      "A rip is writing into this folder right now — job " +
+      "4d37d72e-7f72-4cee-a82b-7af82c10bfd3 is live. Wait for " +
+      "it to land, or cancel it from its bay.",
+    is_safe_to_delete: false,
+    is_locked: true,
+    lock_reason:
+      "a rip is writing into this folder right now — job " +
+      "4d37d72e-7f72-4cee-a82b-7af82c10bfd3 is live. Wait for " +
+      "it to land, or cancel it from its bay",
+  },
   {
     path: "/media/Disc-Rips/.rip-deck-incomplete-71f30886-ede6-4b11-9c60-995210bb0588",
     name: ".rip-deck-incomplete-71f30886-ede6-4b11-9c60-995210bb0588",
@@ -2023,6 +2081,8 @@ let mockLeftovers: Leftover[] = [
       "An EMPTY rip folder. The rip was cancelled or refused " +
       "before it wrote anything, so there is nothing here to lose.",
     is_safe_to_delete: true,
+    is_locked: false,
+    lock_reason: null,
   },
   {
     path: "/media/Disc-Rips/[BACKUP] Ivanhoe (1952) - Blu-ray (rip-deck-duplicate-01234567)",
@@ -2039,6 +2099,8 @@ let mockLeftovers: Leftover[] = [
       "whichever one you do not want — this is a real rip, not " +
       "a leftover.",
     is_safe_to_delete: false,
+    is_locked: false,
+    lock_reason: null,
   },
   {
     // ⚠️ A DVD duplicate, which is one ISO FILE and therefore
@@ -2061,6 +2123,8 @@ let mockLeftovers: Leftover[] = [
       "kept. Delete whichever one you do not want — this is a " +
       "real rip, not a leftover.",
     is_safe_to_delete: false,
+    is_locked: false,
+    lock_reason: null,
   },
 ]
 

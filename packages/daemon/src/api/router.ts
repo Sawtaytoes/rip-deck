@@ -1,5 +1,9 @@
 import type { TopicConfig } from "../mqtt/topics.ts"
 import {
+  type LiveRipsReader,
+  unknownLiveRips,
+} from "../rip/liveRips.ts"
+import {
   createFixtureSnapshot,
   FIXTURE_NAMES,
   isFixtureName,
@@ -514,6 +518,20 @@ export type ApiRouter = {
   ) => ApiResponse | Promise<ApiResponse>
 }
 
+/**
+ * What a router that was told nothing answers.
+ *
+ * A function rather than a value so the reason travels with it:
+ * "unknown" is a state `refusalForLiveRip` fails closed on, and a
+ * fixture server or a test router genuinely does not know.
+ */
+const defaultLiveRipsReader: LiveRipsReader = () =>
+  Promise.resolve(
+    unknownLiveRips(
+      "this API process was not told how to see running rips",
+    ),
+  )
+
 export const createApiRouter = ({
   readSnapshot,
   readNowMs = () => Date.now(),
@@ -533,6 +551,12 @@ export const createApiRouter = ({
   readLogCapture = null,
   readLogExists = null,
   destinationRoot = null,
+  // ⚠️ Defaulting to UNKNOWN, never to "nothing is running". A
+  // router built without this one cannot tell a live rip from an
+  // abandoned folder, and the honest answer to that is to refuse
+  // to touch an unfinished rip rather than to assume the rack is
+  // idle. See `liveRips.ts`.
+  readLiveRips = defaultLiveRipsReader,
   historyStateDir = null,
 }: {
   readSnapshot: () => TowerSnapshot
@@ -572,6 +596,17 @@ export const createApiRouter = ({
    * directory nobody named.
    */
   destinationRoot?: string | null
+  /**
+   * Which rips are running right now — see `rip/liveRips.ts`.
+   *
+   * The one fact `/api/leftovers` needs that no amount of
+   * looking at the destination root can supply: a rip in
+   * progress and a rip that died leave the SAME folder, and only
+   * this says which is which. Threaded from `main.ts` the way
+   * `destinationRoot` is, so the folder being listed and the
+   * jobs being checked always come from one watcher.
+   */
+  readLiveRips?: LiveRipsReader
   /**
    * Where `history.jsonl` and the per-job files live.
    *
@@ -691,6 +726,7 @@ export const createApiRouter = ({
       if (method === "GET" || method === "HEAD") {
         return handleLeftoversList({
           destinationRoot,
+          readLiveRips,
         }).then(jsonResponse)
       }
 
@@ -711,6 +747,7 @@ export const createApiRouter = ({
             handleLeftoversWrite({
               body,
               destinationRoot,
+              readLiveRips,
             }),
           )
           .then(jsonResponse)

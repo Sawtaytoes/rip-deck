@@ -90,6 +90,24 @@ import type { Leftover } from "../types"
  * asked — it is a real choice, and the collision is exactly the
  * moment a human has to make it — but nothing here should imply
  * it is housekeeping.
+ *
+ * ## ⚠️ Why a rip that is RUNNING shows up here, greyed out
+ *
+ * A rip in progress writes into a `.rip-deck-incomplete-<uuid>`
+ * folder, which is the same shape as one a dead rip left behind.
+ * The daemon now refuses both verbs on one — but a refusal the
+ * operator only meets by pressing Delete is worse than a disabled
+ * button, because by then he has already decided to delete it. So
+ * `is_locked` disables Rename and Delete, and `lock_reason` says
+ * which job owns the folder.
+ *
+ * It is not HIDDEN, and that was the choice. A hidden row makes
+ * this panel disagree with the bay grid about what is on disk,
+ * and an operator who cannot see the folder cannot tell "there is
+ * no leftover" from "the panel is not showing one" — which is the
+ * trust the panel needs the next time a rip really does strand
+ * output
+ * ([decision](../../../../docs/decisions/2026-08-27-a-leftover-control-refuses-a-live-rip.md)).
  */
 export function LeftoverRips() {
   const {
@@ -204,15 +222,9 @@ function LeftoverRow({
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <span
-              className={
-                leftover.kind === "duplicate"
-                  ? "bg-intent-warning-subtle text-intent-warning rounded px-2 py-0.5 text-xs font-semibold uppercase"
-                  : "bg-surface-raised text-content-muted rounded px-2 py-0.5 text-xs font-semibold uppercase"
-              }
+              className={CHIP_CLASS[chipToneOf(leftover)]}
             >
-              {leftover.kind === "duplicate"
-                ? "Finished — duplicate"
-                : "Unfinished"}
+              {chipWordOf(leftover)}
             </span>
             <span className="text-content-muted text-xs">
               {formatSize(leftover.size_bytes)}
@@ -228,6 +240,18 @@ function LeftoverRow({
           <p className="text-content-muted text-sm">
             {leftover.detail}
           </p>
+
+          {/* The daemon's own refusal, said where the buttons
+              are — a disabled control with no reason beside it
+              reads as a broken page. `detail` already carries
+              the same sentence, so this is the SHORT half: what
+              the operator does next. */}
+          {leftover.is_locked ? (
+            <p className="text-intent-accent-content text-sm font-semibold">
+              Rip Deck will not delete or rename this folder
+              while the rip is running.
+            </p>
+          ) : null}
         </div>
 
         {/* `shrink-0`: the two buttons keep their width while the
@@ -236,7 +260,13 @@ function LeftoverRow({
           <Button
             appearance="outline"
             intent="neutral"
-            isDisabled={isPending || isRenaming}
+            // ⚠️ `is_locked` disables BOTH verbs, not just
+            // Delete. Renaming a folder a `makemkvcon` is
+            // writing into strands every byte of the rip, so it
+            // is the same loss under a friendlier name.
+            isDisabled={
+              isPending || isRenaming || leftover.is_locked
+            }
             onClick={onStartRename}
             size="sm"
           >
@@ -252,8 +282,12 @@ function LeftoverRow({
             }
             // Disabled while the form is open: deleting the
             // folder you are in the middle of renaming is not a
-            // press anybody means to make.
-            isDisabled={isPending || isRenaming}
+            // press anybody means to make. And disabled while a
+            // rip is writing into it, which is not a press
+            // anybody means to make either.
+            isDisabled={
+              isPending || isRenaming || leftover.is_locked
+            }
             onClick={onClear}
             size="sm"
           >
@@ -402,6 +436,62 @@ const headingFor = (input: {
 
   return input.isRefused ? "Not cleared" : "Cleared"
 }
+
+/**
+ * Which of the three words the chip carries.
+ *
+ * "Ripping now" wins over the kind, because the kind is a fact
+ * about the FOLDER and this is a fact about what is happening to
+ * it — and only one of those decides whether the operator may
+ * touch it. Every locked row is an incomplete one (a duplicate
+ * landing is written by the rename that ENDS a rip, so no live
+ * job can claim one), which is why this is a two-branch answer
+ * and not a matrix.
+ */
+const chipToneOf = (
+  leftover: Leftover,
+): keyof typeof CHIP_CLASS => {
+  if (leftover.is_locked) return "live"
+
+  return leftover.kind === "duplicate"
+    ? "duplicate"
+    : "unfinished"
+}
+
+const chipWordOf = (leftover: Leftover): string => {
+  if (leftover.is_locked) return "Ripping now"
+
+  return leftover.kind === "duplicate"
+    ? "Finished — duplicate"
+    : "Unfinished"
+}
+
+/**
+ * The chip's look, one entry per tone.
+ *
+ * `accent` for the live one rather than `warning`: a rip that is
+ * running is the tower working correctly, and the warning colour
+ * on this panel already means "a finished rip is sitting here,
+ * decide about it". Two meanings for one colour on one list is
+ * how a colour stops meaning anything.
+ *
+ * ⚠️ **`…-surface` / `…-content`, not `…-subtle`.** The duplicate
+ * chip was written as `bg-intent-warning-subtle
+ * text-intent-warning`, and Charcuterie publishes neither name —
+ * the token set is `border` / `content` / `on-solid` / `solid` /
+ * `surface`. Tailwind v4 emits nothing for a class it cannot
+ * resolve and reports nothing either, so the chip has been
+ * painting no background and inheriting its colour since it
+ * shipped. Fixed here rather than left, because copying it into
+ * a second tone would have made a typo into a convention.
+ */
+const CHIP_CLASS = {
+  duplicate:
+    "bg-intent-warning-surface text-intent-warning-content rounded px-2 py-0.5 text-xs font-semibold uppercase",
+  live: "bg-intent-accent-surface text-intent-accent-content rounded px-2 py-0.5 text-xs font-semibold uppercase",
+  unfinished:
+    "bg-surface-raised text-content-muted rounded px-2 py-0.5 text-xs font-semibold uppercase",
+} as const
 
 /**
  * Bytes for a person.
