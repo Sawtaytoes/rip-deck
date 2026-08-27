@@ -1,7 +1,6 @@
 import {
   chown,
   lchown,
-  mkdir,
   readdir,
   rename,
   rm,
@@ -184,7 +183,45 @@ export type PreparedDestination = {
   jobUuid: string
 }
 
-export const prepareDestination = async (input: {
+/**
+ * Name the incomplete directory. **Do NOT create it.**
+ *
+ * ⚠️ `makemkvcon backup` REFUSES a destination that already
+ * exists, even an empty one it would have been happy to create
+ * itself:
+ *
+ *     MSG:5072 "Backing up disc into folder file:///…/.rip-deck-incomplete-…"
+ *     MSG:5068 "Folder /…/.rip-deck-incomplete-… already contains
+ *               a backup, please choose another folder"
+ *     MSG:5069 "Backup failed"
+ *
+ * and then exits **0** having written nothing, so the only
+ * symptom upstream is an `empty_output` summary that names no
+ * cause. Four TMNT DVDs failed exactly that way on 2026-08-26.
+ *
+ * Proven by A/B on the live tower that day, same disc, same
+ * drive, one isolated container each — the only difference being
+ * whether the directory was there first:
+ *
+ *   - destination pre-created (empty) -> MSG:5068, backup failed
+ *   - destination absent              -> backup runs, PRGV climbs
+ *
+ * "Already contains a backup" is a misleading message: the
+ * directory was empty. MakeMKV means "this path is taken".
+ *
+ * So the leaf is a NAME here and nothing else. `makemkvcon`
+ * creates it, and `finaliseDestination` renames it afterwards.
+ * The root is not created either — `checkFreeSpace` has already
+ * `statfs`'d it, so a missing destination root has failed the
+ * job long before this point.
+ *
+ * ⚠️ This is the makemkv/`backup` path ONLY. cyanrip is the
+ * opposite: it is spawned with the incomplete directory as its
+ * `cwd`, so that one MUST exist before the spawn, and
+ * `ripAudioCd` in `watcher.ts` creates its own. Do not
+ * "consolidate" the two — they disagree on purpose.
+ */
+export const prepareDestination = (input: {
   rootPath: string
   folderName: string
   jobUuid: string
@@ -194,11 +231,9 @@ export const prepareDestination = async (input: {
    * the one Stage 6 should aim for.
    */
   innerRootPath?: string
-}): Promise<PreparedDestination> => {
+}): PreparedDestination => {
   const dirName = incompleteDirName(input.jobUuid)
   const incompletePath = join(input.rootPath, dirName)
-
-  await mkdir(incompletePath, { recursive: true })
 
   return {
     incompletePath,
@@ -447,7 +482,17 @@ export const discardDestination = async (
   })
 }
 
-const pathExists = async (
+/**
+ * Does this path exist?
+ *
+ * Exported because a FAILED rip now has to ask it about its own
+ * incomplete directory. `makemkvcon` creates that directory
+ * itself (see `prepareDestination`), so a rip that died before
+ * the backup started leaves nothing behind — and reporting
+ * "Partial output KEPT at …" for a path that is not there sends
+ * a reader to look for a directory that never existed.
+ */
+export const pathExists = async (
   path: string,
 ): Promise<boolean> => {
   try {
