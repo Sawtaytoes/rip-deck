@@ -14,6 +14,7 @@ import {
   DEFAULT_OUTPUT_GID,
   DEFAULT_OUTPUT_UID,
   finaliseDestination,
+  ISO_SUFFIX,
   incompleteDirName,
   pathExists,
   prepareDestination,
@@ -470,5 +471,129 @@ describe("finalising a rip", () => {
     expect(finalised.path).toBe(
       join(tmpRoot, "Taken (rip-deck-duplicate-collide-)"),
     )
+  })
+})
+
+/**
+ * ⚠️ A DVD backup lands as a single ISO FILE, not a directory —
+ * see `verifyBackup.ts` for the measurement. Everything below is
+ * about the file shape, which nothing here handled until
+ * 2026-08-26.
+ */
+describe("finalising a DVD, which is one ISO file", () => {
+  const tmpRoot = join(
+    tmpdir(),
+    `rip-deck-iso-finalise-${process.pid}`,
+  )
+
+  afterAll(async () => {
+    await rm(tmpRoot, { recursive: true, force: true })
+  })
+
+  const prepareImage = async (input: {
+    jobUuid: string
+    folderName: string
+  }) => {
+    const prepared = prepareDestination({
+      rootPath: tmpRoot,
+      folderName: input.folderName,
+      jobUuid: input.jobUuid,
+    })
+
+    await mkdir(tmpRoot, { recursive: true })
+    // Standing in for `makemkvcon backup` on a DVD: it writes a
+    // FILE at exactly this path, with no extension.
+    await writeFile(prepared.incompletePath, "iso", "utf8")
+
+    return prepared
+  }
+
+  it("publishes it with an .iso extension", async () => {
+    // Without this the library gains an 8 GB file named
+    // `[BACKUP] Some Film (1987) - DVD`, which Windows offers to
+    // open with a text editor.
+    const prepared = await prepareImage({
+      jobUuid: "iso-1",
+      folderName: "[BACKUP] Some Film (1987) - DVD",
+    })
+
+    const finalised = await finaliseDestination(
+      prepared,
+      null,
+    )
+
+    expect(finalised.path).toBe(
+      join(
+        tmpRoot,
+        `[BACKUP] Some Film (1987) - DVD${ISO_SUFFIX}`,
+      ),
+    )
+    expect(await pathExists(finalised.path)).toBe(true)
+  })
+
+  it("⚠️ puts a collision marker BEFORE the extension", async () => {
+    // `… .iso (rip-deck-duplicate-01234567)` is not an ISO to
+    // anything that reads extensions, and staying openable is
+    // the one property the second copy has to keep.
+    const prepared = await prepareImage({
+      jobUuid: "iso-2abcdefg",
+      folderName: "[BACKUP] Some Film (1987) - DVD",
+    })
+
+    const finalised = await finaliseDestination(
+      prepared,
+      null,
+    )
+
+    expect(finalised.hasCollision).toBe(true)
+    expect(finalised.path).toBe(
+      join(
+        tmpRoot,
+        "[BACKUP] Some Film (1987) - DVD " +
+          `(rip-deck-duplicate-iso-2abc)${ISO_SUFFIX}`,
+      ),
+    )
+  })
+
+  it("leaves a Blu-ray directory's name alone", async () => {
+    // The suffix comes from what is ON DISK, so the directory
+    // shape must be untouched by it.
+    const prepared = prepareDestination({
+      rootPath: tmpRoot,
+      folderName: "[BACKUP] Some Disc (2001) - Blu-ray",
+      jobUuid: "dir-1",
+    })
+
+    await mkdir(join(prepared.incompletePath, "BDMV"), {
+      recursive: true,
+    })
+
+    const finalised = await finaliseDestination(
+      prepared,
+      null,
+    )
+
+    expect(finalised.path).toBe(
+      join(tmpRoot, "[BACKUP] Some Disc (2001) - Blu-ray"),
+    )
+  })
+
+  it("⚠️ chowns an image without throwing ENOTDIR", async () => {
+    // `applyOutputOwnership` used to `readdir` its own argument.
+    // On a file that throws, and the throw reached
+    // `failureOfChown` — so every DVD would have reported
+    // landing with the wrong owner while the chown had in fact
+    // succeeded.
+    const prepared = await prepareImage({
+      jobUuid: "iso-own",
+      folderName: "[BACKUP] Owned Film (1990) - DVD",
+    })
+
+    const finalised = await finaliseDestination(prepared, {
+      uid: process.getuid?.() ?? 0,
+      gid: process.getgid?.() ?? 0,
+    })
+
+    expect(finalised.ownershipError).toBeNull()
   })
 })
