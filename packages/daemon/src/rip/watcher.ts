@@ -76,7 +76,10 @@ import {
   createNullEventLog,
 } from "./eventLog.ts"
 import type { Governor } from "./governor.ts"
-import { identifyDisc } from "./identifyDisc.ts"
+import {
+  chooseDiscNameSource,
+  identifyDisc,
+} from "./identifyDisc.ts"
 import {
   type LoadedDiscSummary,
   phantomLoadedBays,
@@ -1232,6 +1235,7 @@ export const runBayRip = async (
         input,
         discType: typed.discType,
         capacityBytes: typed.capacityBytes,
+        volumeLabel: typed.volumeLabel,
       })
 }
 
@@ -1246,6 +1250,11 @@ const ripWithMakemkv = async (context: {
   input: BayRipInput
   discType: DiscType
   capacityBytes: number
+  /**
+   * The disc's volume label as udev already recorded it, or null
+   * when udev had none. See `readVolumeLabel`.
+   */
+  volumeLabel: string | null
 }): Promise<BayOutcome> => {
   const { input } = context
   const { config } = input
@@ -1259,14 +1268,42 @@ const ripWithMakemkv = async (context: {
   // out — same order, same refusals. Skipping the read is not just
   // a saving: on a disc identify could not name, running it again
   // would return the same nothing and hold the bay a second time.
+  //
+  // …and unless udev ALREADY read the label off this disc, which
+  // is the common case and costs nothing. `detectDiscType` read
+  // the record a moment ago to route the disc; the name was in
+  // the same file. Going to `makemkvcon` for a string we are
+  // already holding is what made every DVD in the rack ask the
+  // owner to type a title on 2026-08-26: `info` ignores
+  // `--noscan`, walked the bus, and outran its 120 s timeout
+  // because four drives on that bus were wedged.
+  //
+  // Order is deliberate — operator, then disc, then makemkvcon:
+  // the operator is looking at the sleeve, udev is quoting the
+  // disc itself, and `makemkvcon` is the one that can hang.
+  const nameSource = chooseDiscNameSource({
+    explicitName: input.explicitName ?? null,
+    volumeLabel: context.volumeLabel,
+  })
+
+  if (nameSource.kind === "volume_label") {
+    // Said out loud. "Where did that folder name come from" is
+    // the first question a wrong one raises, and the answer is
+    // different for each of the three sources.
+    input.note(
+      `named "${nameSource.discName}" from the disc's own ` +
+        "volume label — no drive read needed",
+    )
+  }
+
   const identified =
-    input.explicitName == null
+    nameSource.kind === "identify"
       ? await identifyDisc({
           devPath: input.devPath,
           makemkv: config.makemkv,
         })
       : {
-          discName: input.explicitName,
+          discName: nameSource.discName,
           spawnFailure: null,
         }
 

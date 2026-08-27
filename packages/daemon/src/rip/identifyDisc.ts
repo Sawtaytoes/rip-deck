@@ -77,6 +77,75 @@ import type { MakemkvCommand } from "./ripCommand.ts"
  * comment on the timeout itself.
  */
 
+/**
+ * Where a disc's name comes from, and in what order.
+ *
+ * Three sources, and the order is an argument rather than a
+ * preference:
+ *
+ *  1. **The operator.** He is looking at the sleeve. Nothing a
+ *     drive can report beats that, and `--name` exists precisely
+ *     to override a disc whose label is wrong or absent.
+ *  2. **The disc's own volume label**, as udev recorded it at
+ *     insert. Free — no device I/O, no spawn, no timeout — and it
+ *     is the same string `makemkvcon info` would go and fetch.
+ *     See `readVolumeLabel` in `discType.ts`.
+ *  3. **`makemkvcon info`.** The fallback, and the only one that
+ *     can hang: `info` ignores `--noscan` and walks the whole USB
+ *     bus, so one wedged drive delays every healthy bay's
+ *     identify. Worth keeping for the discs udev could not read,
+ *     worth avoiding for the ones it could.
+ *
+ * ⚠️ Until 2026-08-26 there was no step 2, and step 3 ran on
+ * every disc. With eight DVDs loaded and four drives wedged, all
+ * eight identifies outran their 120 s timeout and every disc in
+ * the rack came back nameless — asking the owner to type a title
+ * for discs whose labels were sitting in `/run/udev/data` the
+ * whole time.
+ *
+ * Pure, and separate from the I/O, because the precedence is the
+ * part worth pinning down: `identifyDisc` itself cannot be
+ * reached from a test (it sits behind `waitForSettledMedia` and
+ * `detectDiscType`, both of which read `/sys/block/srN`).
+ */
+export type DiscNameSource =
+  | { kind: "operator"; discName: string }
+  | { kind: "volume_label"; discName: string }
+  /** Nothing free was available. Go and read the disc. */
+  | { kind: "identify" }
+
+export const chooseDiscNameSource = (input: {
+  /** What the operator typed, or null. */
+  explicitName: string | null
+  /** What udev read off the disc, or null. */
+  volumeLabel: string | null
+}): DiscNameSource => {
+  // `!= null` on purpose, not a truthiness test: an empty string
+  // is a name the operator did not give, and treating "" as a
+  // title would create a folder called `" (2026) - DVD"`.
+  if (
+    input.explicitName != null &&
+    input.explicitName.trim() !== ""
+  ) {
+    return {
+      kind: "operator",
+      discName: input.explicitName,
+    }
+  }
+
+  if (
+    input.volumeLabel != null &&
+    input.volumeLabel.trim() !== ""
+  ) {
+    return {
+      kind: "volume_label",
+      discName: input.volumeLabel,
+    }
+  }
+
+  return { kind: "identify" }
+}
+
 /** CINFO attribute id 2 is the disc name. */
 const CINFO_DISC_NAME = 2
 

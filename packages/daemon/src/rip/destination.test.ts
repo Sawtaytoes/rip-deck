@@ -15,6 +15,7 @@ import {
   DEFAULT_OUTPUT_UID,
   finaliseDestination,
   incompleteDirName,
+  pathExists,
   prepareDestination,
   SPACE_HEADROOM_FRACTION,
   sanitiseFolderName,
@@ -189,13 +190,13 @@ describe("addressing the output from two filesystem views", () => {
     await rm(tmpRoot, { recursive: true, force: true })
   })
 
-  it("uses one path for us and another for makemkvcon", async () => {
+  it("uses one path for us and another for makemkvcon", () => {
     // Measured on Tower: the destination dataset is
     // /media/Disc-Rips to us and /home/arm/media
     // inside the arm container. Handing our path to a
     // container-side makemkvcon addresses a directory that does
     // not exist there, so the rip fails before it starts.
-    const prepared = await prepareDestination({
+    const prepared = prepareDestination({
       rootPath: tmpRoot,
       folderName: "Some Film (2001) - Blu-ray",
       jobUuid: "uuid-1",
@@ -216,9 +217,9 @@ describe("addressing the output from two filesystem views", () => {
     )
   })
 
-  it("keeps both identical when views agree", async () => {
+  it("keeps both identical when views agree", () => {
     // The normal case, and what Stage 6 should aim for.
-    const prepared = await prepareDestination({
+    const prepared = prepareDestination({
       rootPath: tmpRoot,
       folderName: "X",
       jobUuid: "uuid-2",
@@ -226,6 +227,34 @@ describe("addressing the output from two filesystem views", () => {
 
     expect(prepared.incompleteInnerPath).toBe(
       prepared.incompletePath,
+    )
+  })
+
+  it("⚠️ does NOT create the incomplete directory", async () => {
+    // The regression guard for 2026-08-26. `makemkvcon backup`
+    // REFUSES a destination that already exists — even an empty
+    // one — with
+    //
+    //   MSG:5068 "Folder … already contains a backup, please
+    //             choose another folder"
+    //
+    // and then exits 0 having written nothing. Pre-creating the
+    // directory here failed four DVDs in a row, and the only
+    // symptom upstream was `empty_output` with no cause named.
+    //
+    // Proven by A/B on the live tower, same disc and drive: with
+    // the directory present, MSG:5068; with it absent, the backup
+    // runs. So the leaf is a NAME and makemkvcon owns creating
+    // it. cyanrip is the opposite case and creates its own —
+    // see `ripAudioCd`.
+    const prepared = prepareDestination({
+      rootPath: tmpRoot,
+      folderName: "Untouched (2026) - DVD",
+      jobUuid: "uuid-no-mkdir",
+    })
+
+    expect(await pathExists(prepared.incompletePath)).toBe(
+      false,
     )
   })
 })
@@ -290,10 +319,20 @@ describe("finalising a rip", () => {
     jobUuid: string
     folderName: string
   }) => {
-    const prepared = await prepareDestination({
+    const prepared = prepareDestination({
       rootPath: tmpRoot,
       folderName: input.folderName,
       jobUuid: input.jobUuid,
+    })
+
+    // Standing in for `makemkvcon backup`, which creates this
+    // directory itself — `prepareDestination` deliberately does
+    // not, because MakeMKV refuses a destination that already
+    // exists (MSG:5068). Every test below is about what happens
+    // AFTER a rip wrote something, so the write has to be faked
+    // here rather than assumed.
+    await mkdir(prepared.incompletePath, {
+      recursive: true,
     })
 
     await writeFile(
