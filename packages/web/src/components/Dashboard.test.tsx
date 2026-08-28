@@ -606,6 +606,35 @@ describe("what the page calls itself", () => {
   })
 })
 
+describe("the page navigation", () => {
+  it("uses real links for the Deck and History destinations", async () => {
+    showFixture("nine-rips")
+
+    const navigation = await screen.findByRole(
+      "navigation",
+      {
+        name: "Main",
+      },
+    )
+
+    expect(
+      within(navigation).getByRole("link", {
+        name: "Deck",
+      }),
+    ).toHaveAttribute("href", "/")
+    expect(
+      within(navigation).getByRole("link", {
+        name: "History",
+      }),
+    ).toHaveAttribute("href", "/history")
+    expect(
+      within(navigation).getByRole("link", {
+        name: "Deck",
+      }),
+    ).toHaveAttribute("aria-current", "page")
+  })
+})
+
 /**
  * §2. The bulk control at the top.
  *

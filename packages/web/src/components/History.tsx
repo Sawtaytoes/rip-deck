@@ -1,6 +1,5 @@
 import { Alert, Button, EmptyState } from "@charcuterie/ui"
 import { useState } from "react"
-import { Link } from "react-router"
 
 import { historyTitle } from "../historyFormat"
 import {
@@ -9,10 +8,10 @@ import {
 } from "../hooks/useHistory"
 import { contentMaxWidthRem } from "../hooks/useLayoutColumns"
 import type { HistoryRip } from "../types"
+import { AppHeader } from "./AppHeader"
 import { HistoryCard } from "./HistoryCard"
 import { HistoryControls } from "./HistoryControls"
 import { LogModal, type LogTarget } from "./LogModal"
-import { SchemeSwitcher } from "./SchemeSwitcher"
 
 /**
  * Every rip this tower has finished.
@@ -93,26 +92,10 @@ export function History() {
         maxWidth: `${String(contentMaxWidthRem(1))}rem`,
       }}
     >
-      <header className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0">
-          <h1 className="mb-1 text-lg font-semibold">
-            🗜️ Rip Deck · History
-          </h1>
-          <p className="text-base text-content-muted">
-            Every rip this tower has finished · newest first
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <Link
-            className="text-base underline underline-offset-2"
-            to="/"
-          >
-            Back to the tower
-          </Link>
-          <SchemeSwitcher />
-        </div>
-      </header>
+      <AppHeader
+        subtitle="Every rip this tower has finished · newest first"
+        title="🗜️ Rip Deck · History"
+      />
 
       <div className="mb-4">
         <HistoryControls
