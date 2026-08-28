@@ -1,3 +1,5 @@
+import { RouterLinkProvider } from "@charcuterie/ui"
+import { ReactRouterLink } from "@charcuterie/ui/react-router"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import {
@@ -31,18 +33,23 @@ if (rootElement) {
           browser tries to execute. That is also what makes a RELOAD on
           `/history` work rather than 404 — the SPA fallback and the route are
           the same change, as the fleet rule requires. */}
-      <BrowserRouter>
-        <AppProviders>
-          <Routes>
-            <Route element={<Dashboard />} path="/" />
-            <Route element={<History />} path="/history" />
-            <Route
-              element={<Navigate replace to="/" />}
-              path="*"
-            />
-          </Routes>
-        </AppProviders>
-      </BrowserRouter>
+      <RouterLinkProvider link={ReactRouterLink}>
+        <BrowserRouter>
+          <AppProviders>
+            <Routes>
+              <Route element={<Dashboard />} path="/" />
+              <Route
+                element={<History />}
+                path="/history"
+              />
+              <Route
+                element={<Navigate replace to="/" />}
+                path="*"
+              />
+            </Routes>
+          </AppProviders>
+        </BrowserRouter>
+      </RouterLinkProvider>
     </StrictMode>,
   )
 }

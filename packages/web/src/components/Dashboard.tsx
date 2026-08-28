@@ -11,10 +11,12 @@ import {
 } from "../hooks/useLayoutColumns"
 import { useRipDeckState } from "../hooks/useRipDeckState"
 import type { Rip } from "../types"
-import { DashboardHeader } from "./DashboardHeader"
+import { AppHeader } from "./AppHeader"
+import { ColumnPicker } from "./ColumnPicker"
 import { HostSection } from "./HostSection"
 import { LeftoverRips } from "./LeftoverRips"
 import { LogModal, type LogTarget } from "./LogModal"
+import { TrayControls } from "./TrayControls"
 
 /**
  * The whole screen: every bay of the tower, in one view.
@@ -82,13 +84,24 @@ export function Dashboard({
         maxWidth: `${String(contentMaxWidthRem(columns))}rem`,
       }}
     >
-      <DashboardHeader
+      <AppHeader
+        subtitle={
+          <>
+            Every bay of the tower · progress, verdict and
+            destination per disc
+          </>
+        }
+        title="🗜️ Rip Deck"
         updatedAt={dataUpdatedAt}
-        choice={choice}
-        autoColumns={autoColumns}
-        onChooseColumns={setChoice}
-        hasBays={(tower?.bays.length ?? 0) > 0}
-      />
+      >
+        {/* These are actions and display controls, not destinations. */}
+        {(tower?.bays.length ?? 0) > 0 && <TrayControls />}
+        <ColumnPicker
+          choice={choice}
+          autoColumns={autoColumns}
+          onChoose={setChoice}
+        />
+      </AppHeader>
 
       {tower?.is_fake && (
         <div className="mb-4 rounded-xl border border-intent-info-border bg-intent-info-surface px-3.5 py-2 text-base text-intent-info-content">

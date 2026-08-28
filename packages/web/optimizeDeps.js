@@ -39,6 +39,7 @@ export const optimizeDepsInclude = [
   "@charcuterie/logic/query",
   "@charcuterie/tokens",
   "@charcuterie/ui",
+  "@charcuterie/ui/react-router",
   "@tanstack/react-query",
   "@testing-library/jest-dom/vitest",
   "@testing-library/react",

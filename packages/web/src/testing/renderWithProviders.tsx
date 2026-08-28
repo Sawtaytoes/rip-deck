@@ -1,3 +1,5 @@
+import { RouterLinkProvider } from "@charcuterie/ui"
+import { ReactRouterLink } from "@charcuterie/ui/react-router"
 import {
   type RenderResult,
   render,
@@ -26,12 +28,14 @@ export const renderWithProviders = (
   dataSource: RipDeckDataSource,
 ): RenderResult =>
   render(
-    <MemoryRouter>
-      <AppProviders
-        queryClient={createQueryClient()}
-        dataSource={dataSource}
-      >
-        {ui}
-      </AppProviders>
-    </MemoryRouter>,
+    <RouterLinkProvider link={ReactRouterLink}>
+      <MemoryRouter>
+        <AppProviders
+          queryClient={createQueryClient()}
+          dataSource={dataSource}
+        >
+          {ui}
+        </AppProviders>
+      </MemoryRouter>
+    </RouterLinkProvider>,
   )

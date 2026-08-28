@@ -374,7 +374,7 @@ describe("History", () => {
     ).toBeInTheDocument()
   })
 
-  it("links back to the tower", async () => {
+  it("keeps the Deck destination in the shared navigation", async () => {
     renderWithProviders(
       <History />,
       createStubDataSource({
@@ -383,9 +383,16 @@ describe("History", () => {
       }),
     )
 
+    const navigation = await screen.findByRole(
+      "navigation",
+      {
+        name: "Main",
+      },
+    )
+
     expect(
-      await screen.findByRole("link", {
-        name: "Back to the tower",
+      within(navigation).getByRole("link", {
+        name: "Deck",
       }),
     ).toHaveAttribute("href", "/")
   })
