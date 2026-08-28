@@ -15,9 +15,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@charcuterie/logic": "^2.0.0",
-    "@charcuterie/tokens": "^1.5.0",
-    "@charcuterie/ui": "^3.21.0",
+    "@charcuterie/logic": "^2.3.0",
+    "@charcuterie/tokens": "^1.6.0",
+    "@charcuterie/ui": "^3.24.0",
     "@rip-deck/contracts": "workspace:*",
     "@tanstack/react-query": "^5.100.9",
     "react": "^19.2.6",
@@ -25,7 +25,7 @@
     "react-router": "^8.3.0"
   },
   "devDependencies": {
-    "@charcuterie/storybook-config": "^0.2.2",
+    "@charcuterie/storybook-config": "^0.3.0",
     "@charcuterie/vitest-config": "^1.1.0",
     "@storybook/addon-a11y": "^10.5.5",
     "@storybook/addon-docs": "^10.5.5",
