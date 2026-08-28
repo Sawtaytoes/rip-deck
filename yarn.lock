@@ -292,7 +292,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@charcuterie/logic@npm:2.3.0":
+"@charcuterie/logic@npm:2.3.0, @charcuterie/logic@npm:^2.3.0":
   version: 2.3.0
   resolution: "@charcuterie/logic@npm:2.3.0"
   peerDependencies:
@@ -322,41 +322,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@charcuterie/logic@npm:^2.0.0":
-  version: 2.0.0
-  resolution: "@charcuterie/logic@npm:2.0.0"
-  peerDependencies:
-    "@preact/signals-core": ">=1.8"
-    "@tanstack/react-query": ">=5"
-    jotai: ">=2"
-    openapi-fetch: ">=0.17"
-    openapi-react-query: ">=0.5"
-    preact: ">=10.11"
-    react: ">=18"
-  peerDependenciesMeta:
-    "@preact/signals-core":
-      optional: true
-    "@tanstack/react-query":
-      optional: true
-    jotai:
-      optional: true
-    openapi-fetch:
-      optional: true
-    openapi-react-query:
-      optional: true
-    preact:
-      optional: true
-    react:
-      optional: true
-  checksum: 10c0/dff58bccec6d90526a5189ab660c087b321bb26e92ee198e43389bfe4f755fe2c56ff063dc6d18bfd66432137ed10e1371e168d6daf6f7d78461f2cbf050f4b1
-  languageName: node
-  linkType: hard
-
-"@charcuterie/storybook-config@npm:^0.2.2":
-  version: 0.2.2
-  resolution: "@charcuterie/storybook-config@npm:0.2.2"
+"@charcuterie/storybook-config@npm:^0.3.0":
+  version: 0.3.0
+  resolution: "@charcuterie/storybook-config@npm:0.3.0"
   dependencies:
-    "@charcuterie/tokens": "npm:1.5.0"
+    "@charcuterie/tokens": "npm:1.6.0"
     remark-gfm: "npm:^4.0.1"
   peerDependencies:
     "@storybook/addon-docs": ">=10"
@@ -374,18 +344,11 @@ __metadata:
       optional: true
     vite:
       optional: true
-  checksum: 10c0/89e18233e83183ff77e3cb2f893414c01378faed01c8bafca1cfcc554698f45ed70489db1309701ebf2d84aad734308490e8a3ff80a2c9b87213a6d5c243cd6a
+  checksum: 10c0/0255b68b8d4dd4e69c211c9366f19b0742008c918959f1436dcc1b8fa41e7be0368fd4cc617c9f2ed88dd1f38310c9fb90710b4ffbde0709ea8b31fb5e3a7612
   languageName: node
   linkType: hard
 
-"@charcuterie/tokens@npm:1.5.0, @charcuterie/tokens@npm:^1.5.0":
-  version: 1.5.0
-  resolution: "@charcuterie/tokens@npm:1.5.0"
-  checksum: 10c0/1dba63b654ca2cb4c54b2412dd7c82a29274333b22ed884d21d7afca050709af0dbbceaaaadb35733829e28a6464f5e01b1baf96957ba82e5f33ead1acf1e58e
-  languageName: node
-  linkType: hard
-
-"@charcuterie/tokens@npm:1.6.0":
+"@charcuterie/tokens@npm:1.6.0, @charcuterie/tokens@npm:^1.6.0":
   version: 1.6.0
   resolution: "@charcuterie/tokens@npm:1.6.0"
   checksum: 10c0/1f2c6093beffde630a6ddd9c19fbe80c95eedaad6694bdeb77104ace0b6613704da64521cf376328b50466996ca5df64c2a6e2bd56429fda15f2af73cb2d4650
@@ -399,9 +362,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@charcuterie/ui@npm:^3.21.0":
-  version: 3.21.0
-  resolution: "@charcuterie/ui@npm:3.21.0"
+"@charcuterie/ui@npm:^3.24.0":
+  version: 3.24.0
+  resolution: "@charcuterie/ui@npm:3.24.0"
   dependencies:
     "@charcuterie/logic": "npm:2.3.0"
     "@charcuterie/tokens": "npm:1.6.0"
@@ -433,7 +396,7 @@ __metadata:
       optional: true
     react-router:
       optional: true
-  checksum: 10c0/8223473e670d3b53471448fe3620e844a5788075636841fcb812a14f9359738b132fda7e41f14cc5af1828e16ae30092d445adc47ff7617f360fbdc44a867bea
+  checksum: 10c0/517b7e85eef9fa20109eb965fdbfee07fc10774c55a63435ac45760d10cb0b8963b18eb2fdfbeb7d057242287ec96eee7e098eb04fc9cac267e81ac5d5e581d5
   languageName: node
   linkType: hard
 
@@ -1309,10 +1272,10 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@rip-deck/web@workspace:packages/web"
   dependencies:
-    "@charcuterie/logic": "npm:^2.0.0"
-    "@charcuterie/storybook-config": "npm:^0.2.2"
-    "@charcuterie/tokens": "npm:^1.5.0"
-    "@charcuterie/ui": "npm:^3.21.0"
+    "@charcuterie/logic": "npm:^2.3.0"
+    "@charcuterie/storybook-config": "npm:^0.3.0"
+    "@charcuterie/tokens": "npm:^1.6.0"
+    "@charcuterie/ui": "npm:^3.24.0"
     "@charcuterie/vitest-config": "npm:^1.1.0"
     "@rip-deck/contracts": "workspace:*"
     "@storybook/addon-a11y": "npm:^10.5.5"
