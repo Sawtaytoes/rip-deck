@@ -432,8 +432,6 @@ export const summariseRip = (input: {
   const { observations, exitCode, termination } = input
   const { titlesSaved, readErrorCount } = observations
 
-  const warnings = buildRipWarnings(observations)
-
   const summary = (
     failureReason: FailureReason | null,
   ): RipSummary => ({
@@ -441,7 +439,14 @@ export const summariseRip = (input: {
     failureReason,
     titlesSaved,
     readErrorCount,
-    warnings,
+    // A warning describes a copy that exists but may contain
+    // damage. A failed backup has no verified copy to describe.
+    // Building this unconditionally made `Backup failed` claim
+    // that the backup finished and its structure verified.
+    warnings:
+      failureReason === null
+        ? buildRipWarnings(observations)
+        : [],
   })
 
   if (termination !== "exited") {

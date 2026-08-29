@@ -417,6 +417,7 @@ export function verdictTone(
 
     case "disc_dirty":
     case "disc_scratched":
+    case "disc_read_error":
     case "disc_marginal_slow":
       return "disc"
 

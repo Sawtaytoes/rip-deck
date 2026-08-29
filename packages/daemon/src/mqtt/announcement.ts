@@ -111,6 +111,7 @@ export const toLegacyHealth = (
     case "drive_failing":
     case "enumeration_flap":
     case "key_expired":
+    case "disc_read_error":
     case "unknown":
       return "unknown"
   }
