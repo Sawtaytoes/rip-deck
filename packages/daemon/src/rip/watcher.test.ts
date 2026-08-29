@@ -2591,6 +2591,45 @@ describe("startWatcher tray commands", () => {
     await watcher.stop()
   })
 
+  it("moves bulk trays one at a time on the shared USB tree", async () => {
+    let inFlight = 0
+    let maxInFlight = 0
+
+    const watcher = startWatcher(
+      {
+        config: noopConfig,
+        governor: createGovernor({ maxConcurrentRips: 9 }),
+      },
+      watcherDeps({
+        probeDrives: async () => nineLoadedDrives(),
+        runBayRip: async () => {
+          throw new Error("no rip may start in this test")
+        },
+        runTray: async ({ action }) => {
+          inFlight += 1
+          maxInFlight = Math.max(maxInFlight, inFlight)
+          await Promise.resolve()
+          inFlight -= 1
+
+          return {
+            isSuccessful: true,
+            isCommandMissing: false,
+            isTimedOut: false,
+            exitCode: 0,
+            detail: action === "open" ? "opened" : "closed",
+          }
+        },
+      }),
+    )
+
+    await watcher.runTrayCommand({
+      request: { kind: "open_trays" },
+    })
+
+    expect(maxInFlight).toBe(1)
+    await watcher.stop()
+  })
+
   it("⚠️ opens the idle bays and still refuses the ripping one", async () => {
     // The fallback's safety case. The cap is one, so bay 1 rips
     // and the other eight sit idle holding discs — nothing is
@@ -2721,7 +2760,7 @@ describe("startWatcher tray commands", () => {
     await watcher.stop()
   })
 
-  it("closes only the bays it opened, refusing a ripping one", async () => {
+  it("moves no tray on bulk close while any bay is ripping", async () => {
     const ripper = controllableRipper()
     const tray = trayRecorder()
 
@@ -2750,13 +2789,23 @@ describe("startWatcher tray commands", () => {
 
     await watcher.tickNow()
 
+    // Open the idle bay while sr1 keeps ripping. This is the
+    // exact state the live failure reached before Close Trays.
+    await watcher.runTrayCommand({
+      request: { kind: "open_trays" },
+    })
+    expect(tray.moved).toEqual([
+      { action: "open", devPath: "/dev/sr0" },
+    ])
+    tray.moved.length = 0
+
     const report = await watcher.runTrayCommand({
       request: { kind: "close_trays" },
     })
 
-    // sr0 was never opened by rip-deck, so close-only-open leaves
-    // it alone; sr1 is RIPPING, and the refusal outranks every
-    // command-specific rule. Nothing moves.
+    // The per-bay refusal on sr1 is not enough: closing sr0 can
+    // reset the shared hub and destroy sr1's rip. The whole bulk
+    // close therefore moves nothing.
     expect(tray.moved).toEqual([])
     expect(report.counts.closed).toBe(0)
     expect(report.counts.refused).toBe(1)
@@ -2764,7 +2813,7 @@ describe("startWatcher tray commands", () => {
       report.bays.find(
         (entry) => entry.drive_id === "2-1.1.0",
       )?.result,
-    ).toBe("skipped_already_closed")
+    ).toBe("skipped_untouched")
 
     await watcher.stop()
   })

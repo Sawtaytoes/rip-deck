@@ -620,6 +620,14 @@ export const decideTrayBayAction = (input: {
   bay: BayState | null
   observation: BayObservation
   /**
+   * A rip owns any bay on this shared USB tree.
+   *
+   * Bulk CLOSE uses this tower-wide fact. The live tower proved
+   * that closing other drawers in parallel can reset the hub and
+   * make an untouched ripping drive vanish too.
+   */
+  hasActiveRip?: boolean
+  /**
    * How wide an `open_trays` press reaches, resolved by the caller
    * over the whole probe and the tray memory
    * ([decision](docs/decisions/2026-07-30-open-trays-escalates-and-close-trays-is-plain.md)):
@@ -703,6 +711,25 @@ export const decideTrayBayAction = (input: {
         "the tower's power was cut while this bay was still " +
         "reading the disc. No rip had started, so nothing was " +
         "lost; the disc is still in the drive.",
+    }
+  }
+
+  // A per-bay refusal was not enough. On 2026-08-29, three
+  // ripping bays were correctly refused while Close Trays moved
+  // the other drawers. The motor load reset the shared USB hub;
+  // all nine drives disconnected and all three rips failed with
+  // ENODEV. A bulk close is therefore all-or-nothing while any
+  // rip is active: every non-ripping bay is skipped too.
+  if (
+    request.kind === "close_trays" &&
+    input.hasActiveRip === true
+  ) {
+    return {
+      action: "skip",
+      resultKind: "skipped_untouched",
+      detail:
+        "another bay is ripping, so the tower-wide close " +
+        "command moved no trays",
     }
   }
 
