@@ -1405,6 +1405,33 @@ describe("the watcher, feeding the store", () => {
     await watcher.stop()
   })
 
+  it("retires a dismissed finished card even when the drive says it has media", async () => {
+    const { store, watcher } = startFedWatcher({
+      probeDrives: async () =>
+        nineBayTower({ isPoweredOn: true }),
+    })
+
+    await watcher.tickNow()
+
+    await watcher.runTrayCommand({
+      request: { kind: "clear_loaded" },
+    })
+
+    const view = buildTowerView({
+      snapshot: store.readSnapshot(),
+      nowMs: NOW_MS,
+    })
+
+    // The drives keep reporting the old disc after the operator has taken it
+    // out. The card must respect the explicit operator action instead of
+    // leaving an unremovable failed rip on the dashboard.
+    expect(
+      view.bays.filter((bay) => bay.state.state !== "idle"),
+    ).toHaveLength(0)
+
+    await watcher.stop()
+  })
+
   it("renders nine bays for a nine-bay tower", async () => {
     // Live 0.4.0: `drive_count: 3`, against a console that had
     // just printed "9 drive(s) present."
