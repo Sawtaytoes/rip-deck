@@ -28,6 +28,7 @@ import {
   Subject,
   tap,
 } from "rxjs"
+import type { BayAction } from "../api/towerView.ts"
 import {
   type DriveRegistry,
   type DriveRegistryEntry,
@@ -567,6 +568,8 @@ export type BayState = {
    * after the press does not bring the reminder back.
    */
   isLoadedDismissed: boolean
+  /** A human told the liveness watchdog to continue this rip. */
+  isKeepTryingRequested?: boolean
   updatedAtMs: number
 }
 
@@ -660,6 +663,7 @@ export const createBayState = (input: {
   // have. `rearm` builds through here, which is what makes the
   // dismissal die with the disc it was about.
   isLoadedDismissed: false,
+  isKeepTryingRequested: false,
   updatedAtMs: input.atMs,
 })
 
@@ -848,6 +852,7 @@ export const applyBayDecision = (input: {
         // A different disc, so whatever the operator said about
         // the last one is spent.
         isLoadedDismissed: false,
+        isKeepTryingRequested: false,
         updatedAtMs: atMs,
       }
 
@@ -1102,6 +1107,7 @@ export type BayRipInput = {
   explicitName?: string | null
   config: WatcherConfig
   signal: AbortSignal
+  isKeepTryingRequested?: () => boolean
   /** Progress narration, for the console. */
   note: (message: string) => void
   /** Called the instant a ripper child exists. */
@@ -1442,6 +1448,7 @@ const ripWithMakemkv = async (context: {
       isolation: config.isolation,
       eventLog,
       signal: input.signal,
+      isKeepTryingRequested: input.isKeepTryingRequested,
     },
     { onProgress: input.onProgress },
   )
@@ -2088,6 +2095,11 @@ export type RunningWatcher = {
     request: TrayCommandRequest
     requestId?: string | null
   }) => Promise<TrayCommandResponsePayload>
+  /** Control a job that already owns one bay. */
+  runBayAction?: (input: {
+    driveId: string
+    action: BayAction
+  }) => Promise<{ ok: boolean; msg: string }>
   /**
    * The discs still sitting in the tower, waiting for a human.
    *
@@ -2135,6 +2147,10 @@ export const startWatcher = (
   const bays = new Map<string, BayState>()
   const sightings = new Map<string, BaySighting>()
   const controllers = new Map<string, AbortController>()
+  const settlements = new Map<
+    string,
+    { promise: Promise<void>; resolve: () => void }
+  >()
   const dispatches = new Subject<BayDispatch>()
 
   let registry: DriveRegistry | null = null
@@ -2510,6 +2526,9 @@ export const startWatcher = (
             explicitName: dispatch.explicitName,
             config: input.config,
             signal: dispatch.controller.signal,
+            isKeepTryingRequested: () =>
+              bays.get(driveId)?.isKeepTryingRequested ??
+              false,
             note: (message) =>
               handlers.onBayNote?.({
                 driveId,
@@ -2581,6 +2600,8 @@ export const startWatcher = (
       tap((outcome) => {
         input.governor.release({ driveId })
         controllers.delete(driveId)
+        settlements.get(driveId)?.resolve()
+        settlements.delete(driveId)
 
         const current = bays.get(driveId)
         const finishedAtMs = deps.now()
@@ -2686,10 +2707,18 @@ export const startWatcher = (
     explicitName?: string | null
   }): void => {
     const controller = new AbortController()
+    let resolve = (): void => {}
+    const promise = new Promise<void>((done) => {
+      resolve = done
+    })
     controllers.set(
       input.drive.identity.usbPortPath,
       controller,
     )
+    settlements.set(input.drive.identity.usbPortPath, {
+      promise,
+      resolve,
+    })
 
     dispatches.next({
       drive: input.drive,
@@ -3816,9 +3845,117 @@ export const startWatcher = (
     })
   }
 
+  const runBayAction = async (params: {
+    driveId: string
+    action: BayAction
+  }): Promise<{ ok: boolean; msg: string }> => {
+    const bay = bays.get(params.driveId)
+
+    if (bay === undefined) {
+      return {
+        ok: false,
+        msg: "That bay is not known to this watcher yet.",
+      }
+    }
+
+    if (params.action === "clear_quarantine") {
+      if (bay.phase !== "quarantined") {
+        return {
+          ok: false,
+          msg: "This bay is not quarantined.",
+        }
+      }
+
+      bays.set(params.driveId, {
+        ...bay,
+        phase: "idle",
+        outcome: null,
+        jobUuid: null,
+        startCount: 0,
+        isKeepTryingRequested: false,
+        updatedAtMs: deps.now(),
+      })
+      persistLedger()
+      handlers.onBayTableChanged?.()
+
+      return {
+        ok: true,
+        msg: "Quarantine cleared. Rip Deck will inspect this bay on its next poll.",
+      }
+    }
+
+    if (params.action === "retry_in_another_drive") {
+      return {
+        ok: false,
+        msg: "Move the disc to another bay, then press Rip there. Rip Deck cannot move a disc between drives.",
+      }
+    }
+
+    const controller = controllers.get(params.driveId)
+
+    if (controller === undefined) {
+      return {
+        ok: false,
+        msg: "This bay has no running rip to control.",
+      }
+    }
+
+    if (params.action === "keep_trying") {
+      bays.set(params.driveId, {
+        ...bay,
+        isKeepTryingRequested: true,
+        updatedAtMs: deps.now(),
+      })
+      persistLedger()
+      handlers.onBayTableChanged?.()
+
+      return {
+        ok: true,
+        msg: "Rip Deck will keep trying until you cancel it or the rip finishes.",
+      }
+    }
+
+    const settlement = settlements.get(
+      params.driveId,
+    )?.promise
+    controller.abort()
+
+    if (settlement !== undefined) await settlement
+
+    if (params.action === "give_up") {
+      return {
+        ok: true,
+        msg: "Rip cancelled. Its partial output was kept for you to review or remove.",
+      }
+    }
+
+    // Cancel is also an explicit operator request to get the disc back. The
+    // tray move occurs only AFTER the rip's abort path has landed, so it uses
+    // the normal tray command and never opens a drive a job still owns.
+    const report = await runTrayCommandForRequest({
+      request: {
+        kind: "open_bay",
+        target: { driveId: params.driveId },
+      },
+    })
+
+    const isOpened =
+      report.counts.opened +
+        report.counts.opened_not_ripped >
+      0
+
+    return {
+      ok: isOpened,
+      msg: isOpened
+        ? "Rip cancelled and tray opened."
+        : `Rip cancelled, but the tray did not open: ${report.message}`,
+    }
+  }
+
   return {
     tickNow,
     runTrayCommand: runTrayCommandForRequest,
+    runBayAction,
 
     stop: async () => {
       isStopped = true

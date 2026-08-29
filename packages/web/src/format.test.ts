@@ -18,6 +18,7 @@ import {
   nextTrayCommandFor,
   ripBucket,
   ripVisual,
+  ripWarningLines,
   throughputText,
   trayActionsFor,
   trayReportToActionResult,
@@ -317,6 +318,20 @@ describe("bayActionLabel", () => {
   it("calls the tray commands what they move", () => {
     expect(bayActionLabel("open_bay")).toBe("Open tray")
     expect(bayActionLabel("close_bay")).toBe("Close tray")
+  })
+})
+
+describe("ripWarningLines", () => {
+  it("puts each warning sentence on its own scan line", () => {
+    expect(
+      ripWarningLines(
+        "One read error at 788.3 MB. The copy was saved. Play the disc.",
+      ),
+    ).toEqual([
+      "One read error at 788.3 MB.",
+      "The copy was saved.",
+      "Play the disc.",
+    ])
   })
 })
 

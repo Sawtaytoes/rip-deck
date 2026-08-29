@@ -529,6 +529,20 @@ export function bayActionLabel(action: string): string {
 }
 
 /**
+ * Split a daemon warning into the short statements a card can scan.
+ *
+ * The daemon writes these as complete sentences so the same value also works
+ * in a log and an MQTT payload. A card has more room to make the consequence
+ * and the next action distinct, so it renders one sentence per line.
+ */
+export function ripWarningLines(warning: string): string[] {
+  return warning
+    .split(/(?<=\.)\s+/)
+    .map((line) => line.trim())
+    .filter((line) => line !== "")
+}
+
+/**
  * Job states in which a rip owns the drive.
  *
  * Opening a tray in any of them destroys the copy in progress —

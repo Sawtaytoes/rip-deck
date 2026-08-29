@@ -39,8 +39,8 @@ import { RIP_DECK_STATE_KEY } from "./useRipDeckState"
  *     land on the wrong card after the tower is power-cycled.
  *
  * The transport is the data source's problem, not this hook's.
- * Today the live one refuses locally with a message naming MQTT
- * `cmd/drive`, and the mock actually performs the action.
+ * The live source sends job actions to `/api/bay-action`; the mock
+ * performs the equivalent state change in memory.
  */
 
 export type BayActionState = {

@@ -22,6 +22,7 @@ import {
   RIP_VISUAL_INTENT,
   ripProgressLabel,
   ripVisual,
+  ripWarningLines,
   throughputText,
 } from "../format"
 import type { BayActionState } from "../hooks/useBayActions"
@@ -454,12 +455,19 @@ export function RipCard({
               Not behind the collapse: a warning nobody scrolls to
               is a warning that is not there. */}
           {rip.warnings.map((warning) => (
-            <p
+            <ul
               className="mt-1.5 rounded-md border border-intent-warning-border bg-surface-raised px-2 py-1 text-sm text-intent-warning-content"
               key={warning}
             >
-              {warning}
-            </p>
+              {ripWarningLines(warning).map((line) => (
+                <li
+                  className="ml-4 list-disc pl-0.5"
+                  key={line}
+                >
+                  {line}
+                </li>
+              ))}
+            </ul>
           ))}
 
           {/* Everything below is what a collapsed card drops. */}
