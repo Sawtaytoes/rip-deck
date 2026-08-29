@@ -185,7 +185,7 @@ const buildReport = (
 })
 
 describe("runBayAction", () => {
-  it("says the job actions have nowhere to go — including MQTT", async () => {
+  it("says an unbuilt job action has nowhere to go", async () => {
     const fetchMock = stubFetch({ ok: true })
 
     const result = await httpDataSource.runBayAction({
@@ -201,6 +201,32 @@ describe("runBayAction", () => {
     expect(fetchMock).not.toHaveBeenCalled()
     expect(result.ok).toBe(false)
     expect(result.msg).toContain("no transport yet")
+  })
+
+  it("opens the failed bay for a retry in another drive", async () => {
+    const fetchMock = stubFetch({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(buildReport()),
+    })
+
+    const result = await httpDataSource.runBayAction({
+      driveId: DRIVE_ID,
+      action: "retry_in_another_drive",
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/tray", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: `{"command":"open_bay","drive_id":"${DRIVE_ID}"}`,
+    })
+    expect(result).toEqual({
+      ok: true,
+      msg:
+        "Tray opened. Move this disc to another drive. " +
+        "Rip Deck will start the comparison rip when you " +
+        "close that tray.",
+    })
   })
 
   /**

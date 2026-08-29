@@ -135,7 +135,7 @@ export const httpDataSource: RipDeckDataSource = {
   },
 
   /**
-   * The five JOB actions, which still have nowhere to go.
+   * Job actions that do not yet have their own daemon command.
    *
    * ⚠️ This function used to refuse a TRAY command here too,
    * with the sentence the owner read on the live page: *"No REST
@@ -148,8 +148,8 @@ export const httpDataSource: RipDeckDataSource = {
    * now go to `runTrayCommand` below, and a press moves a drawer.
    *
    * What is left is genuinely unbuilt, and the refusal now says
-   * so accurately. `cancel`, `keep_trying`, `give_up`,
-   * `clear_quarantine` and `retry_in_another_drive` have **no
+   * so accurately. `cancel`, `keep_trying`, `give_up` and
+   * `clear_quarantine` have **no
    * transport at all** — not REST and NOT MQTT either, which the
    * previous message got backwards: `cmd/drive` is the only
    * inbound topic and `parseTrayCommand` accepts only the four
@@ -175,6 +175,36 @@ export const httpDataSource: RipDeckDataSource = {
         .then((report) =>
           trayReportToActionResult({ driveId, report }),
         )
+        .catch((error: unknown) => ({
+          ok: false,
+          msg: String(error),
+        }))
+    }
+
+    // The retry is a physical hand-off, not a second rip that
+    // software can start while the disc remains in this drive.
+    // Open the failed bay through the existing guarded command.
+    // Normal insertion starts the comparison rip after the
+    // operator moves the disc to another bay.
+    if (action === "retry_in_another_drive") {
+      return httpDataSource
+        .runTrayCommand({ command: "open_bay", driveId })
+        .then((report) => {
+          const result = trayReportToActionResult({
+            driveId,
+            report,
+          })
+
+          return result.ok
+            ? {
+                ok: true,
+                msg:
+                  "Tray opened. Move this disc to another " +
+                  "drive. Rip Deck will start the comparison " +
+                  "rip when you close that tray.",
+              }
+            : result
+        })
         .catch((error: unknown) => ({
           ok: false,
           msg: String(error),
