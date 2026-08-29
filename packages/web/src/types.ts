@@ -257,11 +257,12 @@ export type RipEventPayload = {
  *    vocabulary serves both callers. They are NOT in
  *    `bay.actions` — `format.trayActionsFor` derives them, and
  *    says why it is allowed to.
- *  - The five JOB actions have no transport at all yet, MQTT
- *    included: `cmd/drive` is the only inbound topic and
- *    `parseTrayCommand` accepts only the four tray words. Their
- *    endpoint is unbuilt, not forbidden — the argument above
- *    applies to them the day someone builds it.
+ *  - The four JOB actions ride `POST /api/bay-action`, which
+ *    reaches the watcher's matching job control. They are not
+ *    `cmd/drive` words: that MQTT surface remains tray-only.
+ *    `retry_in_another_drive` remains in this type only so an old
+ *    daemon response can be rendered safely; current daemons do
+ *    not offer it because moving a physical disc is manual.
  */
 export type BayAction =
   | "clear_quarantine"
