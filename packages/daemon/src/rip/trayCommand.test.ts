@@ -506,6 +506,23 @@ describe("decideTrayBayAction", () => {
     }
   })
 
+  it("skips every other bay on bulk close when a rip is active", () => {
+    const decision = decideTrayBayAction({
+      request: { kind: "close_trays" },
+      bay: bay({
+        phase: "idle",
+        lastTrayCommand: "open_bay",
+      }),
+      observation: loaded(),
+      hasActiveRip: true,
+    })
+
+    expect(decision).toMatchObject({
+      action: "skip",
+      resultKind: "skipped_untouched",
+    })
+  })
+
   it("closes only bays rip-deck opened, skipping the rest", () => {
     // ⚠️ The 2026-07-30 redesign: Close trays closes what
     // `lastTrayCommand` says is open, not every present bay. A bay
