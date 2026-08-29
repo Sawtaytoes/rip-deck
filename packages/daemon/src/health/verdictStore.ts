@@ -194,6 +194,7 @@ const KNOWN_KINDS: ReadonlySet<VerdictKind> =
     "enumeration_flap",
     "disc_scratched",
     "disc_dirty",
+    "disc_read_error",
     "disc_marginal_slow",
     "unknown",
   ])
