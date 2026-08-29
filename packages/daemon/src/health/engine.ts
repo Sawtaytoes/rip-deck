@@ -292,6 +292,18 @@ export const evaluateDrive = (
     ])
   }
 
+  // One or two errors do not contain enough shape to call the
+  // disc dirty or scratched. They are still positive evidence
+  // of a failed read. Never let a later throughput branch call
+  // such a run "reading cleanly", as the live slot 4 failure did.
+  if (observation.errorLbas.length > 0) {
+    return makeVerdict("disc_read_error", confidence, [
+      `${observation.errorLbas.length} read ` +
+        `error${observation.errorLbas.length === 1 ? "" : "s"} ` +
+        "without enough locations to identify a surface pattern.",
+    ])
+  }
+
   // No usable error pattern, but the drive is clearly unwell.
   //
   // The kernel-invisible-retry case: MakeMKV's own retry

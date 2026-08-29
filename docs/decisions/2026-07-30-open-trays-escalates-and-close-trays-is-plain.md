@@ -4,6 +4,7 @@ Status: Accepted
 Date: 2026-07-30
 Type: ux / behaviour
 Supersedes: `docs/decisions/2026-07-27-bulk-tray-buttons-fall-back-to-open-all.md`
+Superseded by: `2026-08-29-bulk-tray-moves-are-serial-and-close-is-blocked-during-a-rip.md` (parallel execution and close-during-rip clauses only)
 
 ## Decision
 

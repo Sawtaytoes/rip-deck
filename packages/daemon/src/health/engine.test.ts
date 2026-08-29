@@ -113,13 +113,28 @@ describe("evaluateDrive — dirt vs scratch", () => {
     expect(verdict.action).toBe("clean_disc")
   })
 
-  it("refuses to classify one or two stray errors", () => {
+  it("reports one stray error without inventing a surface pattern", () => {
     const verdict = evaluateDrive(
       observation({ errorLbas: [123_456] }),
       baselineFor("drive-a"),
     )
 
-    expect(verdict.kind).toBe("ok")
+    expect(verdict.kind).toBe("disc_read_error")
+    expect(verdict.message).toContain("another drive")
+    expect(verdict.evidence[0]).toContain("1 read error")
+  })
+
+  it("never calls a slow run with a read error clean", () => {
+    const verdict = evaluateDrive(
+      observation({
+        errorLbas: [403_584],
+        recentThroughput: [0],
+      }),
+      baselineFor("drive-a"),
+    )
+
+    expect(verdict.kind).toBe("disc_read_error")
+    expect(verdict.message).not.toContain("cleanly")
   })
 })
 

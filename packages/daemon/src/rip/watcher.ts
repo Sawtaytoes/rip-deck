@@ -3580,15 +3580,13 @@ export const startWatcher = (
    * one the poll loop uses, so a wedged bus costs a reported
    * failure rather than a hung button.
    *
-   * ## Why the bays are moved in parallel
+   * ## Why the bays are moved in sequence
    *
-   * Bounded by construction: at most the nine drives this probe
-   * returned, each its own device with no shared lock. Serially,
-   * one drive that has stopped answering would spend the whole
-   * `TRAY_TUNING.commandTimeoutMs` before the next bay was even
-   * tried, and an operator standing at the tower would wait
-   * three minutes to hear about nine bays. In parallel a wedged
-   * bay costs its own line in the report and nobody else's.
+   * The devices share one powered USB tree. Measured on the live
+   * tower on 2026-08-29: parallel tray-close motors reset that
+   * tree, disconnected all nine drives and killed three DVD rips.
+   * A slow report is recoverable; three destroyed rips are not.
+   * The per-drive watchdog still bounds each move.
    */
   const runTrayCommandForRequest = async (params: {
     request: TrayCommandRequest
@@ -3700,6 +3698,14 @@ export const startWatcher = (
         ? "finished"
         : "all"
 
+    const hasActiveRip = probed.some((drive) => {
+      const phase = bays.get(
+        drive.identity.usbPortPath,
+      )?.phase
+
+      return phase === "starting" || phase === "ripping"
+    })
+
     const target =
       "target" in params.request
         ? params.request.target
@@ -3742,96 +3748,100 @@ export const startWatcher = (
       })
     }
 
-    const results = await Promise.all(
-      candidates.map(
-        async (drive): Promise<TrayBayResult> => {
-          const driveId = drive.identity.usbPortPath
-          const placement = placementOf(drive)
-          const bay = bays.get(driveId) ?? null
+    const results: TrayBayResult[] = []
 
-          const base = {
-            driveId,
-            slot: placement.slot,
-            // Already `07 - Pioneer BDR-211M`. Re-applying the
-            // slot prefix here is what produced
-            // "06 - 06 - Pioneer BDR-211M" out loud.
-            label: placement.name,
-          }
+    for (const drive of candidates) {
+      const driveId = drive.identity.usbPortPath
+      const placement = placementOf(drive)
+      const bay = bays.get(driveId) ?? null
 
-          const decision = decideTrayBayAction({
-            request: params.request,
+      const base = {
+        driveId,
+        slot: placement.slot,
+        // Already `07 - Pioneer BDR-211M`. Re-applying the
+        // slot prefix here is what produced
+        // "06 - 06 - Pioneer BDR-211M" out loud.
+        label: placement.name,
+      }
+
+      const decision = decideTrayBayAction({
+        request: params.request,
+        bay,
+        observation: observationOf(drive),
+        openScope,
+        hasActiveRip,
+      })
+
+      if (
+        decision.action === "skip" ||
+        decision.action === "refuse"
+      ) {
+        if (decision.action === "refuse") {
+          // On the daemon's own log too, not only in the
+          // MQTT reply: the operator hears the reply, and
+          // whoever reads the log tomorrow needs to see
+          // that a button came within one branch of
+          // destroying a rip.
+          console.warn(
+            `[tray] ${base.label}: ${decision.detail}`,
+          )
+        }
+
+        results.push({
+          ...base,
+          resultKind: decision.resultKind,
+          detail: decision.detail,
+        })
+        continue
+      }
+
+      if (decision.action === "rip") {
+        results.push(
+          await startOperatorRip({
+            drive,
+            base,
             bay,
             observation: observationOf(drive),
-            openScope,
-          })
+            name:
+              params.request.kind === "rip_bay"
+                ? params.request.name
+                : null,
+          }),
+        )
+        continue
+      }
 
-          if (
-            decision.action === "skip" ||
-            decision.action === "refuse"
-          ) {
-            if (decision.action === "refuse") {
-              // On the daemon's own log too, not only in the
-              // MQTT reply: the operator hears the reply, and
-              // whoever reads the log tomorrow needs to see
-              // that a button came within one branch of
-              // destroying a rip.
-              console.warn(
-                `[tray] ${base.label}: ${decision.detail}`,
-              )
-            }
+      const result = await deps.runTray({
+        action: decision.action,
+        devPath: drive.address.devPath,
+        eject: input.config.eject,
+      })
 
-            return {
-              ...base,
-              resultKind: decision.resultKind,
-              detail: decision.detail,
-            }
-          }
+      if (!result.isSuccessful) {
+        results.push({
+          ...base,
+          resultKind: "failed",
+          detail: result.detail,
+        })
+        continue
+      }
 
-          if (decision.action === "rip") {
-            return await startOperatorRip({
-              drive,
-              base,
-              bay,
-              observation: observationOf(drive),
-              name:
-                params.request.kind === "rip_bay"
-                  ? params.request.name
-                  : null,
-            })
-          }
+      rememberTrayCommand({
+        driveId,
+        action: decision.action,
+      })
 
-          const result = await deps.runTray({
-            action: decision.action,
-            devPath: drive.address.devPath,
-            eject: input.config.eject,
-          })
-
-          if (!result.isSuccessful) {
-            return {
-              ...base,
-              resultKind: "failed",
-              detail: result.detail,
-            }
-          }
-
-          rememberTrayCommand({
-            driveId,
-            action: decision.action,
-          })
-
-          return {
-            ...base,
-            resultKind:
-              decision.action === "close"
-                ? "closed"
-                : isRipCompleted(bay)
-                  ? "opened"
-                  : "opened_not_ripped",
-            detail: result.detail,
-          }
-        },
-      ),
-    )
+      results.push({
+        ...base,
+        resultKind:
+          decision.action === "close"
+            ? "closed"
+            : isRipCompleted(bay)
+              ? "opened"
+              : "opened_not_ripped",
+        detail: result.detail,
+      })
+    }
 
     return buildTrayCommandResponse({
       request: params.request,
