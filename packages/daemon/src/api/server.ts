@@ -6,6 +6,7 @@ import {
 import type { AddressInfo } from "node:net"
 import type { TopicConfig } from "../mqtt/topics.ts"
 import type { LiveRipsReader } from "../rip/liveRips.ts"
+import type { BayActionRunner } from "./bayActionEndpoint.ts"
 import {
   createLogCaptureProbe,
   createLogCaptureReader,
@@ -143,6 +144,7 @@ export const createApiServer = ({
   // the dashboard they want rather than needing one on disk.
   webAssets = loadWebAssets(),
   readTrayRunner,
+  readBayActionRunner,
   // Reading captures needs only a directory name, so this one
   // CAN be defaulted honestly. `main.ts` passes the watcher's
   // own `config.stateDir` so the two can never diverge.
@@ -161,6 +163,7 @@ export const createApiServer = ({
   topicConfig?: TopicConfig
   webAssets?: WebAssets
   readTrayRunner?: () => TrayCommandRunner | null
+  readBayActionRunner?: () => BayActionRunner | null
   stateDir?: string
   readLogCapture?: LogCaptureReader | null
   /** Does a capture exist for this job? See `logCapture.ts`. */
@@ -189,6 +192,7 @@ export const createApiServer = ({
     topicConfig,
     webAssets,
     readTrayRunner,
+    readBayActionRunner,
     readLogCapture,
     readLogExists,
     destinationRoot,

@@ -136,13 +136,11 @@ and the rail chip. `verdictTone` gives `unknown` its own quiet
 card that earned it, never as the loudest thing on the page.
 
 `bayActionsFor` is the other half, and it is the one place the UI
-**subtracts** from `bay.actions`. `retry_in_another_drive` is hidden
-when the rip is `completed` or the verdict is `unknown`: the control
-exists to confirm a suspected disc verdict in a second drive, and
-neither of those bays has a verdict to confirm. Hidden rather than
-disabled — a disabled button still says "this is a thing you might do
-to a finished rip". ⚠️ The real fix is `towerView.buildBayActions`
-not publishing it; delete the guard when it stops.
+**subtracts** from `bay.actions`. `retry_in_another_drive` is never
+rendered. Moving a disc to another drive is a manual physical-media
+workflow, so an application control promised an operation it could not
+perform. The compatibility guard also protects a current UI from an old
+daemon that still publishes the legacy action.
 
 **A held bay is not a failed one.** When rip-deck cannot tell whether a
 loaded disc was already ripped, it **holds and flags, never rips**
@@ -152,13 +150,11 @@ verbatim, and the tray control that releases the disc. It sits above the
 active rips, next to quarantine, because those two are the only things
 on the page waiting on a person.
 
-**Most job actions still have no transport.** `cancel`, `keep_trying`,
-`give_up` and `clear_quarantine` still refuse locally. The
-`retry_in_another_drive` control is different: it is a physical hand-off,
-so it sends `open_bay` through the existing guarded tray endpoint, then
-tells the operator to move the disc. Normal insertion starts the
-comparison rip in the new bay. The mock performs every action so the
-controls can be exercised.
+**Job actions use the daemon's same-origin transport.** `cancel`,
+`keep_trying`, `give_up` and `clear_quarantine` send `POST
+/api/bay-action`. Cancel waits for the selected rip to stop before it
+opens that bay. The mock performs every published action so the controls
+can be exercised.
 
 ## Tests
 

@@ -624,6 +624,46 @@ describe("RipCard", () => {
     )
   })
 
+  it("puts the slot above the thumbnail when artwork exists", () => {
+    const { container } = renderCard(
+      <RipCard
+        rip={buildRip({ poster: "/posters/ivanhoe.jpg" })}
+        onShowLog={noop}
+        onAction={noop}
+        now={NOW}
+      />,
+    )
+
+    const slot = screen.getByText("Slot 7")
+    const poster = container.querySelector("img")
+    const title = container.querySelector(
+      "span.break-words.font-semibold",
+    )
+
+    expect(poster).not.toBeNull()
+    expect(slot.parentElement).toHaveClass("flex-col")
+    expect(slot.parentElement).toContainElement(poster)
+    expect(title?.parentElement).not.toContainElement(slot)
+  })
+
+  it("keeps the slot beside the title when there is no artwork", () => {
+    const { container } = renderCard(
+      <RipCard
+        rip={buildRip({ poster: null })}
+        onShowLog={noop}
+        onAction={noop}
+        now={NOW}
+      />,
+    )
+
+    const slot = screen.getByText("Slot 7")
+    const title = container.querySelector(
+      "span.break-words.font-semibold",
+    )
+
+    expect(title?.parentElement).toContainElement(slot)
+  })
+
   // The owner on a phone: the poster and the title must stay
   // visible under the bay-container narrow threshold, not only
   // once a column clears 28rem. The Lightbox trigger used to be

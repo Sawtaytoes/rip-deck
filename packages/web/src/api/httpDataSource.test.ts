@@ -185,47 +185,34 @@ const buildReport = (
 })
 
 describe("runBayAction", () => {
-  it("says an unbuilt job action has nowhere to go", async () => {
-    const fetchMock = stubFetch({ ok: true })
-
-    const result = await httpDataSource.runBayAction({
-      driveId: "usb-2-1-1-2-4-4-5",
-      action: "clear_quarantine",
-    })
-
-    // The five job actions genuinely have no transport: no
-    // endpoint, and `cmd/drive` takes only the four tray words.
-    // The message this replaced claimed they "go over MQTT",
-    // which would have sent an operator to publish something the
-    // daemon explicitly rejects.
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(result.ok).toBe(false)
-    expect(result.msg).toContain("no transport yet")
-  })
-
-  it("opens the failed bay for a retry in another drive", async () => {
+  it("sends a job action to the daemon", async () => {
     const fetchMock = stubFetch({
       ok: true,
       status: 200,
-      json: () => Promise.resolve(buildReport()),
+      statusText: "OK",
+      json: () =>
+        Promise.resolve({
+          ok: true,
+          msg: "Rip cancelled and tray opened.",
+        }),
     })
 
     const result = await httpDataSource.runBayAction({
-      driveId: DRIVE_ID,
-      action: "retry_in_another_drive",
+      driveId: "usb-2-1-1-2-4-4-5",
+      action: "cancel",
     })
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/tray", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: `{"command":"open_bay","drive_id":"${DRIVE_ID}"}`,
-    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bay-action",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: '{"action":"cancel","drive_id":"usb-2-1-1-2-4-4-5"}',
+      },
+    )
     expect(result).toEqual({
       ok: true,
-      msg:
-        "Tray opened. Move this disc to another drive. " +
-        "Rip Deck will start the comparison rip when you " +
-        "close that tray.",
+      msg: "Rip cancelled and tray opened.",
     })
   })
 
