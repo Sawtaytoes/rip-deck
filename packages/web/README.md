@@ -152,13 +152,13 @@ verbatim, and the tray control that releases the disc. It sits above the
 active rips, next to quarantine, because those two are the only things
 on the page waiting on a person.
 
-**Bay actions have no transport.** Drive commands go over MQTT
-(`cmd/drive`), not REST. `httpDataSource.runBayAction` therefore
-refuses locally rather than inventing an endpoint — and the control
-stays **enabled**, because the refusal carries the exact payload to
-publish by hand, which a greyed-out button has nowhere to put. The mock
-performs them for real so the controls can be exercised. One function
-changes when a bridge appears.
+**Most job actions still have no transport.** `cancel`, `keep_trying`,
+`give_up` and `clear_quarantine` still refuse locally. The
+`retry_in_another_drive` control is different: it is a physical hand-off,
+so it sends `open_bay` through the existing guarded tray endpoint, then
+tells the operator to move the disc. Normal insertion starts the
+comparison rip in the new bay. The mock performs every action so the
+controls can be exercised.
 
 ## Tests
 
