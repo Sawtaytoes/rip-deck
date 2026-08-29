@@ -4,6 +4,10 @@ import {
   unknownLiveRips,
 } from "../rip/liveRips.ts"
 import {
+  type BayActionRunner,
+  handleBayActionRequest as handleBayAction,
+} from "./bayActionEndpoint.ts"
+import {
   createFixtureSnapshot,
   FIXTURE_NAMES,
   isFixtureName,
@@ -122,6 +126,7 @@ export type ApiResponse = {
 
 /** The one write endpoint. See `trayEndpoint.ts`. */
 const TRAY_PATHNAME = "/api/tray"
+const BAY_ACTION_PATHNAME = "/api/bay-action"
 
 /**
  * The folders a rip left behind, and the button that clears one.
@@ -213,6 +218,7 @@ export const SERVER_PATHNAMES = [
   FIXTURES_PATHNAME,
   LOGS_PATHNAME,
   TRAY_PATHNAME,
+  BAY_ACTION_PATHNAME,
   LEFTOVERS_PATHNAME,
   HISTORY_PATHNAME,
   ...HEALTH_PATHNAMES,
@@ -373,6 +379,26 @@ const handleTrayRequest = async (input: {
     body,
     runTrayCommand: input.runTrayCommand,
     nowMs: input.nowMs,
+  })
+
+  return jsonResponse({
+    status: result.status,
+    payload: result.payload,
+  })
+}
+
+const handleBayActionRequest = async (input: {
+  readBody: (() => Promise<string>) | undefined
+  runBayAction: BayActionRunner | null
+}): Promise<ApiResponse> => {
+  const body =
+    input.readBody === undefined
+      ? ""
+      : await input.readBody()
+
+  const result = await handleBayAction({
+    body,
+    runBayAction: input.runBayAction,
   })
 
   return jsonResponse({
@@ -548,6 +574,7 @@ export const createApiRouter = ({
   // existing caller — and every existing test — constructs a
   // router with no new argument and gets the honest answer.
   readTrayRunner = () => null,
+  readBayActionRunner = () => null,
   readLogCapture = null,
   readLogExists = null,
   destinationRoot = null,
@@ -573,6 +600,8 @@ export const createApiRouter = ({
    * instead of a handler bound to nothing.
    */
   readTrayRunner?: () => TrayCommandRunner | null
+  /** The watcher's job control, read at request time. */
+  readBayActionRunner?: () => BayActionRunner | null
   readLogCapture?: LogCaptureReader | null
   /**
    * Does a capture exist for this job? See `logCapture.ts`.
@@ -704,6 +733,20 @@ export const createApiRouter = ({
         readBody,
         runTrayCommand: readTrayRunner(),
         nowMs,
+      })
+    }
+
+    if (pathname === BAY_ACTION_PATHNAME) {
+      if (method !== "POST") {
+        return jsonResponse({
+          status: 405,
+          payload: { ok: false, msg: "POST only" },
+        })
+      }
+
+      return handleBayActionRequest({
+        readBody,
+        runBayAction: readBayActionRunner(),
       })
     }
 

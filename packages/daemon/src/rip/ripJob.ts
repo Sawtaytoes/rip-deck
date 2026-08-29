@@ -132,7 +132,7 @@ export type RipJobInput = {
    */
   eventLog?: EventLog
   /** Operator has answered "keep trying" (D4). */
-  isKeepTryingRequested?: boolean
+  isKeepTryingRequested?: () => boolean
   /** Cancels the rip cleanly (E5). */
   signal?: AbortSignal
 }
@@ -417,7 +417,7 @@ const superviseChild = async (
       lastEventAtMs: tracker.lastEventAtMs,
       nowMs: Date.now(),
       isKeepTryingRequested:
-        input.isKeepTryingRequested ?? false,
+        input.isKeepTryingRequested?.() ?? false,
     })
 
     handlers.onLiveness?.(liveness)
