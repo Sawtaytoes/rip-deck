@@ -4,7 +4,7 @@ Status: Accepted
 Date: 2026-08-27
 Type: Rip outcome / verdict model
 Supersedes: —
-Superseded by: —
+Superseded by: `2026-08-29-a-failed-backup-carries-no-completed-copy-warning.md` (failed-run warning clause only)
 
 ## Decision
 
