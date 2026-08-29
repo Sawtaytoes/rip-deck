@@ -326,6 +326,10 @@ export const runWatch = async (
       runningWatcher === null
         ? null
         : runningWatcher.runTrayCommand,
+    readBayActionRunner: () =>
+      runningWatcher === null
+        ? null
+        : (runningWatcher.runBayAction ?? null),
     // The watcher's own directory, passed rather than re-read
     // from the environment, so `/logs` can never look somewhere
     // the captures are not.

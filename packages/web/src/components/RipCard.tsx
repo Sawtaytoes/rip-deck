@@ -22,6 +22,7 @@ import {
   RIP_VISUAL_INTENT,
   ripProgressLabel,
   ripVisual,
+  ripWarningLines,
   throughputText,
 } from "../format"
 import type { BayActionState } from "../hooks/useBayActions"
@@ -203,6 +204,8 @@ export function RipCard({
   // no disc name, which is the adopted-bay case. A card with no
   // title at all is worse than one titled by its bay.
   const title = disc ?? (model || driveName(rip.drive))
+  const poster = rip.poster
+  const hasPoster = poster !== null
   const discType = discTypeText(rip)
 
   const isBusy = action?.status === "pending"
@@ -256,32 +259,41 @@ export function RipCard({
       )}
 
       <div className="flex gap-3">
-        {/* 3. The thumbnail. Always shown when present — the
-            owner wants the poster and title on a phone, not only
-            once a column clears 28rem. Sized smaller under
-            `@md/bay` so a narrow card still has room for the
-            name; full 2:3 trim (`w-28` ≈ 112×168) when the cell
-            is wide. Wrapped in Charcuterie's `Lightbox` so a
-            click opens it full-size. `ring-border-subtle` so the
-            ring survives a light scheme. */}
-        {rip.poster && (
-          <Lightbox
-            alt={`${title} poster`}
-            caption={rip.disctype_label ?? undefined}
-            className="relative z-10 shrink-0"
-            src={rip.poster}
-            thumbnail={
-              <img
-                src={rip.poster}
-                alt=""
-                loading="lazy"
-                onError={(event) => {
-                  event.currentTarget.style.display = "none"
-                }}
-                className="aspect-[2/3] w-16 rounded-md object-cover ring-1 ring-border-subtle @md/bay:w-28"
-              />
-            }
-          />
+        {/* 1 + 3. The slot badge sits above the thumbnail when
+            artwork exists, so it labels the image column rather
+            than interrupting the disc title. The poster remains
+            always shown when present — the owner wants the poster
+            and title on a phone, not only once a column clears
+            28rem. Sized smaller under `@md/bay` so a narrow card
+            still has room for the name; full 2:3 trim (`w-28` ≈
+            112×168) when the cell is wide. Wrapped in
+            Charcuterie's `Lightbox` so a click opens it full-size.
+            `ring-border-subtle` so the ring survives a light
+            scheme. */}
+        {hasPoster && (
+          <div className="flex shrink-0 flex-col items-start gap-1.5">
+            <span className="shrink-0 rounded-md bg-surface-sunken px-1.5 py-0.5 text-sm tabular-nums text-content-muted">
+              Slot {rip.slot ?? "?"}
+            </span>
+            <Lightbox
+              alt={`${title} poster`}
+              caption={rip.disctype_label ?? undefined}
+              className="relative z-10 shrink-0"
+              src={poster}
+              thumbnail={
+                <img
+                  src={poster}
+                  alt=""
+                  loading="lazy"
+                  onError={(event) => {
+                    event.currentTarget.style.display =
+                      "none"
+                  }}
+                  className="aspect-[2/3] w-16 rounded-md object-cover ring-1 ring-border-subtle @md/bay:w-28"
+                />
+              }
+            />
+          </div>
         )}
 
         <div className="min-w-0 flex-1">
@@ -290,16 +302,20 @@ export function RipCard({
               Keep trying / Give up / Cancel. */}
           <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
             <span className="flex min-w-0 max-w-full flex-wrap items-baseline gap-x-2">
-              {/* 1. The slot, said ONCE. It used to be said
+              {/* 1. The slot, said ONCE. When a poster exists,
+                  the badge is above that poster in the column
+                  beside this content. Without a poster it stays
+                  here, next to the title. It used to be said
                   twice — prefixed onto the drive name by
-                  `config/drives.json` and again on the line
-                  below (§3). The registry keeps its prefix,
-                  because that name is the MQTT label and
-                  therefore the HA entity id; the card stops
-                  rendering it. */}
-              <span className="shrink-0 rounded-md bg-surface-sunken px-1.5 py-0.5 text-sm tabular-nums text-content-muted">
-                Slot {rip.slot ?? "?"}
-              </span>
+                  `config/drives.json` and again on this line
+                  (§3). The registry keeps its prefix, because
+                  that name is the MQTT label and therefore the HA
+                  entity id; the card stops rendering it. */}
+              {!hasPoster && (
+                <span className="shrink-0 rounded-md bg-surface-sunken px-1.5 py-0.5 text-sm tabular-nums text-content-muted">
+                  Slot {rip.slot ?? "?"}
+                </span>
+              )}
               {/* 2. The disc — wrap, never truncate. The poster
                   and the title are what the operator is looking
                   for on a phone; `truncate` hid both. */}
@@ -454,12 +470,19 @@ export function RipCard({
               Not behind the collapse: a warning nobody scrolls to
               is a warning that is not there. */}
           {rip.warnings.map((warning) => (
-            <p
+            <ul
               className="mt-1.5 rounded-md border border-intent-warning-border bg-surface-raised px-2 py-1 text-sm text-intent-warning-content"
               key={warning}
             >
-              {warning}
-            </p>
+              {ripWarningLines(warning).map((line) => (
+                <li
+                  className="ml-4 list-disc pl-0.5"
+                  key={line}
+                >
+                  {line}
+                </li>
+              ))}
+            </ul>
           ))}
 
           {/* Everything below is what a collapsed card drops. */}

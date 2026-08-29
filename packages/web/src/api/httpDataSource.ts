@@ -134,34 +134,8 @@ export const httpDataSource: RipDeckDataSource = {
     return await response.text()
   },
 
-  /**
-   * Job actions that do not yet have their own daemon command.
-   *
-   * ⚠️ This function used to refuse a TRAY command here too,
-   * with the sentence the owner read on the live page: *"No REST
-   * endpoint for this, by design — tray commands go over
-   * MQTT."* That was wrong. The house rule is about
-   * service-to-service integration, not about a page talking to
-   * the daemon that served it, and widening it into a capability
-   * ban is the third time this project has done that
-   * (`docs/HANDOFF-stage7-ui-and-naming.md` §2). Tray commands
-   * now go to `runTrayCommand` below, and a press moves a drawer.
-   *
-   * What is left is genuinely unbuilt, and the refusal now says
-   * so accurately. `cancel`, `keep_trying`, `give_up` and
-   * `clear_quarantine` have **no
-   * transport at all** — not REST and NOT MQTT either, which the
-   * previous message got backwards: `cmd/drive` is the only
-   * inbound topic and `parseTrayCommand` accepts only the four
-   * tray words, so publishing `cancel` there gets an explicit
-   * rejection. There is nothing to paste.
-   *
-   * The control stays ENABLED rather than greyed out. A disabled
-   * button has nowhere to put the reason at the moment somebody
-   * wants it — and this refusal now names the one honest way to
-   * stop a rip, which beats a button that quietly does nothing.
-   */
-  runBayAction({ driveId, action }) {
+  /** Run a job action through the daemon that served this page. */
+  async runBayAction({ driveId, action }) {
     // Tray words are routed rather than refused: `bayActionsFor`
     // still hands them to `useBayActions` today, and answering
     // them here means the existing per-bay control works the
@@ -181,47 +155,35 @@ export const httpDataSource: RipDeckDataSource = {
         }))
     }
 
-    // The retry is a physical hand-off, not a second rip that
-    // software can start while the disc remains in this drive.
-    // Open the failed bay through the existing guarded command.
-    // Normal insertion starts the comparison rip after the
-    // operator moves the disc to another bay.
-    if (action === "retry_in_another_drive") {
-      return httpDataSource
-        .runTrayCommand({ command: "open_bay", driveId })
-        .then((report) => {
-          const result = trayReportToActionResult({
-            driveId,
-            report,
-          })
+    const response = await fetch(
+      `${apiBase}/api/bay-action`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action,
+          drive_id: driveId,
+        }),
+      },
+    )
 
-          return result.ok
-            ? {
-                ok: true,
-                msg:
-                  "Tray opened. Move this disc to another " +
-                  "drive. Rip Deck will start the comparison " +
-                  "rip when you close that tray.",
-              }
-            : result
-        })
-        .catch((error: unknown) => ({
-          ok: false,
-          msg: String(error),
-        }))
+    const body = await readJsonBody(response)
+
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      typeof (body as Partial<ActionResult>).ok ===
+        "boolean" &&
+      typeof (body as Partial<ActionResult>).msg ===
+        "string"
+    ) {
+      return body as ActionResult
     }
 
-    const result: ActionResult = {
+    return {
       ok: false,
-      msg:
-        `${action} on ${driveId} has no transport yet — ` +
-        "Rip Deck serves no endpoint for it and `cmd/drive` " +
-        "takes only tray commands. To stop a rip, open the " +
-        "bay's tray (⏏) or restart the daemon; nothing else " +
-        "reaches a running job today.",
+      msg: `/api/bay-action failed: ${response.status} ${response.statusText}`,
     }
-
-    return Promise.resolve(result)
   },
 
   /**
