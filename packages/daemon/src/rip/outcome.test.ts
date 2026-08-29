@@ -383,9 +383,10 @@ describe("backup mode proves itself differently", () => {
 
     expect(summary.isSuccessful).toBe(false)
     expect(summary.failureReason).toBe("read_errors")
-    // Carried on the failure too — the sentence explaining what
-    // went wrong is worth as much here as on a success.
-    expect(summary.warnings).toHaveLength(1)
+    // There is no verified copy to warn about. In particular,
+    // never claim "the backup finished and its structure
+    // verified" after MakeMKV said `Backup failed`.
+    expect(summary.warnings).toEqual([])
   })
 
   it("fails a backup MakeMKV itself said failed, exit 0 and all", () => {
@@ -409,6 +410,7 @@ describe("backup mode proves itself differently", () => {
     })
 
     expect(summary.isSuccessful).toBe(false)
+    expect(summary.warnings).toEqual([])
   })
 })
 

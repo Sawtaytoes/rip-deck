@@ -26,6 +26,7 @@ export type VerdictKind =
   | "enumeration_flap"
   | "disc_scratched"
   | "disc_dirty"
+  | "disc_read_error"
   | "disc_marginal_slow"
   | "unknown"
 
@@ -135,6 +136,15 @@ export const VERDICT_TEMPLATES: Record<
       "Dirty — errors are scattered across the disc, which is " +
       "what fingerprints and smudges look like. Clean it and " +
       "try again.",
+    isKeepTryingSensible: true,
+  },
+  disc_read_error: {
+    action: "none",
+    subject: "disc",
+    message:
+      "A sector could not be read. Retry this disc in another " +
+      "drive to find whether the problem follows the disc or " +
+      "stays with this drive.",
     isKeepTryingSensible: true,
   },
   disc_marginal_slow: {

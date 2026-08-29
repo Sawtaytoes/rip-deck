@@ -229,6 +229,7 @@ const buildVerdicts = (nowMs: number): TowerSnapshot => {
   const kinds: VerdictKind[] = [
     "ok",
     "disc_dirty",
+    "disc_read_error",
     "disc_scratched",
     "disc_marginal_slow",
     "drive_failing",
@@ -255,10 +256,12 @@ const buildVerdicts = (nowMs: number): TowerSnapshot => {
               ? []
               : [`Fixture evidence for ${kind}`],
           readErrorCount:
-            kind === "disc_dirty" ||
-            kind === "disc_scratched"
-              ? 12
-              : 0,
+            kind === "disc_read_error"
+              ? 1
+              : kind === "disc_dirty" ||
+                  kind === "disc_scratched"
+                ? 12
+                : 0,
         }),
       }),
     ),
