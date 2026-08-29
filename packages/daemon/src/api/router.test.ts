@@ -75,6 +75,17 @@ const buildRouter = (
   webAssets?: WebAssets,
   extras: {
     readTrayRunner?: () => TrayCommandRunner | null
+    readBayActionRunner?: () =>
+      | ((input: {
+          driveId: string
+          action:
+            | "clear_quarantine"
+            | "keep_trying"
+            | "give_up"
+            | "retry_in_another_drive"
+            | "cancel"
+        }) => Promise<{ ok: boolean; msg: string }>)
+      | null
     readLogCapture?: LogCaptureReader | null
   } = {},
 ) =>
@@ -244,6 +255,37 @@ describe("GET /json", () => {
         url: "/json",
       }).status,
     ).toBe(405)
+  })
+})
+
+describe("POST /api/bay-action", () => {
+  it("passes Cancel to the watcher", async () => {
+    const runBayAction = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        msg: "Rip cancelled and tray opened.",
+      }),
+    )
+
+    const response = await handleAsync(
+      buildRouter(undefined, {
+        readBayActionRunner: () => runBayAction,
+      }),
+      {
+        method: "POST",
+        url: "/api/bay-action",
+        readBody: () =>
+          Promise.resolve(
+            '{"action":"cancel","drive_id":"usb-2-1-1-2-4-4-2"}',
+          ),
+      },
+    )
+
+    expect(response.status).toBe(200)
+    expect(runBayAction).toHaveBeenCalledWith({
+      action: "cancel",
+      driveId: "usb-2-1-1-2-4-4-2",
+    })
   })
 })
 
@@ -967,6 +1009,7 @@ describe("the server's own surface", () => {
     comparedNames.delete("SERVER_PATHNAMES")
 
     expect([...comparedNames].sort()).toEqual([
+      "BAY_ACTION_PATHNAME",
       "FIXTURES_PATHNAME",
       "HEALTH_PATHNAMES",
       "HISTORY_PATHNAME",

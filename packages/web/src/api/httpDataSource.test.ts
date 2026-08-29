@@ -185,22 +185,35 @@ const buildReport = (
 })
 
 describe("runBayAction", () => {
-  it("says the job actions have nowhere to go — including MQTT", async () => {
-    const fetchMock = stubFetch({ ok: true })
+  it("sends a job action to the daemon", async () => {
+    const fetchMock = stubFetch({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: () =>
+        Promise.resolve({
+          ok: true,
+          msg: "Rip cancelled and tray opened.",
+        }),
+    })
 
     const result = await httpDataSource.runBayAction({
       driveId: "usb-2-1-1-2-4-4-5",
-      action: "clear_quarantine",
+      action: "cancel",
     })
 
-    // The five job actions genuinely have no transport: no
-    // endpoint, and `cmd/drive` takes only the four tray words.
-    // The message this replaced claimed they "go over MQTT",
-    // which would have sent an operator to publish something the
-    // daemon explicitly rejects.
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(result.ok).toBe(false)
-    expect(result.msg).toContain("no transport yet")
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bay-action",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: '{"action":"cancel","drive_id":"usb-2-1-1-2-4-4-5"}',
+      },
+    )
+    expect(result).toEqual({
+      ok: true,
+      msg: "Rip cancelled and tray opened.",
+    })
   })
 
   /**

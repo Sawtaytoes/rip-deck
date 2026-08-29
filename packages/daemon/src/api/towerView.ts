@@ -65,7 +65,7 @@ import type {
  * `buildRipEventPayload`'s output byte for byte.
  */
 
-/** What the UI may offer for a bay. Names only — no endpoint. */
+/** What the UI may offer for a bay. */
 export type BayAction =
   /** Supervision quarantine is cleared by a human, never
    *  automatically (see `DriveSupervisionState`). */
@@ -227,14 +227,6 @@ const buildBayActions = (bay: BaySnapshot): BayAction[] => {
     !job.isKeepTryingRequested
   ) {
     actions.push("keep_trying", "give_up")
-  }
-
-  if (
-    isTroubled &&
-    job.verdict.subject === "disc" &&
-    job.verdict.confidence === "suspected"
-  ) {
-    actions.push("retry_in_another_drive")
   }
 
   if (isActive) actions.push("cancel")

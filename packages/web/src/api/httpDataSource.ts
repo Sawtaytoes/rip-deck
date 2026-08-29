@@ -134,34 +134,8 @@ export const httpDataSource: RipDeckDataSource = {
     return await response.text()
   },
 
-  /**
-   * The five JOB actions, which still have nowhere to go.
-   *
-   * ⚠️ This function used to refuse a TRAY command here too,
-   * with the sentence the owner read on the live page: *"No REST
-   * endpoint for this, by design — tray commands go over
-   * MQTT."* That was wrong. The house rule is about
-   * service-to-service integration, not about a page talking to
-   * the daemon that served it, and widening it into a capability
-   * ban is the third time this project has done that
-   * (`docs/HANDOFF-stage7-ui-and-naming.md` §2). Tray commands
-   * now go to `runTrayCommand` below, and a press moves a drawer.
-   *
-   * What is left is genuinely unbuilt, and the refusal now says
-   * so accurately. `cancel`, `keep_trying`, `give_up`,
-   * `clear_quarantine` and `retry_in_another_drive` have **no
-   * transport at all** — not REST and NOT MQTT either, which the
-   * previous message got backwards: `cmd/drive` is the only
-   * inbound topic and `parseTrayCommand` accepts only the four
-   * tray words, so publishing `cancel` there gets an explicit
-   * rejection. There is nothing to paste.
-   *
-   * The control stays ENABLED rather than greyed out. A disabled
-   * button has nowhere to put the reason at the moment somebody
-   * wants it — and this refusal now names the one honest way to
-   * stop a rip, which beats a button that quietly does nothing.
-   */
-  runBayAction({ driveId, action }) {
+  /** Run a job action through the daemon that served this page. */
+  async runBayAction({ driveId, action }) {
     // Tray words are routed rather than refused: `bayActionsFor`
     // still hands them to `useBayActions` today, and answering
     // them here means the existing per-bay control works the
@@ -181,17 +155,35 @@ export const httpDataSource: RipDeckDataSource = {
         }))
     }
 
-    const result: ActionResult = {
-      ok: false,
-      msg:
-        `${action} on ${driveId} has no transport yet — ` +
-        "Rip Deck serves no endpoint for it and `cmd/drive` " +
-        "takes only tray commands. To stop a rip, open the " +
-        "bay's tray (⏏) or restart the daemon; nothing else " +
-        "reaches a running job today.",
+    const response = await fetch(
+      `${apiBase}/api/bay-action`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action,
+          drive_id: driveId,
+        }),
+      },
+    )
+
+    const body = await readJsonBody(response)
+
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      typeof (body as Partial<ActionResult>).ok ===
+        "boolean" &&
+      typeof (body as Partial<ActionResult>).msg ===
+        "string"
+    ) {
+      return body as ActionResult
     }
 
-    return Promise.resolve(result)
+    return {
+      ok: false,
+      msg: `/api/bay-action failed: ${response.status} ${response.statusText}`,
+    }
   },
 
   /**

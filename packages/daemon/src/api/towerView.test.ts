@@ -396,7 +396,9 @@ describe("suspected vs confirmed", () => {
     expect(bay.verdict_confidence).toBe("suspected")
     // …but only two drives agreeing may wake the house.
     expect(bay.is_announceable).toBe(false)
-    expect(bay.actions).toContain("retry_in_another_drive")
+    expect(bay.actions).not.toContain(
+      "retry_in_another_drive",
+    )
   })
 
   it("marks the confirmed twin announceable", () => {
