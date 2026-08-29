@@ -6,7 +6,7 @@
 - **Supersedes:** the "a PRESENT drive still holding its disc is left alone"
   clause of
   [2026-07-30-loaded-discs-rebuild-from-the-bay-ledger.md](2026-07-30-loaded-discs-rebuild-from-the-bay-ledger.md)
-- **Superseded by:** —
+- **Superseded by:** [2026-08-29-mark-as-taken-out-retires-finished-cards.md](2026-08-29-mark-as-taken-out-retires-finished-cards.md)
 
 ## Decision
 

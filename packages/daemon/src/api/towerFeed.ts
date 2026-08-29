@@ -366,6 +366,8 @@ type BayFacts = {
   isAdopted: boolean
   /** When the outcome was latched. Null when there is none. */
   latchedAtMs: number | null
+  /** The operator said this disc has been taken out. */
+  isLoadedDismissed: boolean
 }
 
 const readBayFacts = (input: {
@@ -389,6 +391,7 @@ const readBayFacts = (input: {
       // something only the bay table can know.
       isAdopted: false,
       latchedAtMs: null,
+      isLoadedDismissed: false,
     }
   }
 
@@ -406,6 +409,7 @@ const readBayFacts = (input: {
     destinationPath: bay.destinationPath,
     isAdopted: bay.isAdopted,
     latchedAtMs: bay.latchedAtMs,
+    isLoadedDismissed: bay.isLoadedDismissed,
   }
 }
 
@@ -569,6 +573,13 @@ const buildJob = (input: {
   verdicts: ComputedVerdictStore
 }): Job | null => {
   const { record, facts } = input
+
+  // A human standing at the tower is the authority on whether the disc is
+  // still there. These drives can report media after it has been removed, so
+  // a dismissed terminal job must not leave a red card that cannot be cleared.
+  // The bay stays latched in the watcher: this is display-only and cannot
+  // cause the old disc to re-rip.
+  if (facts.isLoadedDismissed) return null
 
   // An adopted disc has no start time anywhere: this process
   // never started that rip. It does stamp one — the bay emits a
