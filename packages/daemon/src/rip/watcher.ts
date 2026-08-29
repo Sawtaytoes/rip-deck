@@ -546,12 +546,10 @@ export type BayState = {
    * not agreed.
    *
    * Written only by the `clear_loaded` press ("Mark as taken
-   * out"), read only by `loadedDiscsNow`. It is the live-bay twin
-   * of a ledger phantom — **display-only, and it reaches no rip
-   * decision**: the latch, the fingerprint and the start counter
-   * are all untouched, so a disc that really is still in the tray
-   * is still held rather than re-ripped, and `open_trays` still
-   * offers to open the bay.
+   * out"). It clears the reminder AND hides the old terminal card.
+   * The latch, the fingerprint and the start counter are all
+   * untouched, so a disc that really is still in the tray is still
+   * held rather than re-ripped.
    *
    * ⚠️ **Without it the button does nothing on this rack.** These
    * drives keep reporting their disc long after the tray opens
@@ -3371,7 +3369,7 @@ export const startWatcher = (
    *     marked `isLoadedDismissed` rather than dropped. The bay
    *     stays latched — deleting it would rebuild a fresh `idle`
    *     bay that re-rips the disc it may still be holding — and the
-   *     flag takes it out of the reminder and nothing else.
+   *     flag removes both its reminder and stale finished card.
    *
    * ⚠️ **Point 3 is the fix for a button that did nothing.** It used
    * to leave every present bay alone, on the reasoning that
