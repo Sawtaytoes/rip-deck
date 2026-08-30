@@ -28,6 +28,9 @@ services:
       - /media/Disc-Rips:/media/Disc-Rips
       - /srv/rip-deck/makemkv:/config
       - /srv/rip-deck/state:/var/lib/rip-deck
+      # The image contains example drives only. Copy config/drives.json to
+      # this persistent host path and replace the examples with your tower.
+      - /srv/rip-deck/drives.json:/app/config/drives.json:ro
     environment:
       # Per-rip isolation spawns this same image, device-scoped, over
       # the mounted docker socket — so it must be the registry ref.
