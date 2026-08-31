@@ -2,6 +2,7 @@ import {
   Button,
   DatePicker,
   Field,
+  SearchInput,
   SegmentedControl,
 } from "@charcuterie/ui"
 
@@ -59,23 +60,19 @@ import type { HistoryFilters } from "../types"
  * shape for three.
  */
 
-/**
- * The class a bare `<input>` needs inside a `Field`.
- *
- * ⚠️ **Not a borrowed class, and not a shape that should live in
- * Charcuterie instead.** `Field` is deliberately a SLOT — it owns
- * the label, the wiring, the description and the error, and it
- * clones whatever control it is given without styling it, so the
- * same component can wrap an `<input>`, a `Picker` or a
- * `contenteditable`. Charcuterie's own `Field` stories declare
- * exactly this constant for exactly this reason. mail-sifter and
- * gallery-downloader each declare their own too.
- *
- * Copied from the library's story rather than invented, so the
- * focus ring is the fleet's and not a third spelling of one.
- */
-const TEXT_INPUT_CLASS =
-  "w-full rounded-md border border-border-default bg-surface-raised px-3 py-2 text-content-primary text-sm focus-visible:outline-solid focus-visible:outline-(length:--focus-ring-width) focus-visible:outline-offset-(--focus-ring-offset) focus-visible:outline-focus-ring"
+const ClearIcon = () => (
+  <svg
+    aria-hidden="true"
+    className="size-4"
+    fill="none"
+    stroke="currentColor"
+    strokeLinecap="round"
+    strokeWidth={2}
+    viewBox="0 0 24 24"
+  >
+    <path d="M6 6l12 12M18 6 6 18" />
+  </svg>
+)
 
 /** Local midnight as `YYYY-MM-DD`, for the picker's own value. */
 const toIsoDay = (
@@ -121,23 +118,22 @@ export function HistoryControls({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
-        <Field
-          className="min-w-56 flex-1"
-          label="Search"
-          onChange={(event) => {
-            onChange({
-              ...filters,
-              search: event.currentTarget.value,
-            })
-          }}
-          placeholder="Disc name, bay, drive id…"
-          // `search` rather than `text`, so the browser offers its
-          // own clear affordance and a phone keyboard shows the
-          // right return key.
-          type="search"
-          value={filters.search}
-        >
-          <input className={TEXT_INPUT_CLASS} />
+        <Field className="min-w-56 flex-1" label="Search">
+          <SearchInput
+            clearIcon={<ClearIcon />}
+            onChange={(event) => {
+              onChange({
+                ...filters,
+                search: event.currentTarget.value,
+              })
+            }}
+            onClear={() => {
+              onChange({ ...filters, search: "" })
+            }}
+            placeholder="Disc name, bay, drive id…"
+            size="sm"
+            value={filters.search}
+          />
         </Field>
 
         <SegmentedControl

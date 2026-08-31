@@ -362,9 +362,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@charcuterie/ui@npm:^3.25.0":
-  version: 3.25.0
-  resolution: "@charcuterie/ui@npm:3.25.0"
+"@charcuterie/ui@npm:^3.29.0":
+  version: 3.29.0
+  resolution: "@charcuterie/ui@npm:3.29.0"
   dependencies:
     "@charcuterie/logic": "npm:2.3.0"
     "@charcuterie/tokens": "npm:1.6.0"
@@ -396,7 +396,7 @@ __metadata:
       optional: true
     react-router:
       optional: true
-  checksum: 10c0/a438307134169d61f3a4ab89fa2b810e3eac43cd08bede9bac26b135a93e02cde5887f46577dd7abf3169a1e598218056763714de3f1e3483c3e28e0ae43d330
+  checksum: 10c0/cbb0c89a9c9bf242f56d72002c11d3e47685fb553496833a2ae925a2c1af85c95c41779d0f4ebc737883df57c07af3e5292ef601b306fdf256a137725f606c0d
   languageName: node
   linkType: hard
 
@@ -1275,7 +1275,7 @@ __metadata:
     "@charcuterie/logic": "npm:^2.3.0"
     "@charcuterie/storybook-config": "npm:^0.3.0"
     "@charcuterie/tokens": "npm:^1.6.0"
-    "@charcuterie/ui": "npm:^3.25.0"
+    "@charcuterie/ui": "npm:^3.29.0"
     "@charcuterie/vitest-config": "npm:^1.1.0"
     "@rip-deck/contracts": "workspace:*"
     "@storybook/addon-a11y": "npm:^10.5.5"
