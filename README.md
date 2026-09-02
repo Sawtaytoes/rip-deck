@@ -46,3 +46,20 @@ Open `http://localhost:3007`. The [setup guide](docs/setup.md) explains device a
 ## License
 
 [MIT](LICENSE). The image also contains MakeMKV under [GuinpinSoft's terms](https://www.makemkv.com/); the MIT license applies only to this repository's source.
+
+## A documentation-only change skips CI
+
+CI turns its own gates off when a change touches only `.md` files (or `LICENSE`).
+Nothing in the suite reads markdown, so running it proved nothing and only delayed
+the merge. A documentation-only merge also skips the image build, because the
+rebuilt image would be byte-identical.
+
+Two rules follow, and both matter if you edit `.github/workflows/ci.yml`:
+
+1. **Never convert this to `paths-ignore:` on the trigger.** The `check` job is a
+   required status check. A job that `if:` skips still reports that context, and
+   GitHub counts a `skipped` conclusion as success. A workflow that never starts
+   reports nothing at all, so the required check stays pending and the pull request
+   waits forever on a status that will never arrive.
+2. **`.mdx` is not documentation**, and neither is `.changeset/*.md`. The detector
+   matches `.md$` for that reason. Do not loosen it to `.md*`.
