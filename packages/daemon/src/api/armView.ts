@@ -233,11 +233,17 @@ export const toArmPercent = (job: Job): number | null => {
 /**
  * The capture this job would have, if it has one.
  *
- * Null is what hides the card's Logs button, so this answers
- * "could a capture exist" rather than "does one exist" — the
- * latter is a `stat`, and the parent process does no disk I/O on
- * the way to `/json`. `/logs` answers the real question with a
- * 404, which the modal shows.
+ * Null is what hides the card's Logs button. A job UUID exists
+ * throughout the settle, type and identify sequence, but the
+ * event log does not: `runBayRip` creates it immediately before
+ * `onRipStarted()` moves the bay to `ripping`. Advertising the
+ * UUID during `settling` therefore offered a button whose only
+ * possible answer was a 404 until identification finished.
+ *
+ * This answers "could a capture exist NOW" rather than "does one
+ * exist on disk". The latter is a `stat`, and the parent process
+ * does no disk I/O on the way to `/json`. Once a child has
+ * started, `/logs` remains the authority on the actual file.
  *
  * The test is structural, not a guess: every real capture is
  * named for a `randomUUID()` job id, while a bay that never got
@@ -248,7 +254,12 @@ export const toArmPercent = (job: Job): number | null => {
  * owner most wants a log for.
  */
 const logCaptureNameFor = (job: Job): string | null =>
-  isSafeJobUuid(job.id) ? logCaptureFilename(job.id) : null
+  job.state !== "settling" &&
+  job.state !== "identifying" &&
+  job.state !== "queued" &&
+  isSafeJobUuid(job.id)
+    ? logCaptureFilename(job.id)
+    : null
 
 const buildArmRip = (input: {
   bay: BaySnapshot
