@@ -8,6 +8,7 @@ import {
   discTypeText,
   driveName,
   elapsedText,
+  estimatedCompletionText,
   etaText,
   etaTrendText,
   humanDuration,
@@ -140,6 +141,28 @@ describe("etaText", () => {
   it("says nothing rather than guessing when there is no rate", () => {
     expect(etaText(null)).toBe("")
     expect(etaText(0)).toBe("")
+  })
+})
+
+describe("estimatedCompletionText", () => {
+  it("adds the daemon's measured ETA to the current clock time", () => {
+    const now = new Date("2026-07-26T12:12:00").getTime()
+    const expectedTime = new Intl.DateTimeFormat(
+      undefined,
+      {
+        hour: "numeric",
+        minute: "2-digit",
+      },
+    ).format(new Date(now + 900_000))
+
+    expect(estimatedCompletionText(900, now)).toBe(
+      `Estimated finish ${expectedTime}`,
+    )
+  })
+
+  it("says nothing until the daemon has measured a rate", () => {
+    expect(estimatedCompletionText(null)).toBe("")
+    expect(estimatedCompletionText(0)).toBe("")
   })
 })
 

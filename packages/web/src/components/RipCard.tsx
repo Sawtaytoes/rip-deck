@@ -17,6 +17,7 @@ import {
   discTypeText,
   driveName,
   elapsedText,
+  estimatedCompletionText,
   etaText,
   etaTrendText,
   RIP_VISUAL_INTENT,
@@ -214,6 +215,9 @@ export function RipCard({
     ? elapsedText(rip.start, now)
     : ""
   const eta = rip.active ? etaText(rip.eta_seconds) : ""
+  const estimatedCompletion = rip.active
+    ? estimatedCompletionText(rip.eta_seconds, now)
+    : ""
   const trend = rip.active
     ? etaTrendText(rip.eta_trend)
     : ""
@@ -439,6 +443,17 @@ export function RipCard({
             label={ripProgressLabel(rip)}
             value={visual.fillPercent}
           />
+
+          {/* The operator uses the finish time to plan the next disc. Keep it
+              outside the density wrapper so the Narrow View and every Wide
+              View column count show the same estimate. The daemon's measured
+              ETA is the only input; no percentage extrapolation happens in
+              the browser. */}
+          {estimatedCompletion && (
+            <div className="mt-1 text-sm tabular-nums text-content-secondary">
+              {estimatedCompletion}
+            </div>
+          )}
 
           {/* Never quiet and never behind a tap, but no longer
               always RED. A rip with read errors that still
