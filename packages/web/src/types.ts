@@ -71,13 +71,13 @@ export type Rip = {
   stage: string
   active: boolean
   /**
-   * Non-null once a capture exists for this job; null hides the
-   * card's Logs button.
+   * Non-null once a capture can exist for this job; null hides
+   * the card's Logs button.
    *
    * `armView` sent null unconditionally while `/logs` answered
    * 501. Now that it serves the capture, null means THIS job has
-   * none — a rip that never started writing one — which is a
-   * different fact and still hides the button correctly.
+   * none yet — including the settle, type and identify sequence
+   * before the ripper creates its event log.
    */
   logfile: string | null
   /**
