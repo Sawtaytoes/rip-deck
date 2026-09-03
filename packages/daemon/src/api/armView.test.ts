@@ -217,9 +217,23 @@ describe("the ARM-viewer projection", () => {
 })
 
 describe("the log capture", () => {
+  it("offers no button while the drive is reading the disc", () => {
+    // The UUID is assigned before settle, type and identify, but
+    // the event log is created only when the ripper child starts.
+    // A button during this phase can only lead to a 404.
+    const rip = armState([
+      buildBay({
+        slot: 2,
+        job: buildJob({ state: "settling" }),
+      }),
+    ]).hosts[0].rips[0]
+
+    expect(rip.logfile).toBeNull()
+  })
+
   it("names the capture, so the card shows its button", () => {
-    // `/logs` answers now, so `logfile: null` — which is what
-    // HIDES the button — would be hiding a working feature.
+    // `runBayRip` creates the log before the state becomes
+    // `ripping`, so the button has something to open now.
     const rip = armState([
       buildBay({ slot: 2, job: buildJob() }),
     ]).hosts[0].rips[0]
