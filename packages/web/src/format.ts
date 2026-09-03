@@ -254,6 +254,29 @@ export function etaText(etaSeconds: number | null): string {
 }
 
 /**
+ * Estimated wall-clock completion time from the daemon's measured ETA.
+ *
+ * This is the same estimate as `etaText`, expressed as the clock time the
+ * operator needs for planning. It stays empty until the daemon has measured
+ * a rate. The browser formats the time in the operator's locale and time
+ * zone, because `now` and the displayed wall clock are both client-side.
+ */
+export function estimatedCompletionText(
+  etaSeconds: number | null,
+  now: number = Date.now(),
+): string {
+  if (etaSeconds == null || etaSeconds <= 0) return ""
+
+  const completion = new Date(now + etaSeconds * 1000)
+  const time = new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(completion)
+
+  return `Estimated finish ${time}`
+}
+
+/**
  * The ETA trend, when it is worth saying.
  *
  * Only `rising` gets words. It is a signal in its own right

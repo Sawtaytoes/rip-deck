@@ -120,6 +120,14 @@ describe("RipCard", () => {
     expect(
       screen.getByText(/12m elapsed · ~15m left/),
     ).toBeInTheDocument()
+
+    const finish = screen.getByText(/Estimated finish/)
+    expect(finish).toBeInTheDocument()
+    // The Narrow View hides the detail wrapper. The completion clock is a
+    // direct card child, so it remains visible at every card width.
+    expect(finish.parentElement?.className).not.toContain(
+      "@max-md/bay:hidden",
+    )
   })
 
   it("says nothing about the ETA when the daemon has no rate", () => {
@@ -134,6 +142,9 @@ describe("RipCard", () => {
 
     expect(
       screen.queryByText(/left/),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(/Estimated finish/),
     ).not.toBeInTheDocument()
   })
 
