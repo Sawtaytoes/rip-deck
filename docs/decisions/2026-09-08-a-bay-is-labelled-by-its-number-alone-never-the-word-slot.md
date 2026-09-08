@@ -8,10 +8,12 @@
 
 ## Decision
 
-Every place the UI names a bay shows the bare number — `1`, `7` — never `Slot 1`.
-This binds the dashboard cards (fixed in #54), the tower kiosk rows and its disc
-detail heading, and any future view. Accessible names and log lines may still say
-"slot" where a screen reader or a grep needs the noun; the visible label does not.
+A badge, chip or heading that labels a bay shows the bare number — `1`, `7` — never
+`Slot 1`. This binds the dashboard cards (fixed in #54), the tower kiosk rows and its
+disc detail heading, and any future view. Accessible names, progress-bar labels and
+log lines may still say "slot" where a screen reader or a grep needs the noun; the
+visible label does not. A location written as prose (the history's
+`Slot 3 · <drive>`) is a sentence, not a label, and is outside this record.
 
 ## Context
 

@@ -1,4 +1,8 @@
-import { screen, waitFor } from "@testing-library/react"
+import {
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { Navigate, Route, Routes } from "react-router"
 import { expect, test, vi } from "vitest"
@@ -80,14 +84,27 @@ test("shows nine rows, disc artwork and targeted controls, with a route back", a
     }),
   ).toHaveLength(9)
   expect(screen.queryByRole("heading")).toBeNull()
-  await userEvent.click(
-    screen.getByRole("link", { name: /^Slot 1:/ }),
-  )
+  // The visible label is the bare number — never the word "Slot" —
+  // and the rip name is the headline of every row.
+  const firstRow = screen.getByRole("link", {
+    name: /^Slot 1:/,
+  })
+  expect(firstRow).toHaveTextContent(/^1/)
+  expect(firstRow).toHaveTextContent(bay.state.title)
+  // The progress bar's accessible name still says "slot"; it is
+  // screen-reader only, so nothing visible may say the word.
   expect(
-    await screen.findByRole("heading", { name: "Slot 1" }),
-  ).toBeVisible()
+    within(firstRow).queryByText(/Slot/, {
+      ignore: ".sr-only",
+    }),
+  ).toBeNull()
+  await userEvent.click(firstRow)
+  const heading = await screen.findByRole("heading", {
+    name: new RegExp(`^1\\s*${bay.state.title}$`),
+  })
+  expect(heading).toBeVisible()
+  expect(heading).not.toHaveTextContent("Slot")
   expect(screen.getByText("Success · 100%")).toBeVisible()
-  expect(screen.getByText(bay.state.title)).toBeVisible()
   expect(
     screen.getByRole("img", {
       name: `Poster for ${bay.state.title}`,

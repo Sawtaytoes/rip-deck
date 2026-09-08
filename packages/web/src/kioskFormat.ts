@@ -71,11 +71,38 @@ export const kioskBaySummary = (bay: BayView) => {
     state.eta_seconds > 0
       ? `~${humanDuration(state.eta_seconds)}`
       : ""
+  const readErrors =
+    state.read_error_count > 0
+      ? `${state.read_error_count} read error${state.read_error_count === 1 ? "" : "s"}`
+      : ""
   const detail = [
     type,
-    eta || (status === "Success" ? "Ready to remove" : ""),
+    eta ||
+      (status === "Success"
+        ? "Ready to remove"
+        : status === "Failed"
+          ? readErrors
+          : ""),
   ]
     .filter(Boolean)
     .join(" · ")
-  return { status, intent, percent, detail, isActive }
+  const isEmpty = status === "Empty" || status === "Offline"
+  // The rip name leads the row; an empty or offline bay says what it
+  // is waiting for instead, so the line is never blank.
+  const title = isEmpty
+    ? bay.is_present
+      ? "Ready for disc"
+      : "Drive disconnected"
+    : (state.title ?? bay.label)
+  const meta = [status, detail].filter(Boolean).join(" · ")
+  return {
+    status,
+    intent,
+    percent,
+    detail,
+    isActive,
+    isEmpty,
+    title,
+    meta,
+  }
 }
