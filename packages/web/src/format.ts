@@ -179,11 +179,29 @@ export function discLabel(rip: Rip): string | null {
  * live page. A type nobody read is not worth a parenthetical.
  */
 export function discTypeText(rip: Rip): string | null {
-  if (rip.disctype_label !== null) return rip.disctype_label
+  const label =
+    rip.disctype_label !== null
+      ? rip.disctype_label
+      : rip.disctype === "unknown"
+        ? null
+        : kindLabel(rip.kind)
 
-  return rip.disctype === "unknown"
+  if (label === null || rip.path === null) return label
+
+  // The destination naming contract already ends a backup with
+  // ` - {type}`. Do not print a second `4K` (or Blu-ray/DVD) as
+  // a sibling of that path. This is presentation-only: the
+  // stored destination remains byte-for-byte unchanged.
+  const leaf = rip.path.split("/").pop() ?? rip.path
+  const withoutIso = leaf.replace(/\.iso$/i, "")
+  const withoutCollision = withoutIso.replace(
+    / \(rip-deck-duplicate-[^)]+\)$/,
+    "",
+  )
+
+  return withoutCollision.endsWith(` - ${label}`)
     ? null
-    : kindLabel(rip.kind)
+    : label
 }
 
 /**

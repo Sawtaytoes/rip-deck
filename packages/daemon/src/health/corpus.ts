@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import type { JobFeatureVector } from "@rip-deck/contracts"
+import { copyStageIoErrorDelta } from "./featureVector.ts"
 
 /**
  * How much tuning evidence is on disk, counted rather than
@@ -77,14 +78,19 @@ export const EMPTY_CORPUS: CorpusReadiness = {
  *    sole authority on that;
  *  - MakeMKV counted read errors, which the one rule says is
  *    never a success;
- *  - the kernel's own `ioerr_cnt` moved during the job.
+ *  - the kernel's own `ioerr_cnt` moved during a copy stage.
+ *
+ * Whole-job kernel increments are retained in the vector, but
+ * startup probe commands can increment the counter without a
+ * disc sector being copied. Counting those as a bad rip would
+ * teach the gate from a false warning.
  */
 export const isTroubledJob = (
   vector: JobFeatureVector,
 ): boolean =>
   !vector.outcome.isSuccessful ||
   vector.readErrorCount > 0 ||
-  vector.ioErrorTotalDelta > 0
+  copyStageIoErrorDelta(vector.stages) > 0
 
 /**
  * Count the corpus in `stateDir`.

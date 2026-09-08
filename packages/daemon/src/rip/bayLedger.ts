@@ -6,6 +6,7 @@ import {
 } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import type { DiscType } from "@rip-deck/contracts"
+import { copyStageIoErrorDelta } from "../health/featureVector.ts"
 import type { BayTrayCommand } from "./trayCommand.ts"
 import type {
   BayObservation,
@@ -671,12 +672,114 @@ export const readBayLedger = async (input: {
   path: string
 }): Promise<BayLedger> => {
   try {
-    return parseBayLedger(
+    const ledger = parseBayLedger(
       await readFile(input.path, "utf8"),
     )
+
+    // Outcomes written before the 2026-09-08 stage fix merged
+    // the whole-job `ioerr_cnt` delta into `readErrorCount`.
+    // Correct those records from the feature vector on startup,
+    // when both files already exist and before adoption copies
+    // the outcome into the live bay table. The feature file is
+    // read only; its whole-job and per-stage evidence remains
+    // unchanged.
+    const records = await Promise.all(
+      ledger.records.map((record) =>
+        correctStoredReadErrorCount({
+          record,
+          stateDir: dirname(input.path),
+        }),
+      ),
+    )
+
+    return { ...ledger, records }
   } catch {
     // No file yet is the normal first-run state, not an error.
     return EMPTY_BAY_LEDGER
+  }
+}
+
+const correctStoredReadErrorCount = async (input: {
+  record: BayLedgerRecord
+  stateDir: string
+}): Promise<BayLedgerRecord> => {
+  if (input.record.jobUuid === null) return input.record
+
+  // A real MakeMKV read error on a verified backup carries its
+  // warning sentence, and a failed read-error rip carries its
+  // failure kind. Keep either record intact. The legacy defect
+  // produced a plain `completed` outcome with no warning and put
+  // only the merged kernel count in `readErrorCount`.
+  if (
+    input.record.outcome.kind !== "completed" ||
+    (input.record.outcome.warnings?.length ?? 0) > 0
+  ) {
+    return input.record
+  }
+
+  const raw = await readFile(
+    join(
+      input.stateDir,
+      `${input.record.jobUuid}.features.json`,
+    ),
+    "utf8",
+  ).catch(() => null)
+
+  if (raw === null) return input.record
+
+  try {
+    const parsed: unknown = JSON.parse(raw)
+
+    if (typeof parsed !== "object" || parsed === null) {
+      return input.record
+    }
+
+    const vector = parsed as {
+      readErrorCount?: unknown
+      stages?: unknown
+    }
+
+    if (
+      typeof vector.readErrorCount !== "number" ||
+      !Array.isArray(vector.stages)
+    ) {
+      return input.record
+    }
+
+    const stages = vector.stages.flatMap((stage) => {
+      if (typeof stage !== "object" || stage === null)
+        return []
+
+      const candidate = stage as {
+        label?: unknown
+        ioErrorDelta?: unknown
+      }
+
+      return typeof candidate.label === "string" &&
+        typeof candidate.ioErrorDelta === "number"
+        ? [
+            {
+              label: candidate.label,
+              ioErrorDelta: candidate.ioErrorDelta,
+            },
+          ]
+        : []
+    })
+
+    const readErrorCount = Math.max(
+      vector.readErrorCount,
+      copyStageIoErrorDelta(stages),
+    )
+
+    return {
+      ...input.record,
+      outcome: {
+        ...input.record.outcome,
+        readErrorCount,
+      },
+    }
+  } catch {
+    return input.record
   }
 }
 

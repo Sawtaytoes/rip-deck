@@ -76,6 +76,31 @@ describe("the three states of a finished rip", () => {
     ])
   })
 
+  it("keeps a copy-stage kernel I/O error as a warning", () => {
+    const outcome = describe_({ kernelIoErrorCount: 2 })
+
+    expect(outcome.kind).toBe("completed_with_warnings")
+    expect(outcome.readErrorCount).toBe(2)
+    expect(outcome.warnings).toEqual([
+      "The kernel recorded 2 I/O errors while disc data was being copied.",
+    ])
+  })
+
+  it("keeps MakeMKV read errors when the kernel copy count is zero", () => {
+    const outcome = describe_({
+      readErrorCount: 4,
+      warnings: [
+        {
+          kind: "read_errors",
+          message: "4 read errors at 3.20 GB.",
+        },
+      ],
+    })
+
+    expect(outcome.kind).toBe("completed_with_warnings")
+    expect(outcome.readErrorCount).toBe(4)
+  })
+
   it("a failure still names the reason and the exit code", () => {
     const outcome = describe_({
       isSuccessful: false,

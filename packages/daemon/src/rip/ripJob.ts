@@ -8,6 +8,7 @@ import type {
   MakemkvEvent,
 } from "@rip-deck/contracts"
 import { readScsiGenericPath } from "../drives/sysfs.ts"
+import { copyStageIoErrorDelta } from "../health/featureVector.ts"
 import { evaluateJobHealth } from "../health/jobVerdict.ts"
 import { refreshHealthGate } from "../health/publish.ts"
 import { createSampleStore } from "../health/sampleStore.ts"
@@ -155,7 +156,7 @@ export type RipJobResult = RipSummary & {
   termination: RipTermination
   exitCode: number | null
   observations: RipObservations
-  /** Kernel I/O errors counted during this job. */
+  /** Kernel I/O errors counted while disc data was copied. */
   kernelIoErrorCount: number
   progress: JobProgress
   /** Where the rip ended up, on success. */
@@ -645,7 +646,9 @@ const superviseChild = async (
       termination,
       exitCode,
       observations,
-      kernelIoErrorCount: featureVector.ioErrorTotalDelta,
+      kernelIoErrorCount: copyStageIoErrorDelta(
+        featureVector.stages,
+      ),
       progress: tracker.progress,
       destinationPath: null,
       incompletePath: hasPartialOutput
@@ -665,7 +668,9 @@ const superviseChild = async (
     termination,
     exitCode,
     observations,
-    kernelIoErrorCount: featureVector.ioErrorTotalDelta,
+    kernelIoErrorCount: copyStageIoErrorDelta(
+      featureVector.stages,
+    ),
     progress: tracker.progress,
     destinationPath: finalised.path,
     incompletePath: null,

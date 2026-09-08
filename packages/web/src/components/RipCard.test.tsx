@@ -608,7 +608,7 @@ describe("RipCard", () => {
     expect(screen.getByText("/dev/sr2")).toBeInTheDocument()
   })
 
-  it("explains an adopted rip's missing telemetry", () => {
+  it("does not claim an adopted completed rip has no telemetry", () => {
     renderCard(
       <RipCard
         rip={buildRip({ is_adopted: true })}
@@ -619,8 +619,11 @@ describe("RipCard", () => {
     )
 
     expect(
-      screen.getByText(/no health telemetry/),
-    ).toBeInTheDocument()
+      screen.queryByText(/adopted after a restart/),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(/no health telemetry/),
+    ).not.toBeInTheDocument()
   })
 
   // §12 item 3. The fetcher is being built in parallel; every

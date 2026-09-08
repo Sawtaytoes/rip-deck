@@ -7,6 +7,7 @@ import {
 import { describe, expect, it } from "vitest"
 import {
   buildJobFeatureVector,
+  copyStageIoErrorDelta,
   createFeatureAccumulator,
   type FeatureAccumulator,
   foldSampleIntoFeatures,
@@ -345,6 +346,60 @@ describe("counters", () => {
 
     expect(features.ioErrorTotalDelta).toBe(5)
     expect(features.readErrorCount).toBe(4)
+  })
+
+  it("keeps startup probe errors out of the copy error count", () => {
+    const features = build([
+      sampleAt({
+        at: 0,
+        stageLabel: "Scanning CD-ROM devices",
+        ioErrorDelta: 3,
+        readsCompletedDelta: 0,
+        sectorsReadDelta: 0,
+      }),
+      sampleAt({
+        at: SAMPLE_MS,
+        stageLabel: "Opening Blu-ray disc",
+        ioErrorDelta: 1,
+        readsCompletedDelta: 0,
+        sectorsReadDelta: 0,
+      }),
+      sampleAt({
+        at: 2 * SAMPLE_MS,
+        stageLabel: "Copying all files",
+        ioErrorDelta: 0,
+        readsCompletedDelta: 12,
+        sectorsReadDelta: 4096,
+      }),
+    ])
+
+    // The full evidence is retained. Only its meaning at the
+    // outcome boundary changes.
+    expect(features.ioErrorTotalDelta).toBe(4)
+    expect(copyStageIoErrorDelta(features.stages)).toBe(0)
+  })
+
+  it("keeps kernel errors that occur during copying", () => {
+    const features = build([
+      sampleAt({
+        at: 0,
+        stageLabel: "Scanning CD-ROM devices",
+        ioErrorDelta: 3,
+      }),
+      sampleAt({
+        at: SAMPLE_MS,
+        stageLabel: "Copying all files",
+        ioErrorDelta: 2,
+      }),
+      sampleAt({
+        at: 2 * SAMPLE_MS,
+        stageLabel: "Saving all titles to MKV files",
+        ioErrorDelta: 1,
+      }),
+    ])
+
+    expect(features.ioErrorTotalDelta).toBe(6)
+    expect(copyStageIoErrorDelta(features.stages)).toBe(3)
   })
 
   it("keeps the worst stall and silence seen", () => {
