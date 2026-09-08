@@ -1136,14 +1136,31 @@ export const buildTraySpokenMessage = (input: {
       )
     }
 
-    return input.request.kind === "rip_bay"
-      ? `${
-          formatBayList(refused).charAt(0).toUpperCase() +
-          formatBayList(refused).slice(1)
-        } is already ripping.`
-      : `Not opening ${formatBayList(refused)} — ` +
-          `${refused.length === 1 ? "it is" : "they are"} ` +
-          "still ripping."
+    if (input.request.kind === "rip_bay") {
+      return `${
+        formatBayList(refused).charAt(0).toUpperCase() +
+        formatBayList(refused).slice(1)
+      } is already ripping.`
+    }
+
+    // ⚠️ The verb follows the COMMAND, never a default. This said
+    // "Not opening…" for every kind, so pressing **close trays** on
+    // the Zigbee button spoke a refusal to *open* — which reads as
+    // the tower doing the opposite of what was asked. Reported from
+    // the live tower 2026-09-08 while slots 6, 7 and 8 were ripping.
+    // `buildTrayCommandMessage` already branched correctly; only the
+    // spoken half was wrong, so the dashboard looked fine.
+    const verb =
+      input.request.kind === "close_trays" ||
+      input.request.kind === "close_bay"
+        ? "closing"
+        : "opening"
+
+    return (
+      `Not ${verb} ${formatBayList(refused)} — ` +
+      `${refused.length === 1 ? "it is" : "they are"} ` +
+      "still ripping."
+    )
   }
 
   const ripStarted = countOf(results, "rip_started")

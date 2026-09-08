@@ -1204,6 +1204,62 @@ describe("buildTraySpokenMessage", () => {
     )
   })
 
+  it("speaks CLOSING when the command was close_trays", () => {
+    // Pressing "close trays" on the Zigbee button spoke "Not
+    // opening slots 6, 7 and 8", which reads as the tower doing
+    // the opposite of what was asked. Reported from the live
+    // tower 2026-09-08.
+    expect(
+      buildTraySpokenMessage({
+        request: { kind: "close_trays" },
+        results: [
+          result({
+            slot: 6,
+            resultKind: "refused_ripping",
+          }),
+          result({
+            slot: 7,
+            resultKind: "refused_ripping",
+          }),
+          result({
+            slot: 8,
+            resultKind: "refused_ripping",
+          }),
+        ],
+      }),
+    ).toBe(
+      "Not closing slots 6, 7 and 8 — they are still ripping.",
+    )
+  })
+
+  it("speaks CLOSING for a single-bay close_bay too", () => {
+    expect(
+      buildTraySpokenMessage({
+        request: { kind: "close_bay", target: { slot: 7 } },
+        results: [
+          result({
+            slot: 7,
+            resultKind: "refused_ripping",
+          }),
+        ],
+      }),
+    ).toBe("Not closing slot 7 — it is still ripping.")
+  })
+
+  it("still speaks OPENING for an open command", () => {
+    expect(
+      buildTraySpokenMessage({
+        request: { kind: "open_bay", target: { slot: 7 } },
+        results: [
+          result({
+            slot: 7,
+            resultKind: "refused_ripping",
+          }),
+        ],
+      }),
+    ).toBe("Not opening slot 7 — it is still ripping.")
+  })
+
   it("never speaks the device's own words on a failure", () => {
     // `detail` here is whatever `eject` printed. It belongs on
     // the card and in the log; through TTS it is the exact
