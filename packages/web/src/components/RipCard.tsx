@@ -285,7 +285,7 @@ export function RipCard({
         {hasPoster && (
           <div className="flex shrink-0 flex-col items-start gap-1.5">
             <span className="shrink-0 rounded-md bg-surface-sunken px-1.5 py-0.5 text-sm tabular-nums text-content-muted">
-              Slot {rip.slot ?? "?"}
+              {rip.slot ?? "?"}
             </span>
             <Lightbox
               alt={`${title} poster`}
@@ -325,7 +325,7 @@ export function RipCard({
                   entity id; the card stops rendering it. */}
               {!hasPoster && (
                 <span className="shrink-0 rounded-md bg-surface-sunken px-1.5 py-0.5 text-sm tabular-nums text-content-muted">
-                  Slot {rip.slot ?? "?"}
+                  {rip.slot ?? "?"}
                 </span>
               )}
               {/* 2. The disc — wrap, never truncate. The poster

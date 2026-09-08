@@ -41,7 +41,7 @@ describe("RipCard", () => {
       />,
     )
 
-    expect(screen.getByText("Slot 7")).toBeInTheDocument()
+    expect(screen.getByText("7")).toBeInTheDocument()
     expect(screen.getByText("Ivanhoe")).toBeInTheDocument()
 
     // Said TWICE on a card the daemon gave a `disctype_label`:
@@ -667,7 +667,7 @@ describe("RipCard", () => {
       />,
     )
 
-    const slot = screen.getByText("Slot 7")
+    const slot = screen.getByText("7")
     const poster = container.querySelector("img")
     const title = container.querySelector(
       "span.break-words.font-semibold",
@@ -689,7 +689,7 @@ describe("RipCard", () => {
       />,
     )
 
-    const slot = screen.getByText("Slot 7")
+    const slot = screen.getByText("7")
     const title = container.querySelector(
       "span.break-words.font-semibold",
     )
