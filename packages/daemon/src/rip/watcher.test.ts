@@ -587,6 +587,7 @@ const noopConfig: WatcherConfig = {
   } satisfies CyanripCommand,
   eject: { command: "true", prefixArgs: [] },
   isolation: null,
+  ripCacheMb: 1024,
 }
 
 /**
@@ -668,6 +669,7 @@ const watcherDeps = (input: {
   writeLedger?: WatcherDeps["writeLedger"]
   appendHistory?: WatcherDeps["appendHistory"]
   runTray?: WatcherDeps["runTray"]
+  resetDrive?: WatcherDeps["resetDrive"]
 }): WatcherDeps => ({
   probeDrives: input.probeDrives,
   loadRegistry: async () => ({
@@ -699,6 +701,7 @@ const watcherDeps = (input: {
       exitCode: 0,
       detail: "opened",
     })),
+  resetDrive: input.resetDrive,
   now: () => Date.now(),
 })
 
@@ -2316,12 +2319,7 @@ describe("startWatcher tray commands", () => {
     await watcher.stop()
   })
 
-  it("opens finished bays first, then the rest on the next press", async () => {
-    // The stateless escalation. Slot 9 holds a finished disc; slot
-    // 8 is empty. The first press resolves `openScope: "finished"`
-    // and opens only slot 9. Once slot 9's drawer is open, the
-    // second press sees every finished bay already open, widens to
-    // `"all"`, and opens the empty slot 8 too.
+  it("opens every safe tray on the first press", async () => {
     const ripper = controllableRipper()
     const tray = trayRecorder()
     const SLOT_8 = "2-1.1.2.4.4.3"
@@ -2359,29 +2357,26 @@ describe("startWatcher tray commands", () => {
 
     expect(tray.moved).toEqual([
       { action: "open", devPath: "/dev/sr0" },
+      { action: "open", devPath: "/dev/sr1" },
     ])
     expect(
       first.bays.find((b) => b.drive_id === SLOT_8)?.result,
-    ).toBe("skipped_not_finished")
+    ).toBe("opened_not_ripped")
 
     const second = await watcher.runTrayCommand({
       request: { kind: "open_trays" },
     })
 
-    expect(
-      tray.moved.some(
-        (move) => move.devPath === "/dev/sr1",
-      ),
-    ).toBe(true)
+    expect(tray.moved).toHaveLength(2)
     expect(
       second.bays.find((b) => b.drive_id === SLOT_8)
         ?.result,
-    ).toBe("opened_not_ripped")
+    ).toBe("skipped_untouched")
 
     await watcher.stop()
   })
 
-  it("opens only the finished bay when the drawer memory says open but the disc ripped", async () => {
+  it("opens every safe bay when a completed rip corrected stale drawer memory", async () => {
     // The regression, measured on the live tower 2026-08-20:
     // "Opened 9 drives" on the FIRST press, with a single finished
     // disc in the rack and eight empty bays.
@@ -2455,13 +2450,13 @@ describe("startWatcher tray commands", () => {
       request: { kind: "open_trays" },
     })
 
-    // Only the finished bay. Slot 8 is empty and stays shut.
     expect(tray.moved).toEqual([
       { action: "open", devPath: "/dev/sr0" },
+      { action: "open", devPath: "/dev/sr1" },
     ])
     expect(
       first.bays.find((b) => b.drive_id === SLOT_8)?.result,
-    ).toBe("skipped_not_finished")
+    ).toBe("opened_not_ripped")
 
     await watcher.stop()
   })
@@ -2540,7 +2535,7 @@ describe("startWatcher tray commands", () => {
     ])
     expect(report.request_id).toBe("press-1")
     expect(report.counts.opened).toBe(1)
-    expect(report.counts.refused).toBe(1)
+    expect(report.counts.refused).toBe(0)
 
     await watcher.stop()
   })
@@ -2630,7 +2625,7 @@ describe("startWatcher tray commands", () => {
     await watcher.stop()
   })
 
-  it("⚠️ opens the idle bays and still refuses the ripping one", async () => {
+  it("opens idle bays quietly, then reports active bays on another press", async () => {
     // The fallback's safety case. The cap is one, so bay 1 rips
     // and the other eight sit idle holding discs — nothing is
     // finished, so ▲ falls back to "open all". "All" still
@@ -2657,14 +2652,22 @@ describe("startWatcher tray commands", () => {
       request: { kind: "open_trays" },
     })
 
-    expect(report.counts.refused).toBe(1)
+    expect(report.counts.refused).toBe(0)
     expect(tray.moved).toHaveLength(8)
     expect(
       tray.moved.some(
         (move) => move.devPath === "/dev/sr0",
       ),
     ).toBe(false)
-    expect(report.message.startsWith("Refused")).toBe(true)
+    expect(report.message.startsWith("Refused")).toBe(false)
+
+    const second = await watcher.runTrayCommand({
+      request: { kind: "open_trays" },
+    })
+
+    expect(second.counts.refused).toBe(1)
+    expect(tray.moved).toHaveLength(8)
+    expect(second.message.startsWith("Refused")).toBe(true)
 
     await watcher.stop()
   })
@@ -3539,6 +3542,87 @@ describe("the drive read offset reaches cyanrip", () => {
     await file.cleanup()
 
     expect(ripper.started[0].readOffsetSamples).toBeNull()
+  })
+})
+
+describe("startWatcher reset_bay", () => {
+  it("resets one terminal drive and clears its stale record", async () => {
+    const ripper = controllableRipper()
+    const resetDrive = vi.fn(async () => {})
+    const watcher = startWatcher(
+      {
+        config: noopConfig,
+        governor: createGovernor({ maxConcurrentRips: 1 }),
+      },
+      watcherDeps({
+        probeDrives: async () => [
+          probedDrive({
+            driveId: SLOT_9,
+            kernelName: "sr7",
+            sizeSectors: BLURAY_SECTORS,
+          }),
+        ],
+        runBayRip: ripper.runBayRip,
+        resetDrive,
+      }),
+    )
+
+    await watcher.tickNow()
+    ripper.finish(SLOT_9, {
+      kind: "failed",
+      detail: "stall_timeout",
+    })
+    await flush()
+
+    const result = await watcher.runBayAction?.({
+      driveId: SLOT_9,
+      action: "reset_bay",
+    })
+
+    expect(result?.ok).toBe(true)
+    expect(resetDrive).toHaveBeenCalledWith({
+      driveId: SLOT_9,
+      kernelName: "sr7",
+    })
+    expect(watcher.getBays()[0].phase).toBe("idle")
+    expect(watcher.getBays()[0].outcome).toBeNull()
+
+    await watcher.stop()
+  })
+
+  it("refuses to reset an active rip", async () => {
+    const ripper = controllableRipper()
+    const resetDrive = vi.fn(async () => {})
+    const watcher = startWatcher(
+      {
+        config: noopConfig,
+        governor: createGovernor({ maxConcurrentRips: 1 }),
+      },
+      watcherDeps({
+        probeDrives: async () => [
+          probedDrive({
+            driveId: SLOT_9,
+            kernelName: "sr7",
+            sizeSectors: BLURAY_SECTORS,
+          }),
+        ],
+        runBayRip: ripper.runBayRip,
+        resetDrive,
+      }),
+    )
+
+    await watcher.tickNow()
+
+    const result = await watcher.runBayAction?.({
+      driveId: SLOT_9,
+      action: "reset_bay",
+    })
+
+    expect(result?.ok).toBe(false)
+    expect(resetDrive).not.toHaveBeenCalled()
+
+    ripper.finish(SLOT_9)
+    await watcher.stop()
   })
 })
 

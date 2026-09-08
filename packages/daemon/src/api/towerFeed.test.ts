@@ -495,18 +495,18 @@ describe("the feed", () => {
 
     harness.handlers.onBayOutcome?.({
       ...bayEvent,
-      outcome: outcome(
-        "failed",
-        "read_errors (exit 0 — the silent-success case)",
-      ),
+      outcome: {
+        kind: "failed",
+        failureReason: "read_errors",
+        detail:
+          "read_errors (exit 0 — the silent-success case)",
+      },
     })
 
     const job = harness.readBay()?.job
 
     expect(job?.state).toBe("failed")
-    // `unknown` rather than null: null reads as "nothing went
-    // wrong". The real reason is in the evidence, as prose.
-    expect(job?.failureReason).toBe("unknown")
+    expect(job?.failureReason).toBe("read_errors")
     expect(job?.verdict.evidence[0]).toContain(
       "read_errors",
     )
@@ -1250,6 +1250,7 @@ describe("the watcher, feeding the store", () => {
           },
           eject: { command: "true", prefixArgs: [] },
           isolation: null,
+          ripCacheMb: 1024,
         },
         governor: createGovernor({ maxConcurrentRips: 9 }),
         // Long enough that only the ticks this test asks for

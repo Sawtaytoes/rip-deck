@@ -68,6 +68,7 @@ export type BayActionState = {
 const CONFIRMED_ACTIONS: readonly BayAction[] = [
   "cancel",
   "give_up",
+  "reset_bay",
 ]
 
 /** How long a ✓/✗ stays on the card before clearing itself. */
@@ -109,9 +110,11 @@ export function useBayActions() {
       if (
         CONFIRMED_ACTIONS.includes(action) &&
         !window.confirm(
-          `${bayActionLabel(action)} on ${label}? ` +
-            "The partial output is kept — cleanup is your " +
-            "decision, not Rip Deck's.",
+          action === "reset_bay"
+            ? `Reset ${label}? This reconnects only this drive and makes Rip Deck inspect it again.`
+            : `${bayActionLabel(action)} on ${label}? ` +
+                "The partial output is kept — cleanup is your " +
+                "decision, not Rip Deck's.",
         )
       ) {
         return

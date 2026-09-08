@@ -9,6 +9,7 @@ import {
   ISOLATED_DISC_INDEX,
   type RipIsolation,
   resolveMakemkvCommand,
+  resolveRipCacheMb,
   resolveRipIsolation,
 } from "./ripCommand.ts"
 
@@ -37,9 +38,13 @@ describe("the rip command", () => {
   })
 
   it("bounds the cache", () => {
-    // Nine default caches would exhaust RAM on a host that is
-    // also a NAS (E4).
-    expect(args).toContain("--cache=128")
+    expect(args).toContain("--cache=1024")
+  })
+
+  it("accepts a configured cache and rejects invalid values", () => {
+    expect(resolveRipCacheMb("256")).toBe(256)
+    expect(resolveRipCacheMb("0")).toBe(1024)
+    expect(resolveRipCacheMb("not-a-number")).toBe(1024)
   })
 
   it("keeps progress on stdout", () => {
@@ -419,6 +424,7 @@ describe("choosing the invocation for one rip", () => {
       makemkv: base.makemkv,
       discIndex: 5,
       isIsolated: false,
+      containerControl: null,
     })
   })
 

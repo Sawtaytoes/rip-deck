@@ -7,9 +7,10 @@ import {
   rmdir,
   stat,
 } from "node:fs/promises"
-import { join } from "node:path"
+import { basename, join } from "node:path"
 import type {
   DiscType,
+  FailureReason,
   JobProgress,
 } from "@rip-deck/contracts"
 import {
@@ -91,6 +92,7 @@ import {
   type MakemkvCommand,
   type RipIsolation,
   resolveMakemkvCommand,
+  resolveRipCacheMb,
   resolveRipIsolation,
 } from "./ripCommand.ts"
 import {
@@ -114,7 +116,6 @@ import {
   buildTrayCommandResponse,
   buildTrayPowerOnResponse,
   decideTrayBayAction,
-  hasFinishedDisc,
   isBayTargeted,
   isRipCompleted,
   type TrayBayResult,
@@ -125,6 +126,7 @@ import {
   unrefInterval,
   unrefTimeout,
 } from "./unrefTimers.ts"
+import { resetUsbDrive } from "./usbReset.ts"
 import {
   detectTransitions,
   pruneTransitions,
@@ -372,6 +374,10 @@ export type BayOutcome = {
   kind: BayOutcomeKind
   /** Plain language, for the console and the card. */
   detail: string
+  /** Structured cause retained for the API and web UI. */
+  failureReason?: FailureReason
+  /** Largest available read-error count from MakeMKV or sysfs. */
+  readErrorCount?: number
   /**
    * What went wrong on a rip that still worked, if anything.
    *
@@ -1049,6 +1055,8 @@ export type WatcherConfig = {
    */
   eject: EjectCommand
   isolation: RipIsolation | null
+  /** Independent MakeMKV cache per video rip, in MiB. */
+  ripCacheMb: number
   /** Raw robot-mode capture, on by default (HANDOFF §5). */
   isEventLogEnabled?: boolean
 }
@@ -1065,6 +1073,7 @@ export const createWatcherConfig = (
   cyanrip: resolveCyanripCommand(env.RIP_DECK_CYANRIP),
   eject: resolveEjectCommand(env.RIP_DECK_EJECT),
   isolation: resolveRipIsolation(env),
+  ripCacheMb: resolveRipCacheMb(env.RIP_DECK_RIP_CACHE_MB),
   isEventLogEnabled: env.RIP_DECK_EVENT_LOG !== "false",
 })
 
@@ -1444,6 +1453,7 @@ const ripWithMakemkv = async (context: {
       stateDir: config.stateDir,
       makemkv: config.makemkv,
       isolation: config.isolation,
+      cacheMb: config.ripCacheMb,
       eventLog,
       signal: input.signal,
       isKeepTryingRequested: input.isKeepTryingRequested,
@@ -1517,6 +1527,10 @@ export const describeRipOutcome = (input: {
           ? ""
           : ` — ${warnings.join(" ")}`),
       warnings,
+      readErrorCount: Math.max(
+        result.readErrorCount,
+        result.kernelIoErrorCount,
+      ),
     }
   }
 
@@ -1524,6 +1538,7 @@ export const describeRipOutcome = (input: {
   // project, so it is stated rather than flattened into "failed".
   return {
     kind: "failed",
+    failureReason: result.failureReason ?? "unknown",
     detail:
       `${result.failureReason}` +
       (result.exitCode === 0
@@ -1545,6 +1560,10 @@ export const describeRipOutcome = (input: {
     // so they travel with the failure rather than being dropped
     // for not being a warning-shaped outcome.
     warnings,
+    readErrorCount: Math.max(
+      result.readErrorCount,
+      result.kernelIoErrorCount,
+    ),
   }
 }
 
@@ -1925,6 +1944,10 @@ export type WatcherDeps = {
     devPath: string
     eject: EjectCommand
   }) => Promise<TrayResult>
+  resetDrive?: (input: {
+    driveId: string
+    kernelName: string
+  }) => Promise<void>
   now: () => number
 }
 
@@ -1936,6 +1959,7 @@ export const defaultWatcherDeps: WatcherDeps = {
   writeLedger: writeBayLedger,
   appendHistory: appendRipHistory,
   runTray: runTrayCommand,
+  resetDrive: resetUsbDrive,
   now: () => Date.now(),
 }
 
@@ -3670,33 +3694,19 @@ export const startWatcher = (
     // this same probe, so the answer and the per-bay readings
     // are one snapshot rather than two.
     //
-    // The bays finished with, disc still in them: the set an
-    // `open_trays` press opens first.
-    const finishedDriveIds = probed
-      .filter((drive) =>
-        hasFinishedDisc({
-          bay: bays.get(drive.identity.usbPortPath) ?? null,
-          observation: observationOf(drive),
-        }),
+    // Open means every safe tray. Active bays stay quiet while at
+    // least one safe tray can still move. If the operator presses
+    // again after those trays are open, the active-bay refusal is
+    // useful and becomes visible.
+    const openScope = "all" as const
+    const hasOpenableSafeBay = probed.some((drive) => {
+      const bay = bays.get(drive.identity.usbPortPath)
+      return (
+        bay?.phase !== "starting" &&
+        bay?.phase !== "ripping" &&
+        bay?.lastTrayCommand !== "open_bay"
       )
-      .map((drive) => drive.identity.usbPortPath)
-
-    // The escalation, resolved statelessly from tray memory rather
-    // than a click counter: the first press opens the finished
-    // bays; once they are ALL open, the next press widens to every
-    // non-ripping bay (`"all"`). No finished bays collapses both
-    // into a single "open everything" press.
-    const areAllFinishedBaysOpen =
-      finishedDriveIds.length > 0 &&
-      finishedDriveIds.every(
-        (driveId) =>
-          bays.get(driveId)?.lastTrayCommand === "open_bay",
-      )
-
-    const openScope: "finished" | "all" =
-      finishedDriveIds.length > 0 && !areAllFinishedBaysOpen
-        ? "finished"
-        : "all"
+    })
 
     const hasActiveRip = probed.some((drive) => {
       const phase = bays.get(
@@ -3770,6 +3780,7 @@ export const startWatcher = (
         observation: observationOf(drive),
         openScope,
         hasActiveRip,
+        hasOpenableSafeBay,
       })
 
       if (
@@ -3889,6 +3900,50 @@ export const startWatcher = (
       return {
         ok: true,
         msg: "Quarantine cleared. Rip Deck will inspect this bay on its next poll.",
+      }
+    }
+
+    if (params.action === "reset_bay") {
+      if (
+        bay.phase === "starting" ||
+        bay.phase === "ripping"
+      ) {
+        return {
+          ok: false,
+          msg: "This bay is ripping. Rip Deck did not reset it.",
+        }
+      }
+
+      const sighting = sightings.get(params.driveId)
+      if (
+        sighting?.isDrivePresent !== true ||
+        sighting.devPath === null
+      ) {
+        return {
+          ok: false,
+          msg: "This drive is not present, so Rip Deck cannot reset it.",
+        }
+      }
+
+      const resetDrive = deps.resetDrive ?? resetUsbDrive
+      await resetDrive({
+        driveId: params.driveId,
+        kernelName: basename(sighting.devPath),
+      })
+
+      bays.set(
+        params.driveId,
+        createBayState({
+          driveId: params.driveId,
+          atMs: deps.now(),
+        }),
+      )
+      persistLedger()
+      handlers.onBayTableChanged?.()
+
+      return {
+        ok: true,
+        msg: "This bay was reset. Rip Deck will inspect it again on the next poll.",
       }
     }
 

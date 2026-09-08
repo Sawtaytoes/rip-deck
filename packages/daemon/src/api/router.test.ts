@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs"
 import { describe, expect, it, vi } from "vitest"
 import { DEFAULT_TOPIC_CONFIG } from "../mqtt/topics.ts"
 import type { TrayCommandResponsePayload } from "../rip/trayCommand.ts"
+import type { BayActionRunner } from "./bayActionEndpoint.ts"
 import { FIXTURE_NAMES } from "./fixtures.ts"
 import type { RipDeckJsonDocument } from "./jsonDocument.ts"
 import type { LogCaptureReader } from "./logCapture.ts"
@@ -75,17 +76,7 @@ const buildRouter = (
   webAssets?: WebAssets,
   extras: {
     readTrayRunner?: () => TrayCommandRunner | null
-    readBayActionRunner?: () =>
-      | ((input: {
-          driveId: string
-          action:
-            | "clear_quarantine"
-            | "keep_trying"
-            | "give_up"
-            | "retry_in_another_drive"
-            | "cancel"
-        }) => Promise<{ ok: boolean; msg: string }>)
-      | null
+    readBayActionRunner?: () => BayActionRunner | null
     readLogCapture?: LogCaptureReader | null
   } = {},
 ) =>

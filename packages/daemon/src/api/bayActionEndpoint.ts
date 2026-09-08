@@ -22,6 +22,7 @@ const ACTIONS: readonly BayAction[] = [
   "give_up",
   "retry_in_another_drive",
   "cancel",
+  "reset_bay",
 ]
 
 const isBayAction = (value: unknown): value is BayAction =>

@@ -25,6 +25,8 @@ services:
       - /dev:/dev
       - /var/run/docker.sock:/var/run/docker.sock
       - /run/udev:/run/udev:ro
+      - /sys/bus/usb/drivers/usb/unbind:/run/rip-deck-usb/unbind
+      - /sys/bus/usb/drivers/usb/bind:/run/rip-deck-usb/bind
       - /media/Disc-Rips:/media/Disc-Rips
       - /srv/rip-deck/makemkv:/config
       - /srv/rip-deck/state:/var/lib/rip-deck
@@ -38,6 +40,7 @@ services:
       # force-pull leaves the freshest build on the host for the spawn.
       RIP_DECK_RIP_ISOLATION_IMAGE: ghcr.io/sawtaytoes/rip-deck:latest
       RIP_DECK_RIP_ISOLATION_ARGS: "-v /media/Disc-Rips:/media/Disc-Rips -v /srv/rip-deck/makemkv:/config"
+      RIP_DECK_RIP_CACHE_MB: "1024"
       RIP_DECK_MQTT_URL: mqtts://example.com:8883
       RIP_DECK_MQTT_USERNAME: rip-deck
       RIP_DECK_MQTT_PASSWORD: __FROM_ROOT_ENV__

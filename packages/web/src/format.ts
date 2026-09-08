@@ -539,6 +539,8 @@ export function bayActionLabel(action: string): string {
       return "Retry in another drive"
     case "cancel":
       return "Cancel"
+    case "reset_bay":
+      return "Reset bay"
     // "Tray", not "Eject": `eject --cdrom` is how the daemon
     // moves it, but the thing the owner is doing is opening a
     // drawer, and "eject" in this repo's history means the
