@@ -63,3 +63,5 @@ Two rules follow, and both matter if you edit `.github/workflows/ci.yml`:
    waits forever on a status that will never arrive.
 2. **`.mdx` is not documentation**, and neither is `.changeset/*.md`. The detector
    matches `.md$` for that reason. Do not loosen it to `.md*`.
+
+The [tower kiosk](docs/kiosk.md) exposes `/kiosk` and the app-owned CastKit manifest at `/kiosk/castkit.json`.

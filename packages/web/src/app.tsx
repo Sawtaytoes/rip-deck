@@ -12,6 +12,8 @@ import {
 import { AppProviders } from "./components/AppProviders"
 import { Dashboard } from "./components/Dashboard"
 import { History } from "./components/History"
+import { Kiosk } from "./components/Kiosk"
+import { KioskLoading } from "./components/KioskLoading"
 import "./styles/tailwind.css"
 
 const rootElement = document.getElementById("root")
@@ -38,6 +40,15 @@ if (rootElement) {
           <AppProviders>
             <Routes>
               <Route element={<Dashboard />} path="/" />
+              <Route element={<Kiosk />} path="/kiosk" />
+              <Route
+                element={<KioskLoading />}
+                path="/kiosk/loading"
+              />
+              <Route
+                element={<Kiosk />}
+                path="/kiosk/slots/:driveId"
+              />
               <Route
                 element={<History />}
                 path="/history"

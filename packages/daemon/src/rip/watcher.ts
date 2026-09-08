@@ -110,6 +110,7 @@ import {
   type TrayResult,
 } from "./tray.ts"
 import {
+  type BayTarget,
   type BayTrayCommand,
   buildClearLoadedResponse,
   buildTowerPowerOffResponse,
@@ -2249,7 +2250,14 @@ export const startWatcher = (
     options: { isBlind?: boolean } = {},
   ): void => {
     const allBays = [...bays.values()]
-    const records = toLedgerRecords(allBays)
+    // A disconnected bay may exist only in the durable ledger. Preserve it
+    // until an explicit removal or a live bay supersedes that record.
+    const records = [
+      ...toLedgerRecords(allBays),
+      ...(ledger?.records ?? []).filter(
+        (record) => !bays.has(record.driveId),
+      ),
+    ]
     // Written on the same file and the same trigger, because
     // the two facts change on the same events: a tray command
     // that opens a finished bay is both the last thing done to
@@ -3412,17 +3420,74 @@ export const startWatcher = (
    */
   const runClearLoaded = (params: {
     requestId: string | null
+    target?: BayTarget
     startedAtMs: number
   }): TrayCommandResponsePayload => {
+    const target = params.target
+    const knownIds = [
+      ...new Set([
+        ...bays.keys(),
+        ...(ledger?.records ?? []).map(
+          (record) => record.driveId,
+        ),
+      ]),
+    ]
+    const selectedIds = knownIds.filter(
+      (driveId) =>
+        target === undefined ||
+        isBayTargeted({
+          target,
+          driveId,
+          slot: placementForDriveId(driveId).slot,
+        }),
+    )
+    const selectedId =
+      target === undefined ? undefined : selectedIds[0]
+    const activeBay = selectedIds.find((driveId) => {
+      const phase = bays.get(driveId)?.phase
+      return phase === "starting" || phase === "ripping"
+    })
+    if (
+      target !== undefined &&
+      (selectedIds.length !== 1 || activeBay !== undefined)
+    ) {
+      return buildTrayCommandResponse({
+        request: { kind: "clear_loaded", target },
+        requestId: params.requestId,
+        startedAtMs: params.startedAtMs,
+        finishedAtMs: deps.now(),
+        results: [
+          {
+            driveId: selectedId ?? "",
+            ...placementForDriveId(selectedId ?? ""),
+            resultKind:
+              activeBay === undefined
+                ? "failed"
+                : "refused_ripping",
+            detail:
+              activeBay === undefined
+                ? "No single known bay matches that target. Nothing was cleared."
+                : "This bay is ripping. Its disc cannot be marked as taken out.",
+          },
+        ],
+      })
+    }
     const before = loadedDiscsNow().count
 
     ledger = {
       ...(ledger ?? EMPTY_BAY_LEDGER),
-      records: [],
+      records:
+        target === undefined
+          ? []
+          : (ledger?.records ?? []).filter(
+              (record) => record.driveId !== selectedId,
+            ),
       hasPriorState: true,
     }
 
     for (const [driveId, bay] of [...bays]) {
+      if (target !== undefined && driveId !== selectedId)
+        continue
       const isPresent =
         sightings.get(driveId)?.isDrivePresent ?? false
       const isLatched =
@@ -3461,11 +3526,20 @@ export const startWatcher = (
     // on with a disc still in it is not lied about.
     const cleared = before - loadedDiscsNow().count
 
-    return buildClearLoadedResponse({
+    const response = buildClearLoadedResponse({
       requestId: params.requestId,
       atMs: deps.now(),
       cleared,
     })
+    return selectedId === undefined
+      ? response
+      : {
+          ...response,
+          message:
+            cleared > 0
+              ? `${placementForDriveId(selectedId).label}: disc marked as taken out.`
+              : `${placementForDriveId(selectedId).label}: no loaded disc to clear.`,
+        }
   }
 
   /**
@@ -3635,7 +3709,11 @@ export const startWatcher = (
     // rip-deck's memory of what is loaded, not on any drawer, so it
     // needs no probe and takes none. Routed before the probe below.
     if (params.request.kind === "clear_loaded") {
-      return runClearLoaded({ requestId, startedAtMs })
+      return runClearLoaded({
+        requestId,
+        startedAtMs,
+        target: params.request.target,
+      })
     }
 
     const probed = await probe()

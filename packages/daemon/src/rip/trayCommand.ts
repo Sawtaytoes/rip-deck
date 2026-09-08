@@ -209,7 +209,7 @@ export type TrayCommandRequest =
   | { kind: "open_trays" }
   | { kind: "close_trays" }
   | { kind: "power_off" }
-  | { kind: "clear_loaded" }
+  | { kind: "clear_loaded"; target?: BayTarget }
   | { kind: "open_bay"; target: BayTarget }
   | { kind: "close_bay"; target: BayTarget }
   | {
@@ -254,6 +254,7 @@ const KNOWN_COMMANDS: readonly string[] = [
 
 /** The commands that need a bay named. */
 const TARGETED_COMMANDS: readonly string[] = [
+  "clear_loaded",
   "open_bay",
   "close_bay",
   "rip_bay",
@@ -386,7 +387,11 @@ export const parseTrayCommand = (
 
   const bulkKind = bulkKindOf(command)
 
-  if (bulkKind !== null) {
+  const hasClearTarget =
+    command === "clear_loaded" &&
+    ("slot" in body || "drive_id" in body)
+
+  if (bulkKind !== null && !hasClearTarget) {
     return {
       isValid: true,
       requestId,
@@ -405,6 +410,7 @@ export const parseTrayCommand = (
   }
 
   const kind = command as
+    | "clear_loaded"
     | "open_bay"
     | "close_bay"
     | "rip_bay"

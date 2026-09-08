@@ -9,6 +9,7 @@ default instinct.
 
 | Date | Decision |
 | --- | --- |
+| 2026-09-08 | [The kiosk and its CastKit metadata belong to Rip Deck](2026-09-08-kiosk-and-castkit-metadata-belong-to-rip-deck.md) |
 | 2026-09-08 | [Job controls explain their effects before a press](2026-09-08-job-controls-explain-their-effects-before-a-press.md) — visible phone-safe text distinguishes Keep trying, Give up, Cancel, Try again and Rip as this before the operator acts. |
 | 2026-09-08 | [Mobile rip cards always show live speed](2026-09-08-mobile-rip-cards-always-show-live-speed.md) — elapsed time, estimated time remaining and measured MB/s stay visible at every card width. **Supersedes** the narrow live-metrics clause of the 2026-08-09 layout decision. |
 | 2026-09-08 | [Close trays quietly skips during an active rip](2026-09-08-close-trays-quietly-skips-during-an-active-rip.md) — the tower-wide motor block remains, but the expected no-op returns quiet skips instead of refusals. A targeted close still refuses. **Supersedes** the active-bay result and reporting clause of the 2026-08-29 safety decision. |
