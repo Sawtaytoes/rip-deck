@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en" data-scheme="dark">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rip Deck kiosk colour candidates</title>
+<style>
+  /* Charcuterie "daylight" dark tokens, copied so the mockup needs no build. */
+  :root {
+    --base: #131822; --raised: #1D2430; --sunken: #0B0F16;
+    --primary: #EDF0F5; --secondary: #A9B2C1; --muted: #99A1B0;
+    --border: #212936; --border-default: #2E3745;
+    --info-s: #102733; --info-b: #1F4759; --info-c: #78CAE4; --info-f: #2A8DAE;
+    --success-s: #0E2B20; --success-b: #1C4B36; --success-c: #6FDDA6; --success-f: #1B9E64;
+    --warning-s: #302512; --warning-b: #544120; --warning-c: #ECC673; --warning-f: #D29B2B;
+    --danger-s: #351920; --danger-b: #5C2733; --danger-c: #F79399; --danger-f: #BE3241;
+    --neutral-s: #222A37; --neutral-b: #374152; --neutral-c: #B7C0CE; --neutral-f: #374152;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: #05070a; color: var(--primary); font-family: Arial, sans-serif; }
+  h1 { font-size: 18px; margin: 0 0 12px; }
+  .page { display: grid; grid-template-columns: repeat(2, 480px); gap: 28px 24px; }
+  figure { margin: 0; }
+  figcaption { font-size: 14px; margin: 0 0 6px; color: var(--secondary); }
+  figcaption b { color: var(--primary); }
+  .screen { width: 480px; height: 320px; overflow: hidden; background: var(--base); outline: 1px solid #333; }
+  .screen img { display: block; width: 480px; height: 320px; }
+
+  .rows { display: grid; grid-template-rows: repeat(9, minmax(0, 1fr)); gap: 2px; padding: 3px; height: 320px; }
+  .row {
+    display: grid; grid-template-columns: 26px minmax(0, 1fr) 104px 46px; column-gap: 7px;
+    align-items: center; padding: 0 6px 0 5px; min-height: 0;
+    border-radius: 3px; text-decoration: none; color: var(--primary);
+    background: var(--raised); border: 1px solid var(--border);
+  }
+  .n { width: 26px; height: 26px; border-radius: 4px; display: grid; place-items: center; font-size: 15px; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .text { display: flex; flex-direction: column; min-width: 0; }
+  .title { font-size: 14px; line-height: 15px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta { font-size: 11px; line-height: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .track { height: 9px; border-radius: 5px; background: var(--sunken); overflow: hidden; }
+  .bar { display: block; height: 100%; border-radius: 5px; }
+  .pct { font-size: 18px; font-weight: bold; text-align: right; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
+
+  /* Intent colour per state. --c content, --f fill/solid, --s surface, --b border. */
+  .info { --c: var(--info-c); --f: var(--info-f); --s: var(--info-s); --b: var(--info-b); }
+  .success { --c: var(--success-c); --f: var(--success-f); --s: var(--success-s); --b: var(--success-b); }
+  .warning { --c: var(--warning-c); --f: var(--warning-f); --s: var(--warning-s); --b: var(--warning-b); }
+  .danger { --c: var(--danger-c); --f: var(--danger-f); --s: var(--danger-s); --b: var(--danger-b); }
+  .neutral { --c: var(--muted); --f: var(--neutral-f); --s: var(--neutral-s); --b: var(--neutral-b); }
+  .row .meta { color: var(--c); }
+  .row .bar { background: var(--f); }
+  .row .pct { color: var(--c); }
+  .neutral .title { color: var(--muted); font-weight: normal; }
+
+  /* A. Rail: neutral row, thick coloured left edge, coloured text and bar. */
+  .rail .row { border-left: 5px solid var(--f); padding-left: 4px; }
+  .rail .n { background: var(--neutral-b); color: var(--primary); }
+
+  /* B. Tinted: the whole row takes the state's surface and border, number chip is solid. */
+  .tinted .row { background: var(--s); border-color: var(--b); }
+  .tinted .n { background: var(--f); color: #fff; }
+  .tinted .neutral .n { color: var(--secondary); }
+  .tinted .pct { color: var(--primary); }
+  .tinted .track { background: rgba(0,0,0,.45); }
+
+  /* C. Slot hue: every slot owns a fixed hue on its number; state still colours the bar and text. */
+  .hue .row { border-left: 4px solid var(--hue); padding-left: 5px; }
+  .hue .n { background: var(--hue); color: #0b0f16; }
+  .hue .r1 { --hue: #F26B6B; } .hue .r2 { --hue: #F2A65A; } .hue .r3 { --hue: #F2D35A; }
+  .hue .r4 { --hue: #8CD96B; } .hue .r5 { --hue: #4FD1B3; } .hue .r6 { --hue: #5AB8F2; }
+  .hue .r7 { --hue: #8C8CF2; } .hue .r8 { --hue: #D48CF2; } .hue .r9 { --hue: #F28CC8; }
+  .hue .neutral .n { opacity: .45; }
+</style>
+<h1>Rip Deck tower kiosk, 480×320. Simulated mixed states so every colour shows.</h1>
+<div class="page">
+  <figure>
+    <figcaption><b>Current</b> — deployed today (fixture render)</figcaption>
+    <div class="screen"><img src="kiosk-nine-rows.png" alt="Current kiosk"></div>
+  </figure>
+  <figure>
+    <figcaption><b>A. Rail</b> — dark rows, a thick coloured edge per state, rip name added, shorter bar</figcaption>
+    <div class="screen"><div class="rows rail" data-rows></div></div>
+  </figure>
+  <figure>
+    <figcaption><b>B. Tinted</b> — each row is washed in its state colour, solid number chip</figcaption>
+    <div class="screen"><div class="rows tinted" data-rows></div></div>
+  </figure>
+  <figure>
+    <figcaption><b>C. Slot hue</b> — every slot keeps its own hue on the number; state colours the bar and text</figcaption>
+    <div class="screen"><div class="rows hue" data-rows></div></div>
+  </figure>
+</div>
+<script>
+  const rows = [
+    ["info", "Metropolis", "Ripping · Blu-ray · ~55m", 44],
+    ["info", "The Cabinet of Dr. Caligari", "Ripping · UHD · ~1h 10m", 20],
+    ["info", "Nosferatu: A Symphony of Horror", "Ripping · Blu-ray · ~45m", 30],
+    ["info", "Sherlock Jr.", "Ripping · DVD · ~12m", 62],
+    ["warning", "Battleship Potemkin", "Slow read · DVD · ~40m", 51],
+    ["success", "Safety Last!", "Success · Blu-ray · Ready to remove", 100],
+    ["danger", "The General", "Failed · DVD · 14 read errors", 38],
+    ["neutral", "Ready for disc", "Empty", 0],
+    ["info", "A Trip to the Moon", "Ripping · CD · ~3m", 90],
+  ]
+  for (const grid of document.querySelectorAll("[data-rows]")) {
+    grid.innerHTML = rows.map(([intent, title, meta, pct], i) => `
+      <a class="row ${intent} r${i + 1}" href="#">
+        <span class="n">${i + 1}</span>
+        <span class="text"><span class="title">${title}</span><span class="meta">${meta}</span></span>
+        <span class="track"><span class="bar" style="width:${pct}%"></span></span>
+        <span class="pct">${intent === "neutral" ? "—" : pct + "%"}</span>
+      </a>`).join("")
+  }
+</script>
+</html>

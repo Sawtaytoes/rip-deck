@@ -9,6 +9,7 @@ default instinct.
 
 | Date | Decision |
 | --- | --- |
+| 2026-09-08 | [A bay is labelled by its number alone, never the word "Slot"](2026-09-08-a-bay-is-labelled-by-its-number-alone-never-the-word-slot.md) |
 | 2026-09-08 | [The kiosk and its CastKit metadata belong to Rip Deck](2026-09-08-kiosk-and-castkit-metadata-belong-to-rip-deck.md) |
 | 2026-09-08 | [Bulk Open trays moves from the bottom slot up](2026-09-08-bulk-open-trays-moves-from-the-bottom-slot-up.md) — numbered slots open from 9 down to 1 so each tray has clear space above it; unknown slots follow in stable drive-ID order, and serial execution remains unchanged. |
 | 2026-09-08 | [Rip cards sort by slot or finishing soonest](2026-09-08-rip-cards-sort-by-slot-or-finishing-soonest.md) — the persisted Deck control keeps every card group in ascending slot order or puts valid active ETAs first, with slot-based deterministic fallbacks and tie breaks. |
