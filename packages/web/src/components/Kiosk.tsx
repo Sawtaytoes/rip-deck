@@ -1,4 +1,5 @@
 import {
+  Badge,
   Button,
   ButtonLink,
   ProgressBar,
@@ -53,6 +54,16 @@ export const Kiosk = () => {
     ? `${selected.drive_id}:${selected.state.job_id ?? "empty"}:${selected.state.state}`
     : ""
   const reportText = lastError ?? lastReport?.message
+  // The house label ("4K") is worth a line only when the summary
+  // has not already said it — a location never repeats its type.
+  const discTypeLabel =
+    selectedRip?.disctype_label ?? selected?.state.disctype
+  const discTypeLine =
+    summary &&
+    discTypeLabel &&
+    !summary.detail.includes(discTypeLabel)
+      ? discTypeLabel
+      : null
   const statusMessage = query.isError
     ? "Connection lost — controls unavailable"
     : tower?.error
@@ -91,10 +102,25 @@ export const Kiosk = () => {
           aria-label={`Slot ${selected.slot ?? "?"} controls`}
         >
           <div className="rip-kiosk-heading">
-            <h1>Slot {selected.slot ?? "?"}</h1>
-            <strong>
+            <h1>
+              <Badge
+                className="rip-kiosk-number"
+                intent={summary.intent}
+                appearance="solid"
+              >
+                {selected.slot ?? "?"}
+              </Badge>
+              <span className="rip-kiosk-title">
+                {summary.title}
+              </span>
+            </h1>
+            <Badge
+              className="rip-kiosk-outcome"
+              intent={summary.intent}
+              appearance="soft"
+            >
               {summary.status} · {summary.percent}%
-            </strong>
+            </Badge>
           </div>
           <div className="rip-kiosk-disc">
             {selectedRip?.poster ? (
@@ -109,17 +135,10 @@ export const Kiosk = () => {
               </div>
             )}
             <div className="rip-kiosk-disc-info">
-              <p className="rip-kiosk-title">
-                {selected.state.title ?? selected.label}
-              </p>
-              <p>
+              <p className="rip-kiosk-meta">
                 {summary.detail || "No disc information"}
               </p>
-              <p>
-                {selectedRip?.disctype_label ??
-                  selected.state.disctype ??
-                  "Unknown disc type"}
-              </p>
+              {discTypeLine && <p>{discTypeLine}</p>}
               <p>
                 {selected.state.read_error_count > 0
                   ? `${selected.state.read_error_count} read errors`
@@ -222,34 +241,40 @@ export const Kiosk = () => {
                 <ButtonLink
                   key={bay.drive_id}
                   href={`${slotPath(bay)}${search}`}
-                  appearance="outline"
+                  appearance="soft"
                   intent={row.intent}
                   className="rip-kiosk-row"
+                  data-empty={
+                    row.isEmpty ? "true" : "false"
+                  }
                   data-castkit-loading="disc-details"
                   data-castkit-target={`slot:${bay.drive_id}`}
                   aria-label={`Slot ${bay.slot ?? "?"}: ${row.status}, ${row.percent}%`}
                 >
-                  <span className="rip-kiosk-number">
-                    Slot {bay.slot ?? "?"}
+                  <Badge
+                    className="rip-kiosk-number"
+                    intent={row.intent}
+                    appearance="solid"
+                  >
+                    {bay.slot ?? "?"}
+                  </Badge>
+                  <span className="rip-kiosk-description">
+                    <strong className="rip-kiosk-title">
+                      {row.title}
+                    </strong>
+                    <span className="rip-kiosk-meta">
+                      {row.meta}
+                    </span>
                   </span>
-                  <strong className="rip-kiosk-percent">
-                    {row.percent}%
-                  </strong>
                   <ProgressBar
                     label={`Slot ${bay.slot ?? "?"} progress`}
                     value={row.percent}
                     intent={row.intent}
-                    size="lg"
+                    size="md"
                   />
-                  <span className="rip-kiosk-description">
-                    <strong>{row.status}</strong>
-                    <span>
-                      {row.detail ||
-                        (bay.is_present
-                          ? "Ready for disc"
-                          : "Drive disconnected")}
-                    </span>
-                  </span>
+                  <strong className="rip-kiosk-percent">
+                    {row.isEmpty ? "—" : `${row.percent}%`}
+                  </strong>
                 </ButtonLink>
               )
             })}

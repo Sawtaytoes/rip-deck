@@ -152,43 +152,65 @@ body {
 }
 .rip-kiosk .rip-kiosk-row {
   display: grid;
-  grid-template-columns: 47px 43px minmax(0, 1fr) 143px;
+  grid-template-columns: 26px minmax(0, 1fr) 104px 46px;
   gap: 7px;
+  align-items: center;
   justify-content: normal;
-  padding: 1px 7px;
+  padding: 0 6px 0 5px;
   block-size: 100%;
   min-block-size: 0;
-  border-radius: 2px;
+  border-radius: 3px;
   text-align: start;
   font-weight: normal;
+  color: var(--color-content-primary);
   touch-action: manipulation;
 }
-.rip-kiosk-number {
-  font-size: 17px;
-  white-space: nowrap;
+/* The number chip: a solid Badge in the row's intent colour, sized
+   for a thumb on a 480×320 panel rather than for a caption. */
+.rip-kiosk .rip-kiosk-number {
+  inline-size: 26px;
+  block-size: 26px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 15px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
 }
 .rip-kiosk-percent {
-  font-size: 20px;
+  font-size: 18px;
+  font-weight: bold;
+  text-align: end;
   letter-spacing: -0.5px;
   font-variant-numeric: tabular-nums;
+  color: var(--color-content-primary);
 }
 .rip-kiosk-description {
   display: flex;
   flex-direction: column;
   min-inline-size: 0;
-  line-height: 14px;
 }
-.rip-kiosk-description > strong {
-  font-size: 13px;
+/* The rip name is the headline and stays primary; the meta line
+   underneath keeps the intent colour the soft appearance gives it. */
+.rip-kiosk-row .rip-kiosk-title {
+  font-size: 14px;
+  line-height: 15px;
+  font-weight: bold;
+  color: var(--color-content-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.rip-kiosk-description > span {
-  font-size: 12px;
+.rip-kiosk-row .rip-kiosk-meta {
+  font-size: 11px;
+  line-height: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.rip-kiosk-row[data-empty="true"] .rip-kiosk-title {
+  color: var(--color-content-muted);
+  font-weight: normal;
 }
 .rip-kiosk-details {
   display: flex;
@@ -205,19 +227,35 @@ body {
   align-items: center;
 }
 .rip-kiosk-heading h1 {
-  font-size: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-inline-size: 0;
+  font-size: 22px;
+  line-height: 24px;
   font-weight: bold;
 }
-.rip-kiosk-heading strong {
-  font-size: 18px;
-}
-.rip-kiosk-title {
+.rip-kiosk-heading h1 .rip-kiosk-number {
+  inline-size: 32px;
+  block-size: 32px;
   font-size: 19px;
-  line-height: 22px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  flex: none;
+}
+.rip-kiosk-heading h1 .rip-kiosk-title {
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rip-kiosk .rip-kiosk-outcome {
+  flex: none;
+  font-size: 15px;
+  font-weight: bold;
+  padding: 3px 8px;
+}
+.rip-kiosk-disc-info .rip-kiosk-meta {
+  font-size: 16px;
+  line-height: 18px;
+  font-weight: bold;
 }
 .rip-kiosk-actions {
   display: grid;
