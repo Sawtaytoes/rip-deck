@@ -5,7 +5,9 @@
 - **Type:** web / theming / layout
 - **Supersedes:** the "light mode is still half-done by design" caveat in
   [2026-08-03-first-paint-follows-the-os-scheme.md](2026-08-03-first-paint-follows-the-os-scheme.md)
-- **Superseded by:** —
+- **Superseded by:**
+  [2026-09-08-mobile-rip-cards-always-show-live-speed.md](2026-09-08-mobile-rip-cards-always-show-live-speed.md)
+  for the narrow live-metrics clause only
 
 ## Decision
 

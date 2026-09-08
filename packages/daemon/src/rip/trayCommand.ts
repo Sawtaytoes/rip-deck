@@ -699,6 +699,24 @@ export const decideTrayBayAction = (input: {
       bay.phase === "starting"
 
     if (!isHarmlessPowerCut) {
+      // A bulk Close press is intentionally a tower-wide no-op
+      // while any rip is active. The shared USB tree cannot safely
+      // take even an idle tray's motor load, but that safety guard
+      // is not a refusal: Close was asked to handle the safe set,
+      // and there is no safe set until the rip ends. Classifying
+      // the active bay as `refused_ripping` made the dashboard and
+      // Home Assistant report an error for the expected no-op.
+      // Targeted close still reaches the refusal below.
+      if (request.kind === "close_trays") {
+        return {
+          action: "skip",
+          resultKind: "skipped_untouched",
+          detail:
+            "a rip is active, so the tower-wide close command " +
+            "moved no trays",
+        }
+      }
+
       if (
         request.kind === "open_trays" &&
         input.hasOpenableSafeBay === true
@@ -1104,6 +1122,12 @@ export const buildTrayCommandMessage = (input: {
   // no bay was open to close, and an idle tower with every tray
   // empty is one way ▲ can be.
   if (input.request.kind === "close_trays") {
+    const untouched = countOf(results, "skipped_untouched")
+
+    if (untouched.length > 0) {
+      return "Close trays skipped while a rip is active."
+    }
+
     const closable = countOf(
       results,
       "skipped_already_closed",
