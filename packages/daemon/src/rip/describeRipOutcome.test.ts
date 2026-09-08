@@ -26,6 +26,7 @@ const result = (
   termination: "exited",
   exitCode: 0,
   observations: createRipObservations(),
+  kernelIoErrorCount: 0,
   progress: EMPTY_PROGRESS,
   destinationPath: "/media/Disc-Rips/Ivanhoe.iso",
   incompletePath: null,
@@ -83,6 +84,7 @@ describe("the three states of a finished rip", () => {
     })
 
     expect(outcome.kind).toBe("failed")
+    expect(outcome.failureReason).toBe("empty_output")
     expect(outcome.detail).toContain("empty_output")
     expect(outcome.detail).toContain("makemkvcon exited 0")
   })

@@ -12,9 +12,15 @@ const DISC_BYTES = 25 * GB
 const START = 1_000_000
 
 const tracker = (): ProgressTracker =>
-  createProgressTracker({
-    discBytes: DISC_BYTES,
-    startedAtMs: START,
+  observeEvent({
+    tracker: createProgressTracker({
+      discBytes: DISC_BYTES,
+      startedAtMs: START,
+    }),
+    event: parseMakemkvLine(
+      'PRGT:5047,0,"Copying all files"',
+    ),
+    atMs: START,
   })
 
 const feed = (
@@ -39,6 +45,21 @@ const prgv = (
 ) => `PRGV:${current},${total},${max}`
 
 describe("two-level progress (C5)", () => {
+  it("does not present a device scan as copied disc data", () => {
+    const initial = createProgressTracker({
+      discBytes: DISC_BYTES,
+      startedAtMs: START,
+    })
+    const result = feed(initial, [
+      ['PRGT:5018,0,"Scanning CD-ROM devices"', START],
+      [prgv(19660, 19660), START + 1_000],
+    ])
+
+    expect(result.progress.totalFraction).toBe(0)
+    expect(result.progress.bytesWritten).toBe(0)
+    expect(result.progress.throughputBytesPerSec).toBeNull()
+  })
+
   it("tracks current and total separately", () => {
     const result = feed(tracker(), [
       ['PRGT:5005,0,"Saving all titles to MKV"', START],

@@ -77,6 +77,8 @@ export type ProgressTracker = {
   filesAdded: number
   /** Titles on the disc, from TCOUNT when it appears. */
   titleCount: number | null
+  /** True only while PRGV describes bytes being copied. */
+  isCopyingData: boolean
 }
 
 export const createProgressTracker = (input: {
@@ -93,7 +95,16 @@ export const createProgressTracker = (input: {
   lastEventAtMs: input.startedAtMs,
   filesAdded: 0,
   titleCount: null,
+  isCopyingData: false,
 })
+
+const isCopyOperation = (
+  event: Extract<MakemkvEvent, { type: "PRGT" }>,
+): boolean =>
+  event.code === 5047 ||
+  event.code === 5019 ||
+  event.name === "Copying all files" ||
+  event.name.startsWith("Saving all titles")
 
 /**
  * Drop samples that have aged out of a window, but never drop
@@ -237,6 +248,7 @@ export const observeEvent = (input: {
       )
         ? {
             ...base,
+            isCopyingData: isCopyOperation(event),
             progress: {
               ...base.progress,
               totalLabel: event.name,
@@ -244,6 +256,7 @@ export const observeEvent = (input: {
           }
         : {
             ...base,
+            isCopyingData: isCopyOperation(event),
             rateSamples: [],
             etaSamples: [],
             lastPrgvCurrent: 0,
@@ -315,6 +328,32 @@ const observePrgv = (input: {
   const hasAdvanced =
     event.total > tracker.lastPrgvTotal ||
     event.current > tracker.lastPrgvCurrent
+
+  // Scanning and decrypting use the same 0..65536 counter as the
+  // copy. They prove liveness, but they have written zero bytes.
+  // Keep their forward-motion timestamp while presenting an
+  // indeterminate copy instead of 30% at hundreds of GB/s.
+  if (!tracker.isCopyingData) {
+    return {
+      ...tracker,
+      lastPrgvCurrent: event.current,
+      lastPrgvTotal: event.total,
+      lastForwardProgressAtMs: hasAdvanced
+        ? atMs
+        : tracker.lastForwardProgressAtMs,
+      rateSamples: [],
+      etaSamples: [],
+      progress: {
+        ...tracker.progress,
+        totalFraction: 0,
+        currentFraction: 0,
+        bytesWritten: 0,
+        throughputBytesPerSec: null,
+        etaSeconds: null,
+        etaTrend: null,
+      },
+    }
+  }
 
   const bytesWritten = Math.round(
     totalFraction * tracker.discBytes,

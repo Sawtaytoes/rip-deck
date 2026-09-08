@@ -1,31 +1,19 @@
-import { Button, Dialog } from "@charcuterie/ui"
+import { Dialog } from "@charcuterie/ui"
 import { useEffect, useRef, useState } from "react"
 
 import { useDataSource } from "../hooks/useDataSource"
+import { buildOperatorLog } from "../operatorLog"
 
 export type LogTarget = {
   jobUuid: string
   label: string
 }
 
-/**
- * How much of the capture a freshly-opened modal asks for.
- *
- * A robot log is 1–3 MB and the interesting part of one is the
- * END — the failure, the exit code, the last title written — so
- * the default is a tail and the rest is opt-in. Matching
- * `RipDeckDataSource.fetchLog`'s own default.
- */
-const DEFAULT_TAIL_LINES = 600
-
-/** Each "load more" asks for four times what it last got. */
-const MORE_FACTOR = 4
-
 const countLines = (text: string): number =>
   text === "" ? 0 : text.split("\n").length
 
 /**
- * In-page capture tail.
+ * In-page operator log.
  *
  * Ported from the viewer's `LogModal` and dormant until now: the
  * daemon answered `/logs` with a 501, `armView` therefore sent
@@ -34,25 +22,10 @@ const countLines = (text: string): number =>
  * now, so `logfile: null` has gone back to meaning what it says
  * (this job never wrote one) and this is live.
  *
- * ⚠️ **A robot log is a parsed format, not prose. It is
- * rendered, never summarised.** Nothing here matches on the
- * text: no "looks like it failed" banner, no error highlighting,
- * no counting `MSG:` codes. Reading structure out of MakeMKV's
- * output by string-matching is precisely the `MSG:5072` bug
- * (`docs/HANDOFF-eject-and-open-questions.md` §4.4), and a
- * diagnosis screen that quietly paraphrases the evidence is the
- * worst possible place to repeat it.
- *
- * ⚠️ **"Load more" is not "load everything", and says so.** The
- * `lines` / `all=1` query parameters are the WEB side's
- * proposal; a daemon that does not implement them answers with
- * its own default tail and no error. So the control promises
- * nothing — it asks for more, and the caption reports how many
- * lines actually ARRIVED rather than how many were requested. If
- * the count stops growing, the button retires itself: either
- * that is the whole file, or the daemon is ignoring the
- * parameter, and from this side those two are the same
- * observation.
+ * The complete raw capture remains the diagnostic record on
+ * disk. The browser removes typed telemetry records and keeps
+ * MakeMKV messages, major stages and Rip Deck's final result.
+ * It does not infer success or failure from message prose.
  *
  * ## What M5 changed — and M8 after it
  *
@@ -87,18 +60,6 @@ export function LogModal({
   const bodyRef = useRef<HTMLPreElement>(null)
   const [text, setText] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [requestedLines, setRequestedLines] = useState(
-    DEFAULT_TAIL_LINES,
-  )
-  const [hasMore, setHasMore] = useState(true)
-  /**
-   * How many lines the last answer carried.
-   *
-   * A ref rather than state, and not folded into a `setText`
-   * updater either: an updater that also calls `setHasMore` is a
-   * side effect inside a function React is free to run twice.
-   */
-  const loadedLineCount = useRef(0)
 
   /**
    * Reset the request when a different job opens.
@@ -115,16 +76,13 @@ export function LogModal({
 
   if ((target?.jobUuid ?? null) !== openedJobUuid) {
     setOpenedJobUuid(target?.jobUuid ?? null)
-    setRequestedLines(DEFAULT_TAIL_LINES)
-    setHasMore(true)
     setText("")
-    loadedLineCount.current = 0
   }
 
   const jobUuid = target?.jobUuid ?? null
 
-  // Fetch the capture whenever a new target opens, or the
-  // operator asks for more of the same one.
+  // Fetch the bounded complete capture once. The browser then
+  // removes progress telemetry and renders only operator events.
   useEffect(() => {
     if (jobUuid === null) return
 
@@ -133,29 +91,18 @@ export function LogModal({
     setIsLoading(true)
 
     dataSource
-      .fetchLog(jobUuid, requestedLines)
+      .fetchLog(jobUuid, "all")
       .then((body) => {
         if (isCancelled) return
-
-        const nextCount = countLines(body)
-
-        // No more lines than last time means we are looking at
-        // everything the daemon will give us — whether that is
-        // the whole file or a tail it capped on its own side.
-        // From here those two are the same observation.
-        if (nextCount <= loadedLineCount.current) {
-          setHasMore(false)
-        }
-
-        loadedLineCount.current = nextCount
-
-        setText(body)
+        setText(
+          buildOperatorLog(body) ||
+            "No important messages were recorded.",
+        )
       })
       .catch((error: unknown) => {
         if (isCancelled) return
 
         setText(String(error))
-        setHasMore(false)
       })
       .finally(() => {
         if (!isCancelled) setIsLoading(false)
@@ -164,7 +111,7 @@ export function LogModal({
     return () => {
       isCancelled = true
     }
-  }, [jobUuid, requestedLines, dataSource])
+  }, [jobUuid, dataSource])
 
   // Open at the END. A rip fails at the bottom of its capture,
   // and a modal that opens on "MakeMKV v1.18.1 starting" makes
@@ -193,21 +140,6 @@ export function LogModal({
                 ? "loading…"
                 : `${lineCount} lines`}
             </span>
-
-            {hasMore && (
-              <Button
-                appearance="outline"
-                isDisabled={isLoading}
-                onClick={() => {
-                  setRequestedLines(
-                    (current) => current * MORE_FACTOR,
-                  )
-                }}
-                size="sm"
-              >
-                Load more
-              </Button>
-            )}
           </div>
         )
       }

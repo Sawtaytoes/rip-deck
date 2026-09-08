@@ -29,8 +29,10 @@ import { createHash } from "node:crypto"
  *    resolve the index first. See `discIndex.ts` — including
  *    why the result is verified against MakeMKV's own DRV table
  *    before a byte is written.
- *  - `--cache=128` bounds memory. Nine default caches would
- *    exhaust RAM on a host that is also a NAS (E4).
+ *  - `--cache=1024` gives each independent rip enough room to
+ *    absorb a short destination-write pause. Nine caches use at
+ *    most 9 GiB. The value remains configurable for smaller
+ *    installations.
  *  - `--directio=true` keeps the rip out of the page cache; the
  *    destination is a ZFS dataset with its own ARC.
  *  - `--messages=-stdout --progress=-same` merges both streams
@@ -42,7 +44,18 @@ import { createHash } from "node:crypto"
  */
 
 /** Bounded MakeMKV read cache, in megabytes. */
-export const RIP_CACHE_MB = 128
+export const RIP_CACHE_MB = 1024
+
+/** A positive integer from the environment, or the safe default. */
+export const resolveRipCacheMb = (
+  raw: string | undefined,
+): number => {
+  const parsed = Number.parseInt(raw ?? "", 10)
+
+  return Number.isInteger(parsed) && parsed > 0
+    ? parsed
+    : RIP_CACHE_MB
+}
 
 export type RipCommandInput = {
   /**
@@ -381,6 +394,12 @@ export type RipInvocation = {
   /** What to put after `disc:`. */
   discIndex: number
   isIsolated: boolean
+  /** Exact runtime command that signals this one container. */
+  containerControl: {
+    command: string
+    args: string[]
+    containerName: string
+  } | null
 }
 
 /**
@@ -407,6 +426,7 @@ export const buildRipInvocation = (input: {
         makemkv: input.makemkv,
         discIndex: input.discIndex,
         isIsolated: false,
+        containerControl: null,
       }
     : {
         makemkv: buildIsolatedMakemkvCommand({
@@ -417,6 +437,13 @@ export const buildRipInvocation = (input: {
         }),
         discIndex: ISOLATED_DISC_INDEX,
         isIsolated: true,
+        containerControl: {
+          command: input.isolation.dockerArgs[0],
+          args: input.isolation.dockerArgs.slice(1),
+          containerName: buildRipContainerName({
+            jobUuid: input.jobUuid,
+          }),
+        },
       }
 
 /**

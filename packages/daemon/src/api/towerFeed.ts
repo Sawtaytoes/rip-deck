@@ -632,11 +632,12 @@ const buildJob = (input: {
         jobUuid: record.jobId,
       }),
     }),
-    // `unknown` rather than null for a failure: null reads as
-    // "nothing went wrong". The outcome's own sentence — which
-    // names the real reason — travels as verdict evidence.
+    // Old ledgers did not store the structured cause. Preserve
+    // their honest `unknown`; new outcomes retain the reason.
     failureReason:
-      facts.outcome?.kind === "failed" ? "unknown" : null,
+      facts.outcome?.kind === "failed"
+        ? (facts.outcome.failureReason ?? "unknown")
+        : null,
     // The third state, on the wire. Straight off the bay table,
     // where `runBayRip` put the sentences `buildRipWarnings`
     // wrote, and kept across a restart by the ledger.
@@ -645,8 +646,7 @@ const buildJob = (input: {
     // for anything that has not published — a held disc, a
     // failure, a rip still running.
     destinationPath: facts.destinationPath,
-    // NOT a measured zero. See the header, point 2.
-    readErrorCount: 0,
+    readErrorCount: facts.outcome?.readErrorCount ?? 0,
     // Straight off the bay table, where `adoptBayAtStartup`
     // recorded it. Not inferrable here: an adopted bay emits a
     // "held on startup" note that looks like any other event.

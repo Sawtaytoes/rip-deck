@@ -77,6 +77,8 @@ export type BayAction =
    *  which is what upgrades it to `confirmed`. */
   | "retry_in_another_drive"
   | "cancel"
+  /** Clear stale media state by resetting this drive only. */
+  | "reset_bay"
 
 export type BayView = {
   drive_id: string
@@ -212,6 +214,16 @@ const buildBayActions = (bay: BaySnapshot): BayAction[] => {
 
   if (bay.supervision.isQuarantined) {
     actions.push("clear_quarantine")
+  }
+
+  if (
+    bay.isPresent &&
+    bay.disc !== null &&
+    bay.disc.bay.phase !== "starting" &&
+    bay.disc.bay.phase !== "ripping" &&
+    bay.disc.bay.outcome !== null
+  ) {
+    actions.push("reset_bay")
   }
 
   const { job } = bay
