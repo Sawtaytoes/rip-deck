@@ -3800,11 +3800,34 @@ export const startWatcher = (
         : null
 
     const candidates = [...probed]
-      .sort(
-        (a, b) =>
-          (placementOf(a).slot ?? 99) -
-          (placementOf(b).slot ?? 99),
-      )
+      .sort((a, b) => {
+        const aSlot = placementOf(a).slot
+        const bSlot = placementOf(b).slot
+
+        if (params.request.kind !== "open_trays") {
+          return (aSlot ?? 99) - (bSlot ?? 99)
+        }
+
+        // Bulk Open starts at the bottom of the tower so each
+        // newly opened drawer has no open drawer above it. Unknown
+        // drives follow every numbered slot in a stable identity
+        // order; probe order is not a physical ordering contract.
+        if (aSlot !== null && bSlot !== null) {
+          const byDescendingSlot = bSlot - aSlot
+          if (byDescendingSlot !== 0)
+            return byDescendingSlot
+        } else if (aSlot !== null) {
+          return -1
+        } else if (bSlot !== null) {
+          return 1
+        }
+
+        const aDriveId = a.identity.usbPortPath
+        const bDriveId = b.identity.usbPortPath
+        if (aDriveId < bDriveId) return -1
+        if (aDriveId > bDriveId) return 1
+        return 0
+      })
       .filter((drive) =>
         target === null
           ? true
