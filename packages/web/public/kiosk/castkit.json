@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "viewport": { "width": 480, "height": 320 },
+  "page_url": "/kiosk",
+  "ready_selector": "[data-castkit-ready]",
+  "input": {
+    "target_attribute": "data-castkit-target",
+    "max_frame_age_ms": 7000
+  },
+  "cache": [
+    {
+      "id": "disc-details",
+      "url": "/kiosk/loading",
+      "on_tap": "[data-castkit-loading=\"disc-details\"]"
+    }
+  ],
+  "refresh": { "max_fps": 10, "heartbeat_ms": 2000 }
+}

@@ -1472,6 +1472,105 @@ describe("startWatcher loaded-discs memory", () => {
     await watcher.stop()
   })
 
+  it("targeted removal preserves another disc and never starts a second rip", async () => {
+    const ripper = controllableRipper()
+    const written: BayLedger[] = []
+    const otherRecord = {
+      ...troyRecord,
+      driveId: "other-drive",
+    }
+    const watcher = startWatcher(
+      {
+        config: noopConfig,
+        governor: createGovernor({ maxConcurrentRips: 9 }),
+      },
+      watcherDeps({
+        probeDrives: async () => [
+          probedDrive({
+            driveId: SLOT_9,
+            kernelName: "sr0",
+            sizeSectors: BLURAY_SECTORS,
+          }),
+        ],
+        runBayRip: ripper.runBayRip,
+        readLedger: async () => ({
+          version: BAY_LEDGER_VERSION,
+          hasPriorState: true,
+          trayCommands: [],
+          records: [troyRecord, otherRecord],
+        }),
+        writeLedger: async ({ ledger }) => {
+          written.push(ledger)
+        },
+      }),
+    )
+    await watcher.tickNow()
+    expect(watcher.getLoadedDiscs().count).toBe(2)
+    const report = await watcher.runTrayCommand({
+      request: {
+        kind: "clear_loaded",
+        target: { driveId: SLOT_9 },
+      },
+    })
+    expect(report.message).toContain("marked as taken out")
+    expect(watcher.getLoadedDiscs().count).toBe(1)
+    await watcher.tickNow()
+    expect(ripper.started).toHaveLength(0)
+    expect(watcher.getBays()[0]?.phase).toBe("done")
+    expect(
+      written
+        .at(-1)
+        ?.records.some(
+          (record) =>
+            record.driveId === "other-drive" &&
+            !record.isLoadedDismissed,
+        ),
+    ).toBe(true)
+    const unknown = await watcher.runTrayCommand({
+      request: {
+        kind: "clear_loaded",
+        target: { driveId: "missing-drive" },
+      },
+    })
+    expect(unknown.counts.failed).toBe(1)
+    expect(watcher.getLoadedDiscs().count).toBe(1)
+    await watcher.stop()
+  })
+
+  it("refuses targeted removal while the bay starts or runs a rip", async () => {
+    const ripper = controllableRipper({
+      reportsRipStarted: true,
+    })
+    const watcher = startWatcher(
+      {
+        config: noopConfig,
+        governor: createGovernor({ maxConcurrentRips: 9 }),
+      },
+      watcherDeps({
+        probeDrives: async () => [
+          probedDrive({
+            driveId: SLOT_9,
+            kernelName: "sr0",
+            sizeSectors: BLURAY_SECTORS,
+          }),
+        ],
+        runBayRip: ripper.runBayRip,
+      }),
+    )
+    await watcher.tickNow()
+    const report = await watcher.runTrayCommand({
+      request: {
+        kind: "clear_loaded",
+        target: { driveId: SLOT_9 },
+      },
+    })
+    expect(report.counts.refused).toBe(1)
+    expect(watcher.getBays()[0]?.isLoadedDismissed).toBe(
+      false,
+    )
+    await watcher.stop()
+  })
+
   it("clear_loaded forgets the reminder, persists the clear, and reports the count", async () => {
     const ripper = controllableRipper()
     const written: BayLedger[] = []
