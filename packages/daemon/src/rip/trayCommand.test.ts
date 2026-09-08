@@ -281,11 +281,9 @@ describe("parseTrayCommand — rip_bay", () => {
 })
 
 describe("decideTrayBayAction", () => {
-  it("⚠️ REFUSES a bay that is ripping, every command kind", () => {
+  it("⚠️ REFUSES direct work on a bay that is ripping", () => {
     for (const phase of ["starting", "ripping"] as const) {
       for (const request of [
-        { kind: "open_trays" },
-        { kind: "close_trays" },
         { kind: "open_bay", target: { slot: 7 } },
         { kind: "close_bay", target: { slot: 7 } },
         // `rip_bay` overrules the latch, the fingerprint and the
@@ -352,14 +350,12 @@ describe("decideTrayBayAction", () => {
     })
   })
 
-  it("still refuses to MOVE A TRAY on a starting bay", () => {
+  it("still refuses to MOVE one targeted tray on a starting bay", () => {
     // The exception above is about mains, and only mains. Opening
     // a drawer under a live `makemkvcon` read is how the
     // eject/insert flap-storm starts (B3), and unlike a power cut
     // it fixes nothing when the bus is down.
     for (const request of [
-      { kind: "open_trays" },
-      { kind: "close_trays" },
       { kind: "open_bay", target: { slot: 7 } },
       { kind: "close_bay", target: { slot: 7 } },
     ] as const) {
@@ -483,27 +479,22 @@ describe("decideTrayBayAction", () => {
     ).toEqual({ action: "open" })
   })
 
-  it("⚠️ REFUSES a ripping bay in 'all' scope too", () => {
+  it("⚠️ REFUSES a ripping bay in open 'all' scope too", () => {
     // The one that matters. In `"all"` scope ▲ is "open all" — and
     // "all" still may not mean the bay holding 90 GB half-written.
     // The refusal is the FIRST branch; the scope logic lives inside
     // the command switch, below it, and cannot reach around it.
-    for (const request of [
-      { kind: "open_trays" },
-      { kind: "close_trays" },
-    ] as const) {
-      expect(
-        decideTrayBayAction({
-          request,
-          bay: bay({ phase: "ripping" }),
-          observation: loaded(),
-          openScope: "all",
-        }),
-      ).toMatchObject({
-        action: "refuse",
-        resultKind: "refused_ripping",
-      })
-    }
+    expect(
+      decideTrayBayAction({
+        request: { kind: "open_trays" },
+        bay: bay({ phase: "ripping" }),
+        observation: loaded(),
+        openScope: "all",
+      }),
+    ).toMatchObject({
+      action: "refuse",
+      resultKind: "refused_ripping",
+    })
   })
 
   it("skips every other bay on bulk close when a rip is active", () => {
@@ -586,11 +577,10 @@ describe("decideTrayBayAction", () => {
     ).toEqual({ action: "close" })
   })
 
-  it("still refuses a ripping bay it once opened", () => {
-    // Ordering, not behaviour: the refusal is the FIRST branch
-    // and nothing added after it may reach around. A bay ripping
-    // now, that rip-deck opened at some point in the past, is
-    // still untouchable.
+  it("quietly skips a ripping bay during bulk close", () => {
+    // No tray may move, including one Rip Deck once opened. This
+    // is an expected tower-wide safety no-op, not an operator
+    // error, so it does not publish a refusal.
     expect(
       decideTrayBayAction({
         request: { kind: "close_trays" },
@@ -602,8 +592,8 @@ describe("decideTrayBayAction", () => {
         observation: loaded(),
       }),
     ).toMatchObject({
-      action: "refuse",
-      resultKind: "refused_ripping",
+      action: "skip",
+      resultKind: "skipped_untouched",
     })
   })
 
@@ -956,6 +946,15 @@ describe("buildTrayCommandMessage", () => {
         results: [],
       }),
     ).toContain("No trays to close")
+
+    expect(
+      buildTrayCommandMessage({
+        request: { kind: "close_trays" },
+        results: [
+          result({ resultKind: "skipped_untouched" }),
+        ],
+      }),
+    ).toBe("Close trays skipped while a rip is active.")
   })
 
   it("carries a failure's own words", () => {

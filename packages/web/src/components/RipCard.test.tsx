@@ -117,9 +117,15 @@ describe("RipCard", () => {
       />,
     )
 
+    const liveMetrics = screen.getByText(
+      /12m elapsed · ~15m left · .* MB\/s/,
+    )
+    expect(liveMetrics).toBeInTheDocument()
+    // Speed is visible in the phone card. It no longer lives in
+    // the narrow-only hidden detail wrapper.
     expect(
-      screen.getByText(/12m elapsed · ~15m left/),
-    ).toBeInTheDocument()
+      liveMetrics.parentElement?.className,
+    ).not.toContain("@max-md/bay:hidden")
 
     const finish = screen.getByText(/Estimated finish/)
     expect(finish).toBeInTheDocument()
@@ -377,6 +383,22 @@ describe("RipCard", () => {
       label: "07 - Pioneer BDR-211M",
       action: "keep_trying",
     })
+
+    expect(
+      screen.getByText(
+        "Keep trying disables the automatic stall timeout for this rip.",
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        "Give up stops the rip and keeps its partial output.",
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        "Cancel stops the rip, keeps its partial output, and opens its tray.",
+      ),
+    ).toBeInTheDocument()
   })
 
   // §2: "This button should also have an eject icon, not 'open
