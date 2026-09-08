@@ -72,6 +72,15 @@ const TRAILING_NOISE = [
   "theatrical",
   "directors cut",
   "director s cut",
+  // The `edition` half of the same family. Only the `cut`
+  // spellings were here, so `STAR_TREK_TMP_DIRECTOR_EDITION`
+  // kept two words of packaging in its query and matched
+  // nothing. Seen on the live tower 2026-09-08 across two
+  // drives. The singular `director` is not a typo — that is
+  // what the pressing plant wrote.
+  "directors edition",
+  "director s edition",
+  "director edition",
   "unrated",
   "uncut",
   "remastered",
