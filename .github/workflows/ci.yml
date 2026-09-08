@@ -18,6 +18,12 @@ jobs:
   changes:
     uses: Sawtaytoes/charcuterie/.github/workflows/shared-docs-only-changes.yml@workflows-v1
 
+  # The one gate a docs-only change DOES run. It lints the decision records
+  # the pull request TOUCHED, never the whole tree.
+  # This repo keeps 61 decision records.
+  docs:
+    uses: Sawtaytoes/charcuterie/.github/workflows/shared-docs-lint.yml@workflows-v1
+
   check:
     needs: [changes]
     # Skipped, not absent: this still posts its status context.
