@@ -4,7 +4,8 @@ Status: Accepted
 Date: 2026-08-29
 Type: Hardware safety / tray commands
 Supersedes: The parallel-move and close-during-rip clauses of `2026-07-30-open-trays-escalates-and-close-trays-is-plain.md`
-Superseded by: —
+Superseded by: `2026-09-08-close-trays-quietly-skips-during-an-active-rip.md`
+for the active-bay result and operator-reporting clause only
 
 ## Decision
 

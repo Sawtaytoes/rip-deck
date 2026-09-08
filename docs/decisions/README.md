@@ -9,6 +9,9 @@ default instinct.
 
 | Date | Decision |
 | --- | --- |
+| 2026-09-08 | [Job controls explain their effects before a press](2026-09-08-job-controls-explain-their-effects-before-a-press.md) — visible phone-safe text distinguishes Keep trying, Give up, Cancel, Try again and Rip as this before the operator acts. |
+| 2026-09-08 | [Mobile rip cards always show live speed](2026-09-08-mobile-rip-cards-always-show-live-speed.md) — elapsed time, estimated time remaining and measured MB/s stay visible at every card width. **Supersedes** the narrow live-metrics clause of the 2026-08-09 layout decision. |
+| 2026-09-08 | [Close trays quietly skips during an active rip](2026-09-08-close-trays-quietly-skips-during-an-active-rip.md) — the tower-wide motor block remains, but the expected no-op returns quiet skips instead of refusals. A targeted close still refuses. **Supersedes** the active-bay result and reporting clause of the 2026-08-29 safety decision. |
 | 2026-09-08 | [Concurrent rips use configurable one-gibibyte caches](2026-09-08-concurrent-rips-use-configurable-one-gibibyte-caches.md) — each MakeMKV process gets an independent 1 GiB cache by default, with an environment override for smaller installations. |
 | 2026-09-08 | [A stale bay can be reset without restarting Rip Deck](2026-09-08-a-stale-bay-can-be-reset-without-restarting-rip-deck.md) — Reset bay validates and rebinds one exact USB child, clears its stale record, refuses active work and leaves sibling jobs untouched. |
 | 2026-09-08 | [Web logs show operator events, not progress telemetry](2026-09-08-web-logs-show-operator-events-not-progress-telemetry.md) — the raw capture remains on disk, while the Web UI removes `PRGV` and other telemetry and keeps messages, stages, kernel I/O counts and the terminal cause. |

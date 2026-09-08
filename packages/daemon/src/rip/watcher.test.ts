@@ -2806,15 +2806,24 @@ describe("startWatcher tray commands", () => {
       request: { kind: "close_trays" },
     })
 
-    // The per-bay refusal on sr1 is not enough: closing sr0 can
-    // reset the shared hub and destroy sr1's rip. The whole bulk
-    // close therefore moves nothing.
+    // Closing sr0 can reset the shared hub and destroy sr1's rip.
+    // The whole bulk close therefore moves nothing. That expected
+    // safety no-op is not an error and reports no refusal.
     expect(tray.moved).toEqual([])
     expect(report.counts.closed).toBe(0)
-    expect(report.counts.refused).toBe(1)
+    expect(report.counts.refused).toBe(0)
+    expect(report.message).toBe(
+      "Close trays skipped while a rip is active.",
+    )
+    expect(report.spoken_message).toBe("Nothing to close.")
     expect(
       report.bays.find(
         (entry) => entry.drive_id === "2-1.1.0",
+      )?.result,
+    ).toBe("skipped_untouched")
+    expect(
+      report.bays.find(
+        (entry) => entry.drive_id === "2-1.1.1",
       )?.result,
     ).toBe("skipped_untouched")
 

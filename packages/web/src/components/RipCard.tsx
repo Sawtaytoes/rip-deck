@@ -58,6 +58,16 @@ const CARD_BORDER: Record<string, string> = {
   indeterminate: "border-border-subtle",
 }
 
+const JOB_ACTION_HELP: Partial<Record<BayAction, string>> =
+  {
+    keep_trying:
+      "Keep trying disables the automatic stall timeout for this rip.",
+    give_up:
+      "Give up stops the rip and keeps its partial output.",
+    cancel:
+      "Cancel stops the rip, keeps its partial output, and opens its tray.",
+  }
+
 /**
  * Where this card stops being a card and becomes an accordion.
  *
@@ -123,11 +133,9 @@ const CARD_BORDER: Record<string, string> = {
  *    colour.** Exit code 0 is necessary and not sufficient —
  *    MakeMKV exits 0 having saved nothing — and never reporting
  *    success on a rip that had read errors is the one rule that
- *    overrides everything else here. It is also the ONE thing
- *    the narrow accordion still shows: §4 lists four fields for
- *    a collapsed card and this is not among them, but a rip
- *    whose read errors are one tap away is a rip that reads as
- *    fine.
+ *    overrides everything else here. It remains visible in the
+ *    narrow card beside the live metrics: a rip whose read errors
+ *    are one tap away is a rip that reads as fine.
  *  - **The controls are the daemon's `bay.actions`.** The card
  *    does not decide that a quarantined bay gets a clear button
  *    or that a suspected disc verdict gets a retry; it renders
@@ -424,6 +432,21 @@ export function RipCard({
             </div>
           </div>
 
+          {actions.some(
+            (bayAction) =>
+              JOB_ACTION_HELP[bayAction] !== undefined,
+          ) && (
+            <ul className="mt-1.5 space-y-0.5 text-sm text-content-muted">
+              {actions.map((bayAction) => {
+                const help = JOB_ACTION_HELP[bayAction]
+
+                return help === undefined ? null : (
+                  <li key={bayAction}>{help}</li>
+                )
+              })}
+            </ul>
+          )}
+
           {/* 5. Overall progress — `@charcuterie/ui`'s, which
               corrects three things about the copy this replaced.
               The role goes on the TRACK rather than the fill, so a
@@ -452,6 +475,19 @@ export function RipCard({
           {estimatedCompletion && (
             <div className="mt-1 text-sm tabular-nums text-content-secondary">
               {estimatedCompletion}
+            </div>
+          )}
+
+          {/* Speed is operational information, not optional card
+              detail. A phone card used to hide this whole line in
+              the narrow-density wrapper, leaving only percent and
+              finish time. Keep the same measured values visible at
+              every card width. */}
+          {(elapsed || eta || throughput) && (
+            <div className="mt-1 text-sm tabular-nums text-content-muted">
+              {[elapsed, eta, throughput]
+                .filter(Boolean)
+                .join(" · ")}
             </div>
           )}
 
@@ -502,14 +538,6 @@ export function RipCard({
 
           {/* Everything below is what a collapsed card drops. */}
           <div className="@max-md/bay:hidden">
-            {(elapsed || eta || throughput) && (
-              <div className="mt-1 text-sm tabular-nums text-content-muted">
-                {[elapsed, eta, throughput]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </div>
-            )}
-
             {/* 6. Per-item progress — the title being written
                 right now, not the whole backup.
 

@@ -230,6 +230,11 @@ export function HeldBayCard({
             })
           }}
         >
+          <div className="w-full text-sm text-content-secondary">
+            {trimmedName === ""
+              ? "Try again reads the disc name again, then starts the rip."
+              : "Rip as this starts the rip with the name above."}
+          </div>
           <input
             type="text"
             value={typedName}

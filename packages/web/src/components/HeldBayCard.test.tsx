@@ -298,6 +298,12 @@ describe("HeldBayCard", () => {
         screen.getByRole("button", { name: "Try again" }),
       )
 
+      expect(
+        screen.getByText(
+          "Try again reads the disc name again, then starts the rip.",
+        ),
+      ).toBeInTheDocument()
+
       expect(runTrayCommand).toHaveBeenCalledWith({
         command: "rip_bay",
         driveId: "usb-2-1-1-2-4-4-7",
@@ -320,6 +326,11 @@ describe("HeldBayCard", () => {
       )
       expect(
         screen.getByRole("button", { name: "Rip as this" }),
+      ).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          "Rip as this starts the rip with the name above.",
+        ),
       ).toBeInTheDocument()
     })
 
