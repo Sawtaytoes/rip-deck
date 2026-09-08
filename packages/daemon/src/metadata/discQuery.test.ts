@@ -65,6 +65,9 @@ describe("parseDiscLabel", () => {
   it.each([
     "TROY THEATRICAL CUT",
     "TROY DIRECTORS CUT",
+    "TROY DIRECTORS EDITION",
+    "TROY DIRECTOR'S EDITION",
+    "TROY DIRECTOR EDITION",
     "TROY EXTENDED EDITION",
     "TROY SPECIAL FEATURES",
     "TROY WIDESCREEN",
@@ -72,6 +75,18 @@ describe("parseDiscLabel", () => {
     "TROY 4K",
   ])("strips the edition noise from %s", (label) => {
     expect(parseDiscLabel(label).title).toBe("troy")
+  })
+
+  it("strips DIRECTOR_EDITION off a real tower label", () => {
+    // `STAR_TREK_TMP_DIRECTOR_EDITION` came off two drives on
+    // 2026-09-08 with no poster. Underscores were never the
+    // problem — they normalise away correctly. The label kept
+    // `director edition`, because only the `cut` spellings of
+    // that family were listed as noise.
+    expect(
+      parseDiscLabel("STAR_TREK_TMP_DIRECTOR_EDITION")
+        .title,
+    ).toBe("star trek tmp")
   })
 
   it("strips a disc number and an edition together", () => {
