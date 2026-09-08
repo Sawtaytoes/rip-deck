@@ -1,6 +1,8 @@
 # Tower kiosk
 
-`/kiosk` is Rip Deck's dedicated 480×320 view. It shows every configured slot in physical order without an app title or a scrolling card grid. A row opens `/kiosk/slots/<drive-id>` with the current disc's artwork (when available), title, type, progress, ETA, outcome, and Open / Close / Disc removed / Back controls.
+`/kiosk` is Rip Deck's dedicated 480×320 view. It shows every configured slot in physical order without an app title or a scrolling card grid. Each row is washed in its state's intent colour (info while ripping, success when ready to remove, warning for a slow read or a bay that needs attention, danger for a failure or quarantine, neutral when empty), carries the bay number as a solid chip — never the word "Slot" — and headlines the rip name over a `status · type · ETA` line, with a short progress bar and the percentage at the right edge. A row opens `/kiosk/slots/<drive-id>` with the same chip and title as its heading, the current disc's artwork (when available), type, progress, ETA, outcome, and Open / Close / Disc removed / Back controls.
+
+The colour treatment was chosen from three served candidates ([comparison](previews/2026-09-08-rip-deck-kiosk-colour.html), [render](previews/2026-09-08-rip-deck-kiosk-colour.png)); see the [decision](decisions/2026-09-08-a-kiosk-row-is-tinted-by-its-state-and-headlines-the-rip-name.md).
 
 The kiosk uses the normal Rip Deck data source and command endpoints. Preview and disconnected states disable physical controls. Active rips disable tray and removal commands; the daemon independently refuses unsafe commands. `clear_loaded` accepts an optional `drive_id` or `slot` to dismiss exactly one disc. Omitting the target retains the existing whole-tower command. A malformed or unknown target never becomes a bulk clear. Dismissal preserves the bay latch so a drive that still reports the disc does not rip it again.
 
