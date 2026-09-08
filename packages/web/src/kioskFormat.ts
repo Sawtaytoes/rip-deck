@@ -10,12 +10,18 @@ import type { BayView } from "./types"
 export const kioskBaySummary = (bay: BayView) => {
   const state = bay.state
   const isActive = TRAY_REFUSED_STATES.has(state.state)
-  const percent = Number.isFinite(state.progress_percent)
-    ? Math.max(
-        0,
-        Math.min(100, Math.floor(state.progress_percent)),
-      )
-    : 0
+  const percent =
+    state.state === "completed"
+      ? 100
+      : Number.isFinite(state.progress_percent)
+        ? Math.max(
+            0,
+            Math.min(
+              100,
+              Math.floor(state.progress_percent),
+            ),
+          )
+        : 0
   const status = !bay.is_present
     ? "Offline"
     : bay.is_quarantined

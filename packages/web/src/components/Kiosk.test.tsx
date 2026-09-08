@@ -57,7 +57,7 @@ test("shows nine rows, disc artwork and targeted controls, with a route back", a
               state: {
                 ...entry.state,
                 state: "completed" as const,
-                progress_percent: 100,
+                progress_percent: 0,
               },
             }
           : entry,
@@ -86,6 +86,7 @@ test("shows nine rows, disc artwork and targeted controls, with a route back", a
   expect(
     await screen.findByRole("heading", { name: "Slot 1" }),
   ).toBeVisible()
+  expect(screen.getByText("Success · 100%")).toBeVisible()
   expect(screen.getByText(bay.state.title)).toBeVisible()
   expect(
     screen.getByRole("img", {
