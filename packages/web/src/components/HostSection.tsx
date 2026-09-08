@@ -6,6 +6,11 @@ import {
   ripBucket,
 } from "../format"
 import type { BayActionState } from "../hooks/useBayActions"
+import {
+  type RipSortMode,
+  sortBayViews,
+  sortRips,
+} from "../ripSort"
 import type {
   BayAction,
   BayView,
@@ -62,6 +67,7 @@ export function HostSection({
   onAction,
   actionFor,
   columns,
+  sortMode,
   now,
 }: {
   host: Host
@@ -80,6 +86,8 @@ export function HostSection({
    * pages.
    */
   columns: number
+  /** Order within each existing card bucket. */
+  sortMode: RipSortMode
   /** Injectable so elapsed text is deterministic in tests. */
   now?: number
 }) {
@@ -91,7 +99,10 @@ export function HostSection({
   // their ARM-shaped rip is pulled out of the buckets below —
   // otherwise the same disc appears twice, once as a held bay
   // and once as a `RipCard` whose every number is zero.
-  const held = tower.bays.filter(isBayHeld)
+  const held = sortBayViews(
+    tower.bays.filter(isBayHeld),
+    sortMode,
+  )
   const heldDriveIds = new Set(
     held.map((bay) => bay.drive_id),
   )
@@ -127,25 +138,33 @@ export function HostSection({
   const current = latestPerDrive(host.rips).filter(
     (rip) => !heldDriveIds.has(rip.drive_id),
   )
-  const ripping = current.filter(
-    (rip) => ripBucket(rip) === "ripping",
+  const ripping = sortRips(
+    current.filter((rip) => ripBucket(rip) === "ripping"),
+    sortMode,
   )
-  const attention = current.filter(
-    (rip) => ripBucket(rip) === "attention",
+  const attention = sortRips(
+    current.filter((rip) => ripBucket(rip) === "attention"),
+    sortMode,
   )
-  const recent = current
-    .filter((rip) => ripBucket(rip) === "recent")
-    .slice(0, RECENT_CARD_LIMIT)
+  const recent = sortRips(
+    current
+      .filter((rip) => ripBucket(rip) === "recent")
+      .slice(0, RECENT_CARD_LIMIT),
+    sortMode,
+  )
 
   // A quarantined bay with a job is already a RipCard, and that
   // card carries the clear control among its actions.
   const rippedDriveIds = new Set(
     current.map((rip) => rip.drive_id),
   )
-  const quarantined = tower.bays.filter(
-    (bay) =>
-      bay.is_quarantined &&
-      !rippedDriveIds.has(bay.drive_id),
+  const quarantined = sortBayViews(
+    tower.bays.filter(
+      (bay) =>
+        bay.is_quarantined &&
+        !rippedDriveIds.has(bay.drive_id),
+    ),
+    sortMode,
   )
 
   /**
