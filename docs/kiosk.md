@@ -1,6 +1,6 @@
 # Tower kiosk
 
-`/kiosk` is Rip Deck's dedicated 480×320 view. It shows every configured slot in physical order without an app title or a scrolling card grid. A row opens `/kiosk/<drive-id>` with the current disc's artwork (when available), title, type, progress, ETA, outcome, and Open / Close / Disc removed / Back controls.
+`/kiosk` is Rip Deck's dedicated 480×320 view. It shows every configured slot in physical order without an app title or a scrolling card grid. A row opens `/kiosk/slots/<drive-id>` with the current disc's artwork (when available), title, type, progress, ETA, outcome, and Open / Close / Disc removed / Back controls.
 
 The kiosk uses the normal Rip Deck data source and command endpoints. Preview and disconnected states disable physical controls. Active rips disable tray and removal commands; the daemon independently refuses unsafe commands. `clear_loaded` accepts an optional `drive_id` or `slot` to dismiss exactly one disc. Omitting the target retains the existing whole-tower command. A malformed or unknown target never becomes a bulk clear. Dismissal preserves the bay latch so a drive that still reports the disc does not rip it again.
 

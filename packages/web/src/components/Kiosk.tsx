@@ -12,7 +12,7 @@ import { kioskBaySummary } from "../kioskFormat"
 import type { BayView } from "../types"
 
 const slotPath = (bay: BayView) =>
-  `/kiosk/${encodeURIComponent(bay.drive_id)}`
+  `/kiosk/slots/${encodeURIComponent(bay.drive_id)}`
 
 /** All configured slots in physical order, with dedicated full-size controls. */
 export const Kiosk = () => {

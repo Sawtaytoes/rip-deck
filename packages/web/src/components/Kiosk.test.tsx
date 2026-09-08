@@ -17,7 +17,10 @@ const routes = (
       element={<Navigate to="/kiosk" replace />}
     />
     <Route path="/kiosk" element={<Kiosk />} />
-    <Route path="/kiosk/:driveId" element={<Kiosk />} />
+    <Route
+      path="/kiosk/slots/:driveId"
+      element={<Kiosk />}
+    />
   </Routes>
 )
 

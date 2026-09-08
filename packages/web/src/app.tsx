@@ -47,7 +47,7 @@ if (rootElement) {
               />
               <Route
                 element={<Kiosk />}
-                path="/kiosk/:driveId"
+                path="/kiosk/slots/:driveId"
               />
               <Route
                 element={<History />}

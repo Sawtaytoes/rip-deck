@@ -73,6 +73,7 @@ describe("fetchState", () => {
     // one is a lie with a timestamp on it.
     expect(fetchMock).toHaveBeenCalledWith("/json", {
       cache: "no-store",
+      signal: expect.any(AbortSignal) as AbortSignal,
     })
   })
 
@@ -88,7 +89,10 @@ describe("fetchState", () => {
     // one thing whichever source answers it.
     expect(fetchMock).toHaveBeenCalledWith(
       "/json?fake=hub-fault",
-      { cache: "no-store" },
+      {
+        cache: "no-store",
+        signal: expect.any(AbortSignal) as AbortSignal,
+      },
     )
   })
 

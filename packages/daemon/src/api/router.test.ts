@@ -457,6 +457,22 @@ describe("the dashboard", () => {
     expect(String(response.body)).toBe(INDEX_HTML)
   })
 
+  it("reloads a kiosk slot with a dotted drive id without masking missing assets", () => {
+    const router = buildRouter(buildWebAssets())
+    const response = handleSync(router, {
+      method: "GET",
+      url: "/kiosk/slots/2-2.3.2",
+    })
+    expect(response.status).toBe(200)
+    expect(String(response.body)).toBe(INDEX_HTML)
+    expect(
+      handleSync(router, {
+        method: "GET",
+        url: "/kiosk/missing.json",
+      }).status,
+    ).toBe(404)
+  })
+
   it("keeps the query string out of the lookup", () => {
     // `?fake=verdicts` is the page's own state and is read by
     // the app from `window.location.search`, then forwarded to
