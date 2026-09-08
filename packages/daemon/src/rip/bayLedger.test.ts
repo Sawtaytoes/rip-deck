@@ -1,3 +1,6 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import {
   adoptBayAtStartup,
@@ -7,6 +10,7 @@ import {
   bayLedgerPath,
   ledgerFingerprint,
   parseBayLedger,
+  readBayLedger,
   toLedgerRecords,
   toTrayRecords,
   UNKNOWN_AT_STARTUP_DETAIL,
@@ -827,6 +831,60 @@ describe("parseBayLedger", () => {
     )
 
     expect(parsed.records).toHaveLength(1)
+  })
+})
+
+describe("readBayLedger legacy read-error correction", () => {
+  it("does not reduce a persisted real MakeMKV warning", async () => {
+    const stateDir = await mkdtemp(
+      join(tmpdir(), "rip-deck-real-read-error-"),
+    )
+    const path = join(stateDir, "bays.json")
+    const record = completedRecord({
+      outcome: {
+        kind: "completed_with_warnings",
+        detail: `${DESTINATION_PATH} — 4 read errors at 3.20 GB.`,
+        warnings: ["4 read errors at 3.20 GB."],
+        readErrorCount: 4,
+      },
+    })
+
+    try {
+      await writeFile(
+        path,
+        JSON.stringify({
+          version: BAY_LEDGER_VERSION,
+          records: [record],
+          trayCommands: [],
+        }),
+        "utf8",
+      )
+      await writeFile(
+        join(stateDir, `${JOB_UUID}.features.json`),
+        JSON.stringify({
+          readErrorCount: 0,
+          ioErrorTotalDelta: 4,
+          stages: [
+            {
+              label: "Scanning CD-ROM devices",
+              ioErrorDelta: 4,
+            },
+          ],
+        }),
+        "utf8",
+      )
+
+      const ledger = await readBayLedger({ path })
+
+      expect(
+        ledger.records[0]?.outcome.readErrorCount,
+      ).toBe(4)
+      expect(ledger.records[0]?.outcome.warnings).toEqual([
+        "4 read errors at 3.20 GB.",
+      ])
+    } finally {
+      await rm(stateDir, { recursive: true, force: true })
+    }
   })
 })
 

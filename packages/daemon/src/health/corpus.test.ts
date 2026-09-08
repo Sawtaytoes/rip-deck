@@ -120,7 +120,7 @@ describe("what counts as a job that went badly", () => {
     expect(isTroubledJob(vector())).toBe(false)
   })
 
-  it.each([
+  it.each<[string, Partial<JobFeatureVector>]>([
     [
       "the rip failed",
       {
@@ -134,14 +134,63 @@ describe("what counts as a job that went badly", () => {
     ],
     ["MakeMKV counted read errors", { readErrorCount: 4 }],
     [
-      "the kernel counted I/O errors",
-      { ioErrorTotalDelta: 2 },
+      "the kernel counted I/O errors during copying",
+      {
+        ioErrorTotalDelta: 2,
+        stages: [
+          {
+            label: "Copying all files",
+            firstAtMs: 0,
+            lastAtMs: 2_000,
+            durationMs: 2_000,
+            sampleCount: 2,
+            firstFraction: 0,
+            lastFraction: 1,
+            throughputP50BytesPerSec: 20_000_000,
+            ioErrorDelta: 2,
+          },
+        ],
+      },
     ],
-  ] as const)("is true when %s", (_name, overrides) => {
+  ])("is true when %s", (_name, overrides) => {
     // ORed rather than ranked: a rip that succeeded while the
     // drive logged I/O errors is exactly as instructive to the
     // tuning corpus as one that failed outright.
     expect(isTroubledJob(vector(overrides))).toBe(true)
+  })
+
+  it("does not call startup probe increments a troubled rip", () => {
+    expect(
+      isTroubledJob(
+        vector({
+          ioErrorTotalDelta: 4,
+          stages: [
+            {
+              label: "Scanning CD-ROM devices",
+              firstAtMs: 0,
+              lastAtMs: 2_000,
+              durationMs: 2_000,
+              sampleCount: 2,
+              firstFraction: 0,
+              lastFraction: 1,
+              throughputP50BytesPerSec: 0,
+              ioErrorDelta: 3,
+            },
+            {
+              label: "Opening Blu-ray disc",
+              firstAtMs: 2_000,
+              lastAtMs: 4_000,
+              durationMs: 2_000,
+              sampleCount: 2,
+              firstFraction: 0,
+              lastFraction: 1,
+              throughputP50BytesPerSec: 0,
+              ioErrorDelta: 1,
+            },
+          ],
+        }),
+      ),
+    ).toBe(false)
   })
 })
 

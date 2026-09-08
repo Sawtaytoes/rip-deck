@@ -145,6 +145,87 @@ describe("the publish gate", () => {
   })
 })
 
+describe("kernel error stage attribution", () => {
+  it("does not send startup probe errors to the verdict engine", () => {
+    const observation = buildDriveObservation({
+      vector: vector({
+        ioErrorTotalDelta: 4,
+        stages: [
+          {
+            label: "Scanning CD-ROM devices",
+            firstAtMs: 0,
+            lastAtMs: 2_000,
+            durationMs: 2_000,
+            sampleCount: 2,
+            firstFraction: 0,
+            lastFraction: 1,
+            throughputP50BytesPerSec: 0,
+            ioErrorDelta: 3,
+          },
+          {
+            label: "Opening Blu-ray disc",
+            firstAtMs: 2_000,
+            lastAtMs: 4_000,
+            durationMs: 2_000,
+            sampleCount: 2,
+            firstFraction: 0,
+            lastFraction: 1,
+            throughputP50BytesPerSec: 0,
+            ioErrorDelta: 1,
+          },
+          {
+            label: "Copying all files",
+            firstAtMs: 4_000,
+            lastAtMs: 10_000,
+            durationMs: 6_000,
+            sampleCount: 4,
+            firstFraction: 0,
+            lastFraction: 1,
+            throughputP50BytesPerSec: 24 * MB,
+            ioErrorDelta: 0,
+          },
+        ],
+      }),
+    })
+
+    expect(observation.ioErrorDelta).toBe(0)
+  })
+
+  it("sends copy-stage kernel errors to the verdict engine", () => {
+    const observation = buildDriveObservation({
+      vector: vector({
+        ioErrorTotalDelta: 5,
+        stages: [
+          {
+            label: "Scanning CD-ROM devices",
+            firstAtMs: 0,
+            lastAtMs: 2_000,
+            durationMs: 2_000,
+            sampleCount: 2,
+            firstFraction: 0,
+            lastFraction: 1,
+            throughputP50BytesPerSec: 0,
+            ioErrorDelta: 3,
+          },
+          {
+            label: "Copying all files",
+            firstAtMs: 2_000,
+            lastAtMs: 10_000,
+            durationMs: 8_000,
+            sampleCount: 5,
+            firstFraction: 0,
+            lastFraction: 1,
+            throughputP50BytesPerSec: 24 * MB,
+            ioErrorDelta: 2,
+          },
+        ],
+      }),
+    })
+
+    expect(observation.ioErrorDelta).toBe(2)
+  })
+})
+
 /** A job row that drives the engine to a particular answer. */
 const forKind = (kind: VerdictKind): JobFeatureVector => {
   if (kind === "disc_marginal_slow") {

@@ -1503,6 +1503,27 @@ export const describeRipOutcome = (input: {
     (warning) => warning.message,
   )
 
+  // `kernelIoErrorCount` is deliberately COPY-PHASE only. The
+  // whole-job count remains in the feature vector, where startup
+  // probe-command increments can be inspected without being
+  // presented as disc read errors. A copy-phase increment is a
+  // real warning even when MakeMKV did not emit MSG:2003.
+  if (
+    result.isSuccessful &&
+    result.kernelIoErrorCount > 0
+  ) {
+    warnings.push(
+      `The kernel recorded ${String(result.kernelIoErrorCount)} ` +
+        `I/O error${result.kernelIoErrorCount === 1 ? "" : "s"} ` +
+        "while disc data was being copied.",
+    )
+  }
+
+  const readErrorCount = Math.max(
+    result.readErrorCount,
+    result.kernelIoErrorCount,
+  )
+
   if (result.isSuccessful) {
     return {
       // The rip landed either way. A warning changes the badge
@@ -1528,10 +1549,7 @@ export const describeRipOutcome = (input: {
           ? ""
           : ` — ${warnings.join(" ")}`),
       warnings,
-      readErrorCount: Math.max(
-        result.readErrorCount,
-        result.kernelIoErrorCount,
-      ),
+      readErrorCount,
     }
   }
 
@@ -1561,10 +1579,7 @@ export const describeRipOutcome = (input: {
     // so they travel with the failure rather than being dropped
     // for not being a warning-shaped outcome.
     warnings,
-    readErrorCount: Math.max(
-      result.readErrorCount,
-      result.kernelIoErrorCount,
-    ),
+    readErrorCount,
   }
 }
 

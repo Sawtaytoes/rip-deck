@@ -602,16 +602,6 @@ export function RipCard({
               </div>
             )}
 
-            {/* An adopted process has no stdout, so it has no
-                health telemetry at all; saying "unknown" without
-                saying why reads as a bug. */}
-            {rip.is_adopted && (
-              <div className="mt-1.5 inline-block rounded-md border border-border-default bg-surface-sunken px-2 py-0.5 text-sm text-content-muted">
-                adopted after a restart — no health
-                telemetry
-              </div>
-            )}
-
             <VerdictBadge
               verdict={rip.verdict}
               message={rip.verdict_message}
