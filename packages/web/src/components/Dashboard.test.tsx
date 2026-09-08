@@ -778,3 +778,46 @@ describe("the column layout", () => {
     ).toHaveLength(9)
   })
 })
+
+describe("the rip card order", () => {
+  const displayedDiscOrder = (): string[] =>
+    screen
+      .getAllByText(/^Fixture Disc \d+$/)
+      .map((element) => element.textContent ?? "")
+
+  it("defaults to ascending slot number", async () => {
+    showFixture("nine-rips")
+
+    await screen.findByText(/9 bays · 9 ripping/)
+
+    expect(displayedDiscOrder()).toEqual(
+      Array.from(
+        { length: 9 },
+        (_, index) => `Fixture Disc ${String(index + 1)}`,
+      ),
+    )
+  })
+
+  it("puts the soonest estimated finish first and remembers the mode", async () => {
+    showFixture("nine-rips")
+
+    await screen.findByText(/9 bays · 9 ripping/)
+    await userEvent.click(
+      screen.getByRole("radio", {
+        name: "finishing soonest",
+      }),
+    )
+
+    // This fixture's ETA falls as its slot rises: slot 9 has the
+    // smallest measured ETA and slot 1 has the largest.
+    expect(displayedDiscOrder()).toEqual(
+      Array.from(
+        { length: 9 },
+        (_, index) => `Fixture Disc ${String(9 - index)}`,
+      ),
+    )
+    expect(
+      window.localStorage.getItem("rip-deck.rip-sort-mode"),
+    ).toBe("finishing-soonest")
+  })
+})

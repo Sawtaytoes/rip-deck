@@ -10,12 +10,14 @@ import {
   useLayoutColumns,
 } from "../hooks/useLayoutColumns"
 import { useRipDeckState } from "../hooks/useRipDeckState"
+import { useRipSortMode } from "../hooks/useRipSortMode"
 import type { Rip } from "../types"
 import { AppHeader } from "./AppHeader"
 import { ColumnPicker } from "./ColumnPicker"
 import { HostSection } from "./HostSection"
 import { LeftoverRips } from "./LeftoverRips"
 import { LogModal, type LogTarget } from "./LogModal"
+import { RipSortModeControl } from "./RipSortModeControl"
 import { TrayControls } from "./TrayControls"
 
 /**
@@ -76,6 +78,8 @@ export function Dashboard({
   // than one that is a card out.
   const { columns, choice, autoColumns, setChoice } =
     useLayoutColumns({ cardCount: tower?.bays.length ?? 0 })
+  const { mode: ripSortMode, setMode: setRipSortMode } =
+    useRipSortMode()
 
   return (
     <main
@@ -100,6 +104,10 @@ export function Dashboard({
           choice={choice}
           autoColumns={autoColumns}
           onChoose={setChoice}
+        />
+        <RipSortModeControl
+          mode={ripSortMode}
+          onChoose={setRipSortMode}
         />
       </AppHeader>
 
@@ -133,6 +141,7 @@ export function Dashboard({
           }}
           actionFor={actionFor}
           columns={columns}
+          sortMode={ripSortMode}
           now={now}
         />
       ))}
