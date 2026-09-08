@@ -336,6 +336,7 @@ describe("bayActionLabel", () => {
     )
     expect(bayActionLabel("give_up")).toBe("Give up")
     expect(bayActionLabel("cancel")).toBe("Cancel")
+    expect(bayActionLabel("reset_bay")).toBe("Reset bay")
   })
 
   it("calls the tray commands what they move", () => {

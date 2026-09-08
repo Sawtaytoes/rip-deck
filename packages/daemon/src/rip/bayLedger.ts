@@ -410,6 +410,8 @@ export const ledgerFingerprint = (input: {
           String(record.destinationPath),
           String(record.jobUuid),
           record.outcome.kind,
+          String(record.outcome.failureReason),
+          String(record.outcome.readErrorCount),
           // In it for the same reason the tray commands are: a
           // dismissed bay has changed nothing else at all — same
           // phase, same outcome, same disc — so without this the
@@ -500,11 +502,35 @@ const readOutcome = (outcome: BayOutcome): BayOutcome => {
       )
     : []
 
+  const failureReason =
+    typeof outcome.failureReason === "string"
+      ? outcome.failureReason
+      : undefined
+  const readErrorCount =
+    typeof outcome.readErrorCount === "number"
+      ? outcome.readErrorCount
+      : undefined
+
   return warnings.length === 0
-    ? { kind: outcome.kind, detail: outcome.detail }
+    ? {
+        kind: outcome.kind,
+        detail: outcome.detail,
+        ...(failureReason === undefined
+          ? {}
+          : { failureReason }),
+        ...(readErrorCount === undefined
+          ? {}
+          : { readErrorCount }),
+      }
     : {
         kind: outcome.kind,
         detail: outcome.detail,
+        ...(failureReason === undefined
+          ? {}
+          : { failureReason }),
+        ...(readErrorCount === undefined
+          ? {}
+          : { readErrorCount }),
         warnings,
       }
 }

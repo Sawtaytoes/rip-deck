@@ -576,6 +576,8 @@ const projectBay = (
 
   if (isQuarantined) actions.push("clear_quarantine")
 
+  if (!isActive) actions.push("reset_bay")
+
   const isTroubled = verdict.kind !== "ok"
 
   if (isActive && isTroubled && !isKeepTryingRequested) {
@@ -1582,6 +1584,7 @@ export const mockDataSource: RipDeckDataSource = {
       // routed both to `runTrayCommand`, and TypeScript has
       // already narrowed them out of `action` here.
       case "retry_in_another_drive":
+      case "reset_bay":
         break
     }
 

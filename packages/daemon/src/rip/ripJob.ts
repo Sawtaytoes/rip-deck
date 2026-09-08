@@ -108,6 +108,8 @@ export type RipJobInput = {
   /** Where heartbeats and job state live. */
   stateDir: string
   makemkv: MakemkvCommand
+  /** MakeMKV read cache for this independent rip, in MiB. */
+  cacheMb?: number
   /**
    * Run this rip in a container that can see only `devPath`.
    *
@@ -153,6 +155,8 @@ export type RipJobResult = RipSummary & {
   termination: RipTermination
   exitCode: number | null
   observations: RipObservations
+  /** Kernel I/O errors counted during this job. */
+  kernelIoErrorCount: number
   progress: JobProgress
   /** Where the rip ended up, on success. */
   destinationPath: string | null
@@ -229,6 +233,7 @@ export const runRipJob = async (
       termination: "insufficient_space",
       exitCode: null,
       observations,
+      kernelIoErrorCount: 0,
       progress: createProgressTracker({
         discBytes: input.discBytes,
         startedAtMs: Date.now(),
@@ -287,6 +292,7 @@ const superviseChild = async (
   const ripArgs = buildRipArgs({
     discIndex: invocation.discIndex,
     outputPath: prepared.incompleteInnerPath,
+    cacheMb: input.cacheMb,
   })
 
   const argv = [
@@ -379,23 +385,23 @@ const superviseChild = async (
 
     if (reason !== "exited") termination = reason
 
-    child.kill("SIGTERM")
-    killInsideContainer(
-      invocation.makemkv,
-      input.jobUuid,
-      "TERM",
-    )
+    signalRip({
+      child,
+      invocation,
+      jobUuid: input.jobUuid,
+      signal: "TERM",
+    })
 
     // SIGTERM is the polite ask. A makemkvcon blocked in a
     // device read will not answer it, and E5 says no orphaned
     // processes — so the escalation is not optional.
     const killTimer = setTimeout(() => {
-      child.kill("SIGKILL")
-      killInsideContainer(
-        input.makemkv,
-        input.jobUuid,
-        "KILL",
-      )
+      signalRip({
+        child,
+        invocation,
+        jobUuid: input.jobUuid,
+        signal: "KILL",
+      })
     }, TERMINATION_GRACE_MS)
 
     killTimer.unref()
@@ -531,8 +537,6 @@ const superviseChild = async (
     () => {},
   )
 
-  await eventLog.close()
-
   // Backup mode has no title count, so completion is proven by
   // the dataset rather than by anything makemkvcon said. Only
   // worth the tree walk when the run otherwise looks clean.
@@ -581,7 +585,7 @@ const superviseChild = async (
   // `verdictKind: null` is the caller's own answer — `runRipJob`
   // computes no verdict of its own, and never one that could
   // upgrade a rip `isRipSuccessful` already failed.
-  await sampler.stop(
+  const featureVector = await sampler.stop(
     {
       isSuccessful: summary.isSuccessful,
       failureReason: summary.failureReason,
@@ -601,6 +605,17 @@ const superviseChild = async (
         },
       }),
   )
+
+  eventLog.write(
+    "[rip-deck] " +
+      `result=${summary.isSuccessful ? "completed" : "failed"} ` +
+      `reason=${summary.failureReason ?? "none"} ` +
+      `termination=${termination} ` +
+      `exit=${String(exitCode)} ` +
+      `kernel_io_errors=${String(featureVector.ioErrorTotalDelta)} ` +
+      `makemkv_read_errors=${String(observations.readErrorCount)}`,
+  )
+  await eventLog.close()
 
   // This rip just added a row to the corpus, which is the only
   // event that can move the gate. Re-count now rather than on a
@@ -630,6 +645,7 @@ const superviseChild = async (
       termination,
       exitCode,
       observations,
+      kernelIoErrorCount: featureVector.ioErrorTotalDelta,
       progress: tracker.progress,
       destinationPath: null,
       incompletePath: hasPartialOutput
@@ -649,6 +665,7 @@ const superviseChild = async (
     termination,
     exitCode,
     observations,
+    kernelIoErrorCount: featureVector.ioErrorTotalDelta,
     progress: tracker.progress,
     destinationPath: finalised.path,
     incompletePath: null,
@@ -697,6 +714,54 @@ const killInsideContainer = (
     ).on("error", () => {})
   } catch {
     // Nothing useful to do — the outer signal has already gone.
+  }
+}
+
+/**
+ * Signal one rip, including the exact per-rip container.
+ *
+ * `pkill -f <uuid>` matched both MakeMKV and docker-init. On the
+ * live tower that left docker-init alive with a zombie child, and
+ * Docker could not remove the container because no exit event ever
+ * arrived. An isolated job has a stronger identity: its container
+ * name. `docker kill --signal … <name>` makes the runtime deliver
+ * the signal and account for the container exit. The older wrapper
+ * path keeps the UUID-scoped `pkill` because it has no container
+ * identity of its own.
+ */
+const signalRip = (input: {
+  child: ReturnType<typeof spawn>
+  invocation: ReturnType<typeof buildRipInvocation>
+  jobUuid: string
+  signal: "TERM" | "KILL"
+}): void => {
+  input.child.kill(`SIG${input.signal}`)
+
+  const control = input.invocation.containerControl
+
+  if (control === null) {
+    killInsideContainer(
+      input.invocation.makemkv,
+      input.jobUuid,
+      input.signal,
+    )
+    return
+  }
+
+  try {
+    spawn(
+      control.command,
+      [
+        ...control.args,
+        "kill",
+        "--signal",
+        input.signal,
+        control.containerName,
+      ],
+      { stdio: "ignore" },
+    ).on("error", () => {})
+  } catch {
+    // The outer child signal has already been sent.
   }
 }
 

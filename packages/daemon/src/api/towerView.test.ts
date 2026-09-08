@@ -566,6 +566,25 @@ describe("the tower view", () => {
     expect(bay.actions).toEqual(["clear_quarantine"])
   })
 
+  it("offers a reset for a present terminal bay", () => {
+    const bay = view({
+      bays: [
+        buildBay({
+          slot: 7,
+          disc: heldDiscFacts({
+            outcome: {
+              kind: "failed",
+              failureReason: "stall_timeout",
+              detail: "stall_timeout",
+            },
+          }),
+        }),
+      ],
+    }).bays[0]
+
+    expect(bay.actions).toContain("reset_bay")
+  })
+
   it("offers keep-trying only while a bay is in trouble", () => {
     const troubled = view({
       bays: [

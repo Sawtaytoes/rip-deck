@@ -47,11 +47,13 @@ device_cgroup_rules:
   - "c 21:* rmw"
 volumes:
   - /dev:/dev
+  - /sys/bus/usb/drivers/usb/unbind:/run/rip-deck-usb/unbind
+  - /sys/bus/usb/drivers/usb/bind:/run/rip-deck-usb/bind
 ```
 
 Do not use a fixed `devices:` list. `/dev/srN` values can change after USB re-enumeration, and Docker refuses to start when a listed device is absent.
 
-Bind `/run/udev` read-only so the daemon can receive disc metadata. Bind `/var/run/docker.sock` when the daemon launches one device-scoped container per rip.
+Bind `/run/udev` read-only so the daemon can receive disc metadata. Bind the two USB driver controls so **Reset bay** can reconnect one validated optical drive without restarting the service. Bind `/var/run/docker.sock` when the daemon launches one device-scoped container per rip.
 
 ## Map drives to slots
 
@@ -76,6 +78,7 @@ See [Drive and tower hardware](hardware.md) and the [drive identity decision](de
 | `RIP_DECK_DRIVES_CONFIG` | `config/drives.json` | Drive registry path. |
 | `RIP_DECK_RIP_ISOLATION_IMAGE` | unset | Image used for a device-scoped rip container. |
 | `RIP_DECK_RIP_ISOLATION_ARGS` | unset | Volume arguments passed to each rip container. |
+| `RIP_DECK_RIP_CACHE_MB` | `1024` | Independent MakeMKV cache for each video rip, in MiB. |
 | `RIP_DECK_MAX_CONCURRENT_RIPS` | configured default | Optional concurrency limit. The normal watcher supports all configured drives. |
 | `RIP_DECK_API_PORT` | `3007` | Dashboard and API port. |
 

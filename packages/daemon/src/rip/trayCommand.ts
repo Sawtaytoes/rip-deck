@@ -628,6 +628,11 @@ export const decideTrayBayAction = (input: {
    */
   hasActiveRip?: boolean
   /**
+   * A bulk Open press has at least one safe tray that is not
+   * already known open. Active bays are quiet while this is true.
+   */
+  hasOpenableSafeBay?: boolean
+  /**
    * How wide an `open_trays` press reaches, resolved by the caller
    * over the whole probe and the tray memory
    * ([decision](docs/decisions/2026-07-30-open-trays-escalates-and-close-trays-is-plain.md)):
@@ -694,6 +699,18 @@ export const decideTrayBayAction = (input: {
       bay.phase === "starting"
 
     if (!isHarmlessPowerCut) {
+      if (
+        request.kind === "open_trays" &&
+        input.hasOpenableSafeBay === true
+      ) {
+        return {
+          action: "skip",
+          resultKind: "skipped_untouched",
+          detail:
+            "this bay is ripping, so its tray stayed closed",
+        }
+      }
+
       return {
         action: "refuse",
         resultKind: "refused_ripping",
@@ -788,6 +805,14 @@ export const decideTrayBayAction = (input: {
           }
 
     case "open_trays":
+      if (bay?.lastTrayCommand === "open_bay") {
+        return {
+          action: "skip",
+          resultKind: "skipped_untouched",
+          detail: "this tray is already open",
+        }
+      }
+
       // ⚠️ THE ESCALATION. `"all"` is the second press (or the
       // first when nothing is finished): open every present bay
       // that is not ripping — idle and empty ones too, so a disc

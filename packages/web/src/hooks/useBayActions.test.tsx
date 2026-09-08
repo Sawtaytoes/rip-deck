@@ -137,6 +137,31 @@ describe("useBayActions", () => {
     ).toBeUndefined()
   })
 
+  it("explains that a bay reset reconnects only that drive", async () => {
+    const confirmMock = vi.fn(() => false)
+    const runBayAction = vi.fn(() =>
+      Promise.resolve({ ok: true, msg: "" }),
+    )
+
+    vi.stubGlobal("confirm", confirmMock)
+    const { result } = renderBayActions(
+      buildDataSource(runBayAction),
+    )
+
+    await act(async () => {
+      await result.current.runAction({
+        driveId: DRIVE_ID,
+        label: "05 - Pioneer BDR-211M",
+        action: "reset_bay",
+      })
+    })
+
+    expect(confirmMock).toHaveBeenCalledWith(
+      expect.stringContaining("reconnects only this drive"),
+    )
+    expect(runBayAction).not.toHaveBeenCalled()
+  })
+
   it("surfaces a refusal rather than swallowing it", async () => {
     // The live source refuses locally, naming MQTT `cmd/drive`.
     // A control that silently does nothing is worse than one

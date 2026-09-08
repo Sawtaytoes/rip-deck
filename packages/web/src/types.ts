@@ -270,6 +270,7 @@ export type BayAction =
   | "give_up"
   | "retry_in_another_drive"
   | "cancel"
+  | "reset_bay"
   | "open_bay"
   | "close_bay"
 
