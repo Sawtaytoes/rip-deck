@@ -11,6 +11,7 @@ import {
   type DriveObservation,
   evaluateHealth,
 } from "./engine.ts"
+import { copyStageIoErrorDelta } from "./featureVector.ts"
 import { isHealthVerdictPublished } from "./publish.ts"
 
 /**
@@ -143,7 +144,9 @@ export type JobEvidence = {
  *  - `msSinceProgress` is `longestNoProgressMs` — the longest gap
  *    the job ever had. Asking "did this job ever stall" is the
  *    retrospective form of "is it stalled now".
- *  - `ioErrorDelta` is the job total, not a window's.
+ *  - `ioErrorDelta` is the copy-stage total, not a window's.
+ *    Probe-command increments remain in the vector's whole-job
+ *    total, but do not become a disc-health verdict.
  */
 export const buildDriveObservation = (input: {
   vector: JobFeatureVector
@@ -161,7 +164,7 @@ export const buildDriveObservation = (input: {
     recentThroughput:
       throughput === null ? [] : [throughput],
     avgMsPerRead: vector.avgMsPerReadP50,
-    ioErrorDelta: vector.ioErrorTotalDelta,
+    ioErrorDelta: copyStageIoErrorDelta(vector.stages),
     errorLbas: evidence.errorLbas ?? [],
     msSinceProgress: vector.longestNoProgressMs,
     // Not measured anywhere yet. Zero is the "no evidence"

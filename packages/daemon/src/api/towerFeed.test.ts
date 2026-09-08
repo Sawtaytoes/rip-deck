@@ -1,4 +1,9 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import {
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import {
@@ -30,7 +35,11 @@ import {
   type PosterMatch,
   type PosterStore,
 } from "../metadata/posterStore.ts"
-import { BAY_LEDGER_VERSION } from "../rip/bayLedger.ts"
+import {
+  adoptBayAtStartup,
+  BAY_LEDGER_VERSION,
+  readBayLedger,
+} from "../rip/bayLedger.ts"
 import { createGovernor } from "../rip/governor.ts"
 import {
   type BayOutcome,
@@ -801,6 +810,129 @@ describe("the feed", () => {
     expect(bay?.job?.state).toBe("completed")
     expect(bay?.job?.isAdopted).toBe(true)
     expect(bay?.job?.verdict.evidence[0]).toContain("TROY")
+  })
+
+  it("repairs a saved startup-probe read-error count before /json renders it", async () => {
+    const stateDir = await mkdtemp(
+      join(tmpdir(), "rip-deck-saved-probe-errors-"),
+    )
+    const path = join(stateDir, "bays.json")
+
+    const savedOutcome = {
+      kind: "completed" as const,
+      detail:
+        "/media/Disc-Rips/[BACKUP] EYES WIDE SHUT - 4K",
+      readErrorCount: 4,
+    }
+
+    const savedLedger = {
+      version: BAY_LEDGER_VERSION,
+      records: [
+        {
+          driveId: DRIVE_ID,
+          phase: "done",
+          sizeSectors: 97_000_000,
+          discName: "EYES WIDE SHUT",
+          discType: "uhd",
+          destinationPath:
+            "/media/Disc-Rips/[BACKUP] EYES WIDE SHUT - 4K",
+          jobUuid: JOB_UUID,
+          outcome: savedOutcome,
+          isLoadedDismissed: false,
+          updatedAtMs: NOW_MS - 7_200_000,
+        },
+      ],
+      trayCommands: [],
+    }
+
+    const savedFeatures = {
+      schemaVersion: 1,
+      jobId: JOB_UUID,
+      readErrorCount: 0,
+      ioErrorTotalDelta: 4,
+      stages: [
+        {
+          label: "Scanning CD-ROM devices",
+          ioErrorDelta: 3,
+        },
+        {
+          label: "Opening Blu-ray disc",
+          ioErrorDelta: 1,
+        },
+        {
+          label: "Copying all files",
+          ioErrorDelta: 0,
+        },
+      ],
+      outcome: {
+        isSuccessful: true,
+        failureReason: null,
+        exitCode: 0,
+        verdictKind: "ok",
+      },
+    }
+
+    try {
+      await writeFile(
+        path,
+        JSON.stringify(savedLedger),
+        "utf8",
+      )
+      await writeFile(
+        join(stateDir, `${JOB_UUID}.features.json`),
+        JSON.stringify(savedFeatures),
+        "utf8",
+      )
+
+      const ledger = await readBayLedger({ path })
+      const adopted = adoptBayAtStartup({
+        driveId: DRIVE_ID,
+        record: ledger.records[0],
+        trayRecord: undefined,
+        hasPriorState: ledger.hasPriorState,
+        observation: {
+          isDrivePresent: true,
+          hasMedia: true,
+          sizeSectors: 97_000_000,
+        },
+        atMs: NOW_MS,
+      })
+
+      const harness = createHarness({
+        bays: [adopted],
+        sightings: fakeSightings([{}]),
+      })
+
+      harness.handlers.onTickComplete?.()
+
+      const json = buildArmState({
+        snapshot: harness.store.readSnapshot(),
+      })
+      const rip = json.hosts[0]?.rips[0]
+
+      expect(rip?.status).toBe("success")
+      expect(rip?.read_error_count).toBe(0)
+      expect(rip?.warnings).toEqual([])
+      expect(rip?.path).toBe(
+        "/media/Disc-Rips/[BACKUP] EYES WIDE SHUT - 4K",
+      )
+
+      // The correction changes the adopted card, not the raw
+      // evidence that explains why the old build wrote 4.
+      const rawFeatures: unknown = JSON.parse(
+        await readFile(
+          join(stateDir, `${JOB_UUID}.features.json`),
+          "utf8",
+        ),
+      )
+
+      expect(
+        (rawFeatures as { ioErrorTotalDelta: number })
+          .ioErrorTotalDelta,
+      ).toBe(4)
+    } finally {
+      await rm(stateDir, { recursive: true, force: true })
+    }
   })
 
   it("names the disc, from the bay and not the sentence", () => {

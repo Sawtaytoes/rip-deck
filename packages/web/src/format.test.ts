@@ -823,6 +823,61 @@ describe("an unmeasured completed rip", () => {
     expect(discLabel(buildRip())).toBe("Ivanhoe")
     expect(discTypeText(buildRip())).toBe("Blu-ray")
   })
+
+  it("does not repeat the disc type after a canonical destination", () => {
+    expect(
+      discTypeText(
+        buildRip({
+          kind: "uhd",
+          disctype: "uhd",
+          disctype_label: "4K",
+          path: "/media/Disc-Rips/[BACKUP] Eyes Wide Shut - 4K",
+        }),
+      ),
+    ).toBeNull()
+  })
+
+  it("still names the type when the destination lacks its suffix", () => {
+    expect(
+      discTypeText(
+        buildRip({
+          kind: "uhd",
+          disctype: "uhd",
+          disctype_label: "4K",
+          path: "/media/Disc-Rips/EYES WIDE SHUT",
+        }),
+      ),
+    ).toBe("4K")
+  })
+
+  it("keeps the stored destination unchanged when de-duplicating", () => {
+    const rip = buildRip({
+      kind: "dvd",
+      disctype: "dvd",
+      disctype_label: "DVD",
+      path: "/media/Disc-Rips/[BACKUP] Home Video - DVD.iso",
+    })
+
+    expect(discTypeText(rip)).toBeNull()
+    expect(rip.path).toBe(
+      "/media/Disc-Rips/[BACKUP] Home Video - DVD.iso",
+    )
+  })
+
+  it("finds the type before a collision marker", () => {
+    expect(
+      discTypeText(
+        buildRip({
+          kind: "uhd",
+          disctype: "uhd",
+          disctype_label: "4K",
+          path:
+            "/media/Disc-Rips/[BACKUP] Film - 4K " +
+            "(rip-deck-duplicate-01234567)",
+        }),
+      ),
+    ).toBeNull()
+  })
 })
 
 describe("bayActionsFor", () => {

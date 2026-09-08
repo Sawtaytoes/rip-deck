@@ -100,6 +100,34 @@ export type FeatureAccumulator = {
   stages: StageAccumulator[]
 }
 
+/**
+ * Kernel I/O errors that happened while disc data was copied.
+ *
+ * `ioerr_cnt` also moves for probe commands. Three clean UHD
+ * rips proved that the drive can increment it while MakeMKV is
+ * "Scanning CD-ROM devices" or "Opening Blu-ray disc", with no
+ * completed reads and no sectors transferred. Those increments
+ * remain in `ioErrorTotalDelta` and in the per-stage evidence,
+ * but they are not evidence that the copied disc data had a read
+ * error.
+ *
+ * A copy stage is identified from the PRGT label that already
+ * partitions the feature vector. `progress.ts` uses the same two
+ * verb families for its copy-rate window. Prefix matching keeps
+ * the per-file forms without admitting startup stages such as
+ * "Scanning" or "Opening".
+ */
+export const copyStageIoErrorDelta = (
+  stages: Pick<StageFeature, "label" | "ioErrorDelta">[],
+): number =>
+  stages
+    .filter(
+      (stage) =>
+        stage.label.startsWith("Copying ") ||
+        stage.label.startsWith("Saving all titles"),
+    )
+    .reduce((total, stage) => total + stage.ioErrorDelta, 0)
+
 export const createFeatureAccumulator = (input: {
   jobId: string | null
   driveId: string
