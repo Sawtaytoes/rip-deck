@@ -714,6 +714,23 @@ const nineLoadedDrives = (): ProbedDrive[] =>
     }),
   )
 
+const trayRegistry = (
+  placements: { driveId: string; slot: number }[],
+): DriveRegistry => ({
+  towerRootPortPath: "2-1",
+  entries: placements.map(({ driveId, slot }) => ({
+    slot,
+    name: `${slot.toString().padStart(2, "0")} - Test drive`,
+    firmwareSerial: `TEST-${slot}`,
+    trueModel: "Test drive",
+    reportedModel: "Test drive",
+    usbPortPath: driveId,
+    bridgeSerial: "",
+    isUhdCapable: true,
+    readOffsetSamples: null,
+  })),
+})
+
 describe("startWatcher", () => {
   it("starts nine rips for nine inserted discs", async () => {
     // The owner's request, in one assertion.
@@ -2685,42 +2702,129 @@ describe("startWatcher tray commands", () => {
     await watcher.stop()
   })
 
-  it("moves bulk trays one at a time on the shared USB tree", async () => {
+  it("opens bulk trays from the highest slot down, one at a time", async () => {
     let inFlight = 0
     let maxInFlight = 0
+    const opened: string[] = []
+    const drives = Array.from(
+      { length: 9 },
+      (_unused, index) =>
+        probedDrive({
+          driveId: `drive-slot-${index + 1}`,
+          kernelName: `sr${index}`,
+          sizeSectors: EMPTY_TRAY_SECTORS,
+        }),
+    )
 
     const watcher = startWatcher(
       {
         config: noopConfig,
         governor: createGovernor({ maxConcurrentRips: 9 }),
       },
-      watcherDeps({
-        probeDrives: async () => nineLoadedDrives(),
-        runBayRip: async () => {
-          throw new Error("no rip may start in this test")
-        },
-        runTray: async ({ action }) => {
-          inFlight += 1
-          maxInFlight = Math.max(maxInFlight, inFlight)
-          await Promise.resolve()
-          inFlight -= 1
+      {
+        ...watcherDeps({
+          probeDrives: async () => drives,
+          runBayRip: async () => {
+            throw new Error("no rip may start in this test")
+          },
+          runTray: async ({ action, devPath }) => {
+            inFlight += 1
+            maxInFlight = Math.max(maxInFlight, inFlight)
+            opened.push(devPath)
+            await Promise.resolve()
+            inFlight -= 1
 
-          return {
-            isSuccessful: true,
-            isCommandMissing: false,
-            isTimedOut: false,
-            exitCode: 0,
-            detail: action === "open" ? "opened" : "closed",
-          }
-        },
-      }),
+            return {
+              isSuccessful: true,
+              isCommandMissing: false,
+              isTimedOut: false,
+              exitCode: 0,
+              detail:
+                action === "open" ? "opened" : "closed",
+            }
+          },
+        }),
+        loadRegistry: async () =>
+          trayRegistry(
+            Array.from({ length: 9 }, (_unused, index) => ({
+              driveId: `drive-slot-${index + 1}`,
+              slot: index + 1,
+            })),
+          ),
+      },
     )
 
+    await watcher.tickNow()
     await watcher.runTrayCommand({
       request: { kind: "open_trays" },
     })
 
+    expect(opened).toEqual([
+      "/dev/sr8",
+      "/dev/sr7",
+      "/dev/sr6",
+      "/dev/sr5",
+      "/dev/sr4",
+      "/dev/sr3",
+      "/dev/sr2",
+      "/dev/sr1",
+      "/dev/sr0",
+    ])
     expect(maxInFlight).toBe(1)
+    await watcher.stop()
+  })
+
+  it("opens unknown slots after numbered slots in drive-id order", async () => {
+    const tray = trayRecorder()
+    const drives = [
+      probedDrive({
+        driveId: "unknown-z",
+        kernelName: "sr8",
+        sizeSectors: EMPTY_TRAY_SECTORS,
+      }),
+      probedDrive({
+        driveId: "drive-slot-3",
+        kernelName: "sr3",
+        sizeSectors: EMPTY_TRAY_SECTORS,
+      }),
+      probedDrive({
+        driveId: "unknown-a",
+        kernelName: "sr7",
+        sizeSectors: EMPTY_TRAY_SECTORS,
+      }),
+    ]
+
+    const watcher = startWatcher(
+      {
+        config: noopConfig,
+        governor: createGovernor({ maxConcurrentRips: 9 }),
+      },
+      {
+        ...watcherDeps({
+          probeDrives: async () => drives,
+          runBayRip: async () => {
+            throw new Error("no rip may start in this test")
+          },
+          runTray: tray.runTray,
+        }),
+        loadRegistry: async () =>
+          trayRegistry([
+            { driveId: "drive-slot-3", slot: 3 },
+          ]),
+      },
+    )
+
+    await watcher.tickNow()
+    await watcher.runTrayCommand({
+      request: { kind: "open_trays" },
+    })
+
+    expect(tray.moved.map((move) => move.devPath)).toEqual([
+      "/dev/sr3",
+      "/dev/sr7",
+      "/dev/sr8",
+    ])
+
     await watcher.stop()
   })
 
