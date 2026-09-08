@@ -310,6 +310,9 @@ const isClientRoutePathname = (
 
   if (isServerRoutePathname(pathname)) return false
 
+  // Drive IDs contain dots. This explicit client route carries an ID, not a file.
+  if (/^\/kiosk\/slots\/[^/]+$/.test(pathname)) return true
+
   const lastSegment = pathname.slice(
     pathname.lastIndexOf("/") + 1,
   )

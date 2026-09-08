@@ -74,6 +74,33 @@ const result = (
 })
 
 describe("parseTrayCommand", () => {
+  it("targets removal without broadening an invalid target to every bay", () => {
+    expect(
+      parseTrayCommand(
+        JSON.stringify({
+          command: "clear_loaded",
+          drive_id: "drive-nine",
+        }),
+      ),
+    ).toMatchObject({
+      isValid: true,
+      request: {
+        kind: "clear_loaded",
+        target: { driveId: "drive-nine" },
+      },
+    })
+    for (const drive_id of ["", null, 9]) {
+      expect(
+        parseTrayCommand(
+          JSON.stringify({
+            command: "clear_loaded",
+            drive_id,
+          }),
+        ),
+      ).toMatchObject({ isValid: false })
+    }
+  })
+
   it("takes a bare bulk command, so HA needs no template", () => {
     expect(parseTrayCommand("open_trays")).toEqual({
       isValid: true,

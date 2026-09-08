@@ -79,7 +79,10 @@ export const httpDataSource: RipDeckDataSource = {
       `${apiBase}/json${query}`,
       // `/json` is a live snapshot of a nine-bay tower. A cached
       // one is a lie with a timestamp on it.
-      { cache: "no-store" },
+      {
+        cache: "no-store",
+        signal: AbortSignal.timeout(5000),
+      },
     )
 
     if (!response.ok) {
