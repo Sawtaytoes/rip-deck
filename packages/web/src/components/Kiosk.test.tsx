@@ -169,3 +169,19 @@ test("disables all physical controls for preview data and an active rip", async 
   ).toBeDisabled()
   expect(runTrayCommand).not.toHaveBeenCalled()
 })
+
+test("says the tower is off when no drive answered", async () => {
+  const fixture = await mockDataSource.fetchState("empty")
+  renderWithProviders(
+    routes,
+    createStubDataSource({
+      fetchState: async () => fixture,
+    }),
+  )
+  expect(
+    await screen.findByRole("heading", {
+      name: "Tower is off",
+    }),
+  ).toBeVisible()
+  expect(screen.queryByRole("link")).toBeNull()
+})
