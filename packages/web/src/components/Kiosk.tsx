@@ -226,6 +226,21 @@ export const Kiosk = () => {
                   : selected.outcome_detail))}
           </p>
         </section>
+      ) : !driveId && tower && !tower.is_tower_present ? (
+        // No drive answered the last probe, which is the daemon's
+        // own definition of "tower off". A blank panel here read as
+        // a dead display when the owner had simply switched the
+        // tower off at the wall.
+        <section
+          className="rip-kiosk-off"
+          aria-label="Tower status"
+        >
+          <h1>Tower is off</h1>
+          <p>
+            No drives answered. Power the tower on to see
+            its bays.
+          </p>
+        </section>
       ) : (
         !driveId && (
           <section
