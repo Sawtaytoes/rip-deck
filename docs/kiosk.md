@@ -17,6 +17,8 @@ DVD, and CD media. Fixture responses set `is_fake: true`, the display says
 `Preview — controls disabled`, and no touch can operate the physical tower. Restore
 the normal manifest and restart the CastKit worker after the demonstration.
 
+![Kiosk showcase with the full state and media mix](previews/kiosk-showcase.png)
+
 The loading URL uses the same React application and shared Charcuterie Skeleton component. CastKit renders it once and preloads the bitmap into ESPHome PSRAM. Row bounds from the rendered frame identify where a completed tap should show that cache immediately. The current WT32 receiver supports one optimistic cache image. It does not cache disc-specific progress or command success.
 
 Action identities contain the drive, job, and state. CastKit binds a physical touch to the identity in the acknowledged image and checks that it still matches Chromium before dispatch. Back and slot navigation use stable route identities. A pending command disables its controls, and a server report supplies the result.
