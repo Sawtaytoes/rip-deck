@@ -264,6 +264,39 @@ describe("the fixture set", () => {
     ).toHaveLength(1)
   })
 
+  it("puts every kiosk intent and disc type in the showcase", () => {
+    const view = viewOf("showcase")
+
+    expect(view.bays).toHaveLength(9)
+    expect(
+      view.bays.filter((bay) => bay.state.state === "idle"),
+    ).toHaveLength(1)
+    expect(
+      view.bays.filter(
+        (bay) => bay.state.state === "ripping",
+      ),
+    ).toHaveLength(3)
+    expect(
+      view.bays.filter(
+        (bay) => bay.state.state === "completed",
+      ),
+    ).toHaveLength(3)
+    expect(
+      view.bays.filter(
+        (bay) => bay.state.state === "failed",
+      ),
+    ).toHaveLength(1)
+    expect(
+      view.bays.filter(
+        (bay) => bay.state.state === "stalled",
+      ),
+    ).toHaveLength(1)
+    expect(
+      new Set(view.bays.map((bay) => bay.state.disctype)),
+    ).toEqual(new Set([null, "uhd", "bluray", "dvd", "cd"]))
+    expect(view.bays[6].state.has_warnings).toBe(true)
+  })
+
   it("shows a quarantined drive with its clear control", () => {
     const view = viewOf("quarantined")
 

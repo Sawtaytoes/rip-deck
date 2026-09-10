@@ -49,8 +49,8 @@ import type {
  *
  * The SCENARIOS are not this file's invention. They are
  * `packages/daemon/src/api/fixtures.ts`, name for name and
- * number for number — same seven names, same bay labels, same
- * drive ids, same titles, same slots. That file is the source of
+ * number for number — same names, bay labels, drive ids, titles,
+ * and slots. That file is the source of
  * truth; this is its browser-side twin, transcribed rather than
  * imported because `@rip-deck/daemon` must not reach the browser
  * bundle (see `src/types.ts`). `mockDataSource.test.ts` pins the
@@ -612,6 +612,7 @@ const projectBay = (
       throughput_bytes_per_sec:
         rip.throughput_bytes_per_sec,
       read_error_count: readErrorCount,
+      has_warnings: warnings.length > 0,
       verdict: verdict.kind,
     },
     alert,
@@ -766,6 +767,104 @@ const buildNineRips = (): RipDeckState =>
         etaSeconds: 3_600 - slot * 300,
       },
     })),
+  })
+
+/** The physical kiosk's nine-bay publicity view. */
+const buildShowcase = (): RipDeckState =>
+  buildState({
+    fixture: "showcase",
+    bays: [
+      {
+        slot: 1,
+        job: {
+          title: "Dune: Part Two",
+          discType: "uhd",
+          totalFraction: 0.18,
+          etaSeconds: 2_940,
+        },
+      },
+      {
+        slot: 2,
+        job: {
+          title: "The Iron Giant",
+          discType: "bluray",
+          totalFraction: 0.46,
+          etaSeconds: 1_680,
+        },
+      },
+      {
+        slot: 3,
+        job: {
+          title: "Schoolhouse Rock!",
+          discType: "dvd",
+          totalFraction: 0.73,
+          etaSeconds: 540,
+        },
+      },
+      {
+        slot: 4,
+        job: {
+          state: "stalled",
+          title: "Mezzanine",
+          discType: "cd",
+          totalFraction: 0.64,
+          etaSeconds: null,
+          etaTrend: null,
+          throughputBytesPerSec: null,
+        },
+      },
+      {
+        slot: 5,
+        job: {
+          state: "completed",
+          title: "Blade Runner 2049",
+          discType: "uhd",
+          totalFraction: 1,
+        },
+      },
+      {
+        slot: 6,
+        job: {
+          state: "completed",
+          title: "Spirited Away",
+          discType: "bluray",
+          totalFraction: 1,
+        },
+      },
+      {
+        slot: 7,
+        job: {
+          state: "completed",
+          title: "The Muppet Movie",
+          discType: "dvd",
+          totalFraction: 1,
+          readErrorCount: 4,
+          warnings: [
+            "4 read errors occurred. The backup finished, " +
+              "but it needs playback verification.",
+          ],
+        },
+      },
+      {
+        slot: 8,
+        job: {
+          state: "failed",
+          title: "Kind of Blue",
+          discType: "cd",
+          verdictKind: "disc_scratched",
+          confidence: "confirmed",
+          evidence: [
+            "Errors are concentrated in one continuous band.",
+          ],
+          totalFraction: 0.38,
+          readErrorCount: 41,
+          etaSeconds: null,
+          etaTrend: null,
+          throughputBytesPerSec: null,
+        },
+      },
+      { slot: 9 },
+    ],
   })
 
 /** One bay per verdict kind — every card the UI must render. */
@@ -1166,6 +1265,8 @@ export const createFixtureState = (
       return buildUnmeasured()
     case "usb-flap":
       return buildUsbFlap()
+    case "showcase":
+      return buildShowcase()
   }
 }
 

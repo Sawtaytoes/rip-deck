@@ -111,6 +111,34 @@ describe("nine concurrent rips", () => {
   })
 })
 
+describe("the kiosk showcase", () => {
+  it("shows the full nine-bay state and media mix", () => {
+    const state = createFixtureState("showcase")
+    const bays = state.ripDeck.bays
+
+    expect(bays).toHaveLength(9)
+    expect(
+      bays.filter((bay) => bay.state.state === "idle"),
+    ).toHaveLength(1)
+    expect(
+      bays.filter((bay) => bay.state.state === "ripping"),
+    ).toHaveLength(3)
+    expect(
+      bays.filter((bay) => bay.state.state === "completed"),
+    ).toHaveLength(3)
+    expect(
+      bays.filter((bay) => bay.state.state === "failed"),
+    ).toHaveLength(1)
+    expect(
+      bays.filter((bay) => bay.state.state === "stalled"),
+    ).toHaveLength(1)
+    expect(
+      new Set(bays.map((bay) => bay.state.disctype)),
+    ).toEqual(new Set([null, "uhd", "bluray", "dvd", "cd"]))
+    expect(bayOf(state, 7).state.has_warnings).toBe(true)
+  })
+})
+
 describe("each verdict kind", () => {
   it("renders one bay per kind, ok included", () => {
     const state = createFixtureState("verdicts")
