@@ -76,6 +76,8 @@ successful rip with warnings, and a failed rip. UHD, Blu-ray, DVD, and CD media 
 appear in the same view. Every fixture response identifies itself as fake, and the
 kiosk disables all controls.
 
+![Rip Deck kiosk showcase with nine mixed-state bays](docs/previews/kiosk-showcase.png)
+
 Point a CastKit remote-display worker at `/kiosk/castkit-showcase.json` to put this
 fixture on its physical display. Restore `/kiosk/castkit.json` and restart the worker
 when the demonstration is complete.
