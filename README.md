@@ -64,4 +64,18 @@ Two rules follow, and both matter if you edit `.github/workflows/ci.yml`:
 2. **`.mdx` is not documentation**, and neither is `.changeset/*.md`. The detector
    matches `.md$` for that reason. Do not loosen it to `.md*`.
 
-The [tower kiosk](docs/kiosk.md) exposes `/kiosk` and the app-owned CastKit manifest at `/kiosk/castkit.json`.
+## Kiosk mode
+
+The [tower kiosk](docs/kiosk.md) exposes a dedicated 480×320 view at `/kiosk`.
+CastKit loads the app-owned manifest at `/kiosk/castkit.json` and sends the rendered
+page to a remote browser display.
+
+For photographs and demonstrations, `/kiosk?fake=showcase` shows a read-only nine-bay
+fixture. It includes one empty bay, active rips, a stalled rip, successful rips, a
+successful rip with warnings, and a failed rip. UHD, Blu-ray, DVD, and CD media all
+appear in the same view. Every fixture response identifies itself as fake, and the
+kiosk disables all controls.
+
+Point a CastKit remote-display worker at `/kiosk/castkit-showcase.json` to put this
+fixture on its physical display. Restore `/kiosk/castkit.json` and restart the worker
+when the demonstration is complete.
