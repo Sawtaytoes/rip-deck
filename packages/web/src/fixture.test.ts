@@ -51,6 +51,7 @@ describe("readFixtureName", () => {
       "held-at-startup",
       "unmeasured",
       "usb-flap",
+      "showcase",
     ])
     expect(isFixtureName("verdicts")).toBe(true)
     expect(isFixtureName("Verdicts")).toBe(false)

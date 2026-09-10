@@ -652,6 +652,138 @@ const buildUsbFlap = (nowMs: number): TowerSnapshot => {
 }
 
 /**
+ * The nine-bay publicity view for the physical kiosk.
+ *
+ * It deliberately uses one empty bay and every row intent the
+ * kiosk can show: active, stalled, successful, successful with
+ * warnings, and failed. The four disc types appear in the same
+ * frame. This is presentation data only; every fixture response
+ * is marked fake and the kiosk disables its controls.
+ */
+const buildShowcase = (nowMs: number): TowerSnapshot =>
+  createTowerSnapshot({
+    isMqttEnabled: true,
+    bays: [
+      buildFixtureBay({
+        slot: 1,
+        job: buildFixtureJob({
+          slot: 1,
+          nowMs,
+          title: "Dune: Part Two",
+          discType: "uhd",
+          progress: {
+            totalFraction: 0.18,
+            etaSeconds: 2_940,
+          },
+        }),
+      }),
+      buildFixtureBay({
+        slot: 2,
+        job: buildFixtureJob({
+          slot: 2,
+          nowMs,
+          title: "The Iron Giant",
+          discType: "bluray",
+          progress: {
+            totalFraction: 0.46,
+            etaSeconds: 1_680,
+          },
+        }),
+      }),
+      buildFixtureBay({
+        slot: 3,
+        job: buildFixtureJob({
+          slot: 3,
+          nowMs,
+          title: "Schoolhouse Rock!",
+          discType: "dvd",
+          progress: {
+            totalFraction: 0.73,
+            etaSeconds: 540,
+          },
+        }),
+      }),
+      buildFixtureBay({
+        slot: 4,
+        job: buildFixtureJob({
+          slot: 4,
+          nowMs,
+          state: "stalled",
+          title: "Mezzanine",
+          discType: "cd",
+          progress: {
+            totalFraction: 0.64,
+            etaSeconds: null,
+            etaTrend: null,
+            throughputBytesPerSec: null,
+          },
+        }),
+      }),
+      buildFixtureBay({
+        slot: 5,
+        job: buildFixtureJob({
+          slot: 5,
+          nowMs,
+          state: "completed",
+          title: "Blade Runner 2049",
+          discType: "uhd",
+          progress: { totalFraction: 1 },
+        }),
+      }),
+      buildFixtureBay({
+        slot: 6,
+        job: buildFixtureJob({
+          slot: 6,
+          nowMs,
+          state: "completed",
+          title: "Spirited Away",
+          discType: "bluray",
+          progress: { totalFraction: 1 },
+        }),
+      }),
+      buildFixtureBay({
+        slot: 7,
+        job: buildFixtureJob({
+          slot: 7,
+          nowMs,
+          state: "completed",
+          title: "The Muppet Movie",
+          discType: "dvd",
+          readErrorCount: 4,
+          warnings: [
+            "4 read errors occurred. The backup finished, " +
+              "but it needs playback verification.",
+          ],
+          progress: { totalFraction: 1 },
+        }),
+      }),
+      buildFixtureBay({
+        slot: 8,
+        job: buildFixtureJob({
+          slot: 8,
+          nowMs,
+          state: "failed",
+          title: "Kind of Blue",
+          discType: "cd",
+          verdictKind: "disc_scratched",
+          confidence: "confirmed",
+          evidence: [
+            "Errors are concentrated in one continuous band.",
+          ],
+          readErrorCount: 41,
+          progress: {
+            totalFraction: 0.38,
+            etaSeconds: null,
+            etaTrend: null,
+            throughputBytesPerSec: null,
+          },
+        }),
+      }),
+      buildFixtureBay({ slot: 9 }),
+    ],
+  })
+
+/**
  * Pass, warning and fail, side by side.
  *
  * The three states of a finished rip, in one rack, because they
@@ -730,6 +862,7 @@ export const FIXTURE_NAMES = [
   "unmeasured",
   "usb-flap",
   "three-outcomes",
+  "showcase",
 ] as const
 
 export type FixtureName = (typeof FIXTURE_NAMES)[number]
@@ -768,5 +901,7 @@ export const createFixtureSnapshot = (input: {
       return buildUsbFlap(nowMs)
     case "three-outcomes":
       return buildThreeOutcomes(nowMs)
+    case "showcase":
+      return buildShowcase(nowMs)
   }
 }

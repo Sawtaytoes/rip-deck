@@ -10,6 +10,13 @@ The kiosk uses the normal Rip Deck data source and command endpoints. Preview an
 
 Point CastKit's remote-display worker at **`/kiosk/castkit.json`**. This app-owned, versioned JSON manifest specifies the viewport, initial page, stable touch identity attribute, refresh limits, and the cached loading URL `/kiosk/loading`. CastKit reads those instructions; it owns no Rip Deck view, disc metadata, artwork lookup, or tray commands.
 
+For photographs and demonstrations, **`/kiosk/castkit-showcase.json`** opens the
+read-only `showcase` fixture instead. Its nine rows include one empty bay, active,
+stalled, successful, successful-with-warnings, and failed states, plus UHD, Blu-ray,
+DVD, and CD media. Fixture responses set `is_fake: true`, the display says
+`Preview — controls disabled`, and no touch can operate the physical tower. Restore
+the normal manifest and restart the CastKit worker after the demonstration.
+
 The loading URL uses the same React application and shared Charcuterie Skeleton component. CastKit renders it once and preloads the bitmap into ESPHome PSRAM. Row bounds from the rendered frame identify where a completed tap should show that cache immediately. The current WT32 receiver supports one optimistic cache image. It does not cache disc-specific progress or command success.
 
 Action identities contain the drive, job, and state. CastKit binds a physical touch to the identity in the acknowledged image and checks that it still matches Chromium before dispatch. Back and slot navigation use stable route identities. A pending command disables its controls, and a server report supplies the result.

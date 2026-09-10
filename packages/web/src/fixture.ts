@@ -2,7 +2,7 @@
  * Which fixture scenario the page is asking for.
  *
  * Deliberately the SAME `?fake=<name>` convention the daemon's
- * router already implements, and the same nine names, so one
+ * router already implements, and the same names, so one
  * URL means one thing in both modes: against the mock it selects
  * the bundled scenario, and against a live daemon it is forwarded
  * verbatim to `/json?fake=`. Two spellings for one idea is how a
@@ -26,6 +26,7 @@ export const FIXTURE_NAMES = [
   "held-at-startup",
   "unmeasured",
   "usb-flap",
+  "showcase",
 ] as const
 
 export type FixtureName = (typeof FIXTURE_NAMES)[number]
