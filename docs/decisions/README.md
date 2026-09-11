@@ -9,6 +9,8 @@ default instinct.
 
 | Date | Decision |
 | --- | --- |
+| 2026-09-10 | [A kiosk row is one line, and its background is the progress](2026-09-10-a-kiosk-row-is-one-line-and-its-background-is-the-progress.md) |
+| 2026-09-10 | [The kiosk uses the fleet sans, not Arial](2026-09-10-the-kiosk-uses-the-fleet-sans-not-arial.md) |
 | 2026-09-08 | [A kiosk row is tinted by its state and headlines the rip name](2026-09-08-a-kiosk-row-is-tinted-by-its-state-and-headlines-the-rip-name.md) |
 | 2026-09-08 | [A bay is labelled by its number alone, never the word "Slot"](2026-09-08-a-bay-is-labelled-by-its-number-alone-never-the-word-slot.md) |
 | 2026-09-08 | [The kiosk and its CastKit metadata belong to Rip Deck](2026-09-08-kiosk-and-castkit-metadata-belong-to-rip-deck.md) |
