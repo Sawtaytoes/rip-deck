@@ -4,7 +4,7 @@
 - **Date:** 2026-09-08
 - **Type:** Display UI requirement
 - **Supersedes:** —
-- **Superseded by:** —
+- **Superseded by:** [2026-09-10 — a kiosk row is one line, and its background is the progress](2026-09-10-a-kiosk-row-is-one-line-and-its-background-is-the-progress.md) (the bar column and the two-line row only)
 
 ## Decision
 
