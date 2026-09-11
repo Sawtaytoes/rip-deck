@@ -134,7 +134,10 @@ body {
   flex-direction: column;
   background: var(--color-surface-base);
   color: var(--color-content-primary);
-  font-family: Arial, sans-serif;
+  /* The fleet's sans, not Arial: the app already loads Outfit through
+     `@charcuterie/tokens/fonts.css`, and the kiosk was the one surface
+     that opted out of it. */
+  font-family: var(--font-sans);
 }
 .rip-kiosk-status {
   padding: 3px 8px;
@@ -152,8 +155,8 @@ body {
 }
 .rip-kiosk .rip-kiosk-row {
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) 104px 46px;
-  gap: 7px;
+  grid-template-columns: 30px minmax(0, 1fr) 54px;
+  gap: 8px;
   align-items: center;
   justify-content: normal;
   padding: 0 6px 0 5px;
@@ -164,37 +167,68 @@ body {
   font-weight: normal;
   color: var(--color-content-primary);
   touch-action: manipulation;
+  /* The row is its own progress bar (below), so the fill needs a box to
+     be absolute against and an edge to be clipped at. */
+  position: relative;
+  overflow: hidden;
+}
+/* The progress bar IS the row. On 480×320 a 104px bar column cost the
+   text a quarter of the row, and a row is already a coloured block —
+   so the Charcuterie ProgressBar stays (its role and name are what
+   a screen reader and the tests read) but it is laid over the whole
+   row as a translucent wash of the row's intent colour, behind the
+   text. Everything readable sits above it. */
+.rip-kiosk .rip-kiosk-fill {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  gap: 0;
+  pointer-events: none;
+}
+.rip-kiosk .rip-kiosk-fill [role="progressbar"] {
+  block-size: 100%;
+  border-radius: 0;
+  background: transparent;
+}
+.rip-kiosk .rip-kiosk-fill [role="progressbar"] > span {
+  border-radius: 0;
+  opacity: 0.22;
 }
 /* The number chip: a solid Badge in the row's intent colour, sized
    for a thumb on a 480×320 panel rather than for a caption. */
 .rip-kiosk .rip-kiosk-number {
-  inline-size: 26px;
-  block-size: 26px;
+  inline-size: 30px;
+  block-size: 30px;
   padding: 0;
   justify-content: center;
   border-radius: 4px;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: bold;
   font-variant-numeric: tabular-nums;
 }
 .rip-kiosk-percent {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: bold;
   text-align: end;
   letter-spacing: -0.5px;
   font-variant-numeric: tabular-nums;
   color: var(--color-content-primary);
 }
-.rip-kiosk-description {
+/* One line per row: the rip name, then `status · type · ETA` after it
+   on the same baseline. A 33px row cannot hold two lines anyone can
+   read from the workbench, so the second line was folded into the
+   first. When the line overflows, the meta gives way before the name. */
+.rip-kiosk-line {
   display: flex;
-  flex-direction: column;
+  align-items: baseline;
+  gap: 8px;
   min-inline-size: 0;
 }
-/* The rip name is the headline and stays primary; the meta line
-   underneath keeps the intent colour the soft appearance gives it. */
 .rip-kiosk-row .rip-kiosk-title {
-  font-size: 14px;
-  line-height: 15px;
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  font-size: 20px;
+  line-height: 22px;
   font-weight: bold;
   color: var(--color-content-primary);
   overflow: hidden;
@@ -202,8 +236,10 @@ body {
   white-space: nowrap;
 }
 .rip-kiosk-row .rip-kiosk-meta {
-  font-size: 11px;
-  line-height: 12px;
+  flex: 1 1 0;
+  min-inline-size: 0;
+  font-size: 14px;
+  line-height: 16px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -211,6 +247,14 @@ body {
 .rip-kiosk-row[data-empty="true"] .rip-kiosk-title {
   color: var(--color-content-muted);
   font-weight: normal;
+}
+/* Everything readable sits above the fill. Last, so nothing less
+   specific follows it. */
+.rip-kiosk .rip-kiosk-row > .rip-kiosk-number,
+.rip-kiosk .rip-kiosk-row > .rip-kiosk-line,
+.rip-kiosk .rip-kiosk-row > .rip-kiosk-percent {
+  position: relative;
+  z-index: 1;
 }
 .rip-kiosk-off {
   flex: 1;

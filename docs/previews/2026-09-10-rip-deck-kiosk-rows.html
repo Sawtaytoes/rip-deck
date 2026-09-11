@@ -1,0 +1,48 @@
+<!doctype html><meta charset="utf-8"><title>Rip Deck kiosk at 480x320</title>
+<style>
+:root{--bg:#131822;--fg:#eef1f7;--dim:#9aa3b5}
+body{margin:0;background:#000;font-family:Arial,sans-serif;color:var(--fg)}
+.panel{width:480px;height:320px;overflow:hidden;background:var(--bg);box-sizing:border-box;padding:3px;display:grid;grid-template-rows:repeat(9,minmax(0,1fr));gap:2px}
+.row{display:grid;align-items:center;border-radius:3px;padding:0 6px 0 5px;min-height:0;position:relative;overflow:hidden}
+.row.info{background:#1d2c4a;color:#9cc3ff}.row.success{background:#163524;color:#8fe0a8}.row.warning{background:#3b2f14;color:#f2c76a}.row.danger{background:#3d1a1f;color:#ff9aa4}.row.neutral{background:#1c2230;color:var(--dim)}
+.chip{display:inline-flex;align-items:center;justify-content:center;border-radius:4px;font-weight:bold;font-variant-numeric:tabular-nums;color:#0b0e14}
+.info .chip{background:#4f8ff7}.success .chip{background:#3ec26f}.warning .chip{background:#f0b444}.danger .chip{background:#f05a68}.neutral .chip{background:#5b6578}
+.t{font-weight:bold;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.m{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.bar{height:8px;border-radius:4px;background:#0009;position:relative}.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:currentColor}
+.pct{font-weight:bold;text-align:right;font-variant-numeric:tabular-nums;color:var(--fg)}
+.neutral .t{color:var(--dim);font-weight:normal}
+
+/* R1: same shape, narrow bar, bigger type (title 17 / meta 12) */
+#r1 .row{grid-template-columns:28px minmax(0,1fr) 56px 50px;gap:7px}
+#r1 .chip{width:28px;height:28px;font-size:16px}#r1 .desc{display:flex;flex-direction:column;min-width:0}
+#r1 .t{font-size:17px;line-height:17px}#r1 .m{font-size:12px;line-height:13px}#r1 .pct{font-size:19px}
+
+/* R2: one line per row: title 19 with the meta inline, tiny bar, percent 20 */
+#r2 .row{grid-template-columns:30px minmax(0,1fr) 48px 54px;gap:7px}
+#r2 .chip{width:30px;height:30px;font-size:18px}#r2 .line{display:flex;align-items:baseline;gap:8px;min-width:0}
+#r2 .t{font-size:20px;line-height:22px;flex:0 1 auto}#r2 .m{font-size:14px;flex:0 1 auto}#r2 .pct{font-size:20px}
+
+/* R3: the row IS the bar: progress fills the row background, no bar column, title 20 / meta 14 */
+#r3 .row{grid-template-columns:30px minmax(0,1fr) 62px;gap:8px}
+#r3 .chip{width:30px;height:30px;font-size:18px;position:relative;z-index:1}
+#r3 .fill{position:absolute;left:0;top:0;bottom:0;background:currentColor;opacity:.22}
+#r3 .desc{display:flex;flex-direction:column;min-width:0;position:relative;z-index:1}
+#r3 .t{font-size:19px;line-height:19px}#r3 .m{font-size:13px;line-height:13px}#r3 .pct{font-size:21px;position:relative;z-index:1}
+</style>
+<script>
+const rows=[
+ ['info','1','Blade Runner','Ripping · 4K · 1h 12m',58],
+ ['info','2','The Matrix','Ripping · Blu-ray · 24m',81],
+ ['warning','3','Akira','Slow read · Blu-ray · 2h 40m',12],
+ ['success','4','Spirited Away','Done · Blu-ray',100],
+ ['success','5','Chungking Express','Done, 3 warnings · DVD',100],
+ ['danger','6','Ghost in the Shell','Failed · UHD',37],
+ ['neutral','7','Empty','',0],
+ ['info','8','Abbey Road','Ripping · CD · 4m',66],
+ ['info','9','Police Story','Ripping · Blu-ray · 51m',43]];
+const pct=r=>r[0]==='neutral'?'—':r[4]+'%';
+document.write(`<div class="panel" id="r1">${rows.map(r=>`<div class="row ${r[0]}"><span class="chip">${r[1]}</span><span class="desc"><span class="t">${r[2]}</span><span class="m">${r[3]}</span></span><div class="bar"><i style="width:${r[4]}%"></i></div><span class="pct">${pct(r)}</span></div>`).join('')}</div>`);
+document.write(`<div class="panel" id="r2">${rows.map(r=>`<div class="row ${r[0]}"><span class="chip">${r[1]}</span><span class="line"><span class="t">${r[2]}</span><span class="m">${r[3]}</span></span><div class="bar"><i style="width:${r[4]}%"></i></div><span class="pct">${pct(r)}</span></div>`).join('')}</div>`);
+document.write(`<div class="panel" id="r3">${rows.map(r=>`<div class="row ${r[0]}"><i class="fill" style="width:${r[4]}%"></i><span class="chip">${r[1]}</span><span class="desc"><span class="t">${r[2]}</span><span class="m">${r[3]}</span></span><span class="pct">${pct(r)}</span></div>`).join('')}</div>`);
+</script>

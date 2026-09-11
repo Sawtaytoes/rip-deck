@@ -273,7 +273,7 @@ export const Kiosk = () => {
                   >
                     {bay.slot ?? "?"}
                   </Badge>
-                  <span className="rip-kiosk-description">
+                  <span className="rip-kiosk-line">
                     <strong className="rip-kiosk-title">
                       {row.title}
                     </strong>
@@ -281,15 +281,20 @@ export const Kiosk = () => {
                       {row.meta}
                     </span>
                   </span>
+                  <strong className="rip-kiosk-percent">
+                    {row.isEmpty ? "—" : `${row.percent}%`}
+                  </strong>
+                  {/* The row is its own bar: the fill washes the whole
+                      row behind the text (see `.rip-kiosk-fill`). Last
+                      in the DOM so the row's text still starts with the
+                      bay number, not the bar's hidden label. */}
                   <ProgressBar
+                    className="rip-kiosk-fill"
                     label={`Slot ${bay.slot ?? "?"} progress`}
                     value={row.percent}
                     intent={row.intent}
                     size="md"
                   />
-                  <strong className="rip-kiosk-percent">
-                    {row.isEmpty ? "—" : `${row.percent}%`}
-                  </strong>
                 </ButtonLink>
               )
             })}
