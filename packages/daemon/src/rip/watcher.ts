@@ -3700,6 +3700,16 @@ export const startWatcher = (
    * tree, disconnected all nine drives and killed three DVD rips.
    * A slow report is recoverable; three destroyed rips are not.
    * The per-drive watchdog still bounds each move.
+   *
+   * ⚠️ **This loop is the whole of that protection now.** The same
+   * repair also blocked a bulk close outright while any rip ran,
+   * and that second guard was removed on 2026-09-11
+   * ([decision](docs/decisions/2026-09-11-close-trays-closes-the-safe-bays-during-a-rip.md)):
+   * it stopped the button working in the state the owner uses it
+   * in, while serial motion was already what fixed the hardware
+   * fault. Keep the `await` inside the loop. Moving these presses
+   * back into a `Promise.all` re-creates the 2026-08-29 failure
+   * exactly, and now there is nothing above it to catch that.
    */
   const runTrayCommandForRequest = async (params: {
     request: TrayCommandRequest
@@ -3801,14 +3811,6 @@ export const startWatcher = (
       )
     })
 
-    const hasActiveRip = probed.some((drive) => {
-      const phase = bays.get(
-        drive.identity.usbPortPath,
-      )?.phase
-
-      return phase === "starting" || phase === "ripping"
-    })
-
     const target =
       "target" in params.request
         ? params.request.target
@@ -3895,7 +3897,6 @@ export const startWatcher = (
         bay,
         observation: observationOf(drive),
         openScope,
-        hasActiveRip,
         hasOpenableSafeBay,
       })
 

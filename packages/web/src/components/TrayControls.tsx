@@ -20,6 +20,16 @@ import { useTrayCommand } from "../hooks/useTrayCommand"
  * same press powers it on. **Close trays** sends `close_trays`,
  * which closes only the bays rip-deck opened.
  *
+ * ⚠️ **A running rip does not stop Close trays**
+ * ([decision](docs/decisions/2026-09-11-close-trays-closes-the-safe-bays-during-a-rip.md)).
+ * It used to: between 2026-08-29 and 2026-09-11 one live rip
+ * anywhere on the tower turned this button into a no-op, which
+ * is the state an operator presses it in — drawers open, discs
+ * collected, one long rip still running. Those drawers now
+ * close, one motor at a time. The ripping bay's own drawer is
+ * still never commanded, and a targeted close against it still
+ * refuses.
+ *
  * ## The third button is not a tray button
  *
  * **Tower off** cuts mains to the rack

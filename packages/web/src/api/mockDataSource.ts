@@ -1338,6 +1338,18 @@ const decideMockTrayResult = (input: {
   // checked for every command kind including one an operator
   // aimed deliberately.
   if (TRAY_REFUSED_STATES.has(bay.state.state)) {
+    // A BULK close is the one press that answers quietly: a
+    // ripping bay's drawer is shut already, and the operator
+    // asked for the safe set rather than for this bay. Same
+    // branch and same wording as the daemon.
+    if (command === "close_trays") {
+      return {
+        result: "skipped_untouched",
+        detail:
+          "this bay is ripping, so its tray was not touched",
+      }
+    }
+
     return {
       result: "refused_ripping",
       detail:
