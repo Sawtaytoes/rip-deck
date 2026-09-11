@@ -22,7 +22,9 @@ Attention cards can expose actions such as Keep trying, Give up, and Clear quara
 
 ## Use tray controls safely
 
-Bulk tray commands move one motor at a time. Close trays does not move any tray while a rip is active, because simultaneous tray motors on the shared USB tower can disconnect the complete bus.
+Bulk tray commands move one motor at a time. Simultaneous tray motors on the shared USB tower can disconnect the complete bus, so Rip Deck never runs two tray moves together.
+
+Close trays shuts every drawer Rip Deck opened. A rip in another bay does not stop it. The ripping bay's own drawer is never commanded, because that drawer is already shut and a motor command mid-read can destroy the copy. A targeted close against a ripping bay is still refused. See the [close-during-a-rip decision](decisions/2026-09-11-close-trays-closes-the-safe-bays-during-a-rip.md).
 
 Do not restart the service or power-cycle the tower while any bay is starting or ripping.
 

@@ -4,7 +4,7 @@ Status: Accepted
 Date: 2026-09-08
 Type: UX / hardware safety
 Supersedes: The active-bay result and operator-reporting clause of `2026-08-29-bulk-tray-moves-are-serial-and-close-is-blocked-during-a-rip.md`
-Superseded by: —
+Superseded by: `2026-09-11-close-trays-closes-the-safe-bays-during-a-rip.md` — in full. The tower-wide no-op this record preserved was removed; a bulk Close now closes the safe bays during a rip.
 
 ## Decision
 
