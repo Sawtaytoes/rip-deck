@@ -5,7 +5,11 @@ Date: 2026-08-29
 Type: Hardware safety / tray commands
 Supersedes: The parallel-move and close-during-rip clauses of `2026-07-30-open-trays-escalates-and-close-trays-is-plain.md`
 Superseded by: `2026-09-08-close-trays-quietly-skips-during-an-active-rip.md`
-for the active-bay result and operator-reporting clause only
+for the active-bay result and operator-reporting clause, then
+`2026-09-11-close-trays-closes-the-safe-bays-during-a-rip.md` for **clause 1** —
+the tower-atomic block is gone. ⚠️ **Clauses 2 and 3 stand and are now the whole
+of the protection.** Bulk tray moves must stay serial; that is what fixed the
+fault described below.
 
 ## Decision
 

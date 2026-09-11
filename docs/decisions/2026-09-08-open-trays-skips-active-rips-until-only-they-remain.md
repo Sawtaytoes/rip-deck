@@ -13,8 +13,14 @@ One **Open trays** press opens every present bay that is not `starting` or
 bays while at least one safe tray remains to open. Once every safe tray is
 already known open, another press reports the active bays it cannot open.
 
-A targeted open against an active bay still refuses immediately. The
-tower-atomic Close rule remains unchanged.
+A targeted open against an active bay still refuses immediately.
+
+⚠️ **The reference to a tower-atomic Close rule is out of date.** That rule was
+removed on 2026-09-11
+(`2026-09-11-close-trays-closes-the-safe-bays-during-a-rip.md`). Close now
+behaves the same way Open does here: it moves the safe set serially and
+silently skips the active bays. Nothing in this record's own Open behaviour
+changed.
 
 ## Context
 

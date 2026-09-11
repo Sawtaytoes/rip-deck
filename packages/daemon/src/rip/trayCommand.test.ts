@@ -524,21 +524,29 @@ describe("decideTrayBayAction", () => {
     })
   })
 
-  it("skips every other bay on bulk close when a rip is active", () => {
-    const decision = decideTrayBayAction({
-      request: { kind: "close_trays" },
-      bay: bay({
-        phase: "idle",
-        lastTrayCommand: "open_bay",
+  it("⚠️ closes an idle bay it opened even while another bay rips", () => {
+    // ⚠️ THE ONE THE OWNER ASKED FOR FOUR TIMES. Between
+    // 2026-08-29 and 2026-09-11 this asserted the opposite: a bulk
+    // close moved NOTHING anywhere while any bay ripped, so a rack
+    // of open drawers stayed open until the last rip finished.
+    // Serial motion is what fixed the 2026-08-29 hub reset; the
+    // tower-wide block on top of it only broke the button
+    // ([decision](docs/decisions/2026-09-11-close-trays-closes-the-safe-bays-during-a-rip.md)).
+    //
+    // `decideTrayBayAction` is per bay and no longer takes any
+    // tower-wide rip fact at all, which is the structural half of
+    // the guarantee: there is no input left through which another
+    // bay's phase can veto this drawer.
+    expect(
+      decideTrayBayAction({
+        request: { kind: "close_trays" },
+        bay: bay({
+          phase: "idle",
+          lastTrayCommand: "open_bay",
+        }),
+        observation: loaded(),
       }),
-      observation: loaded(),
-      hasActiveRip: true,
-    })
-
-    expect(decision).toMatchObject({
-      action: "skip",
-      resultKind: "skipped_untouched",
-    })
+    ).toEqual({ action: "close" })
   })
 
   it("closes only bays rip-deck opened, skipping the rest", () => {
@@ -605,9 +613,12 @@ describe("decideTrayBayAction", () => {
   })
 
   it("quietly skips a ripping bay during bulk close", () => {
-    // No tray may move, including one Rip Deck once opened. This
-    // is an expected tower-wide safety no-op, not an operator
-    // error, so it does not publish a refusal.
+    // THIS bay's motor is still untouchable, and that never
+    // changed. Its drawer is shut already, so a close has nothing
+    // to do here, and sending the command mid-read is the act this
+    // file exists to prevent. A skip and not a refusal because a
+    // bulk press asks for the safe set rather than for this bay —
+    // a targeted `close_bay` still refuses.
     expect(
       decideTrayBayAction({
         request: { kind: "close_trays" },
@@ -974,6 +985,10 @@ describe("buildTrayCommandMessage", () => {
       }),
     ).toContain("No trays to close")
 
+    // Every bay on the bus was ripping, so there was no open
+    // drawer to shut. Not "close does not work during a rip":
+    // the drawers rip-deck opened DO close now, and this sentence
+    // is only reached when there were none.
     expect(
       buildTrayCommandMessage({
         request: { kind: "close_trays" },
@@ -981,7 +996,23 @@ describe("buildTrayCommandMessage", () => {
           result({ resultKind: "skipped_untouched" }),
         ],
       }),
-    ).toBe("Close trays skipped while a rip is active.")
+    ).toBe(
+      "No trays to close — every bay on the bus is ripping.",
+    )
+
+    // ⚠️ And a mixed rack reads as "none are open", never as the
+    // rip sentence. Slot 4 rips; every other drawer was already
+    // shut. Blaming the rip for a press that had nothing to do is
+    // what made the old wording look like the bug it was not.
+    expect(
+      buildTrayCommandMessage({
+        request: { kind: "close_trays" },
+        results: [
+          result({ resultKind: "skipped_untouched" }),
+          result({ resultKind: "skipped_already_closed" }),
+        ],
+      }),
+    ).toBe("No trays to close — none are open.")
   })
 
   it("carries a failure's own words", () => {

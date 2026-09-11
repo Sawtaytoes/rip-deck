@@ -2966,7 +2966,7 @@ describe("startWatcher tray commands", () => {
     await watcher.stop()
   })
 
-  it("moves no tray on bulk close while any bay is ripping", async () => {
+  it("⚠️ closes the safe drawers on bulk close while another bay rips", async () => {
     const ripper = controllableRipper()
     const tray = trayRecorder()
 
@@ -3009,26 +3009,87 @@ describe("startWatcher tray commands", () => {
       request: { kind: "close_trays" },
     })
 
-    // Closing sr0 can reset the shared hub and destroy sr1's rip.
-    // The whole bulk close therefore moves nothing. That expected
-    // safety no-op is not an error and reports no refusal.
-    expect(tray.moved).toEqual([])
-    expect(report.counts.closed).toBe(0)
+    // ⚠️ THE REGRESSION THE OWNER REPORTED FOUR TIMES. sr0's
+    // drawer is open, sr1 is ripping, and the press must shut
+    // sr0. Between 2026-08-29 and 2026-09-11 this asserted
+    // `tray.moved` was EMPTY: one live rip anywhere on the tower
+    // turned Close trays into a no-op, which is the state the
+    // button is pressed in
+    // ([decision](docs/decisions/2026-09-11-close-trays-closes-the-safe-bays-during-a-rip.md)).
+    //
+    // sr1's own motor is still never touched, and the moves are
+    // still serial — that loop, not a tower-wide veto, is what
+    // fixed the hub reset of 2026-08-29.
+    expect(tray.moved).toEqual([
+      { action: "close", devPath: "/dev/sr0" },
+    ])
+    expect(report.counts.closed).toBe(1)
     expect(report.counts.refused).toBe(0)
     expect(report.message).toBe(
-      "Close trays skipped while a rip is active.",
+      "Closed 1 drive: slot 2-1.1.0.",
     )
-    expect(report.spoken_message).toBe("Nothing to close.")
+    expect(report.spoken_message).toBe("Closed 1 tray.")
     expect(
       report.bays.find(
         (entry) => entry.drive_id === "2-1.1.0",
       )?.result,
-    ).toBe("skipped_untouched")
+    ).toBe("closed")
     expect(
       report.bays.find(
         (entry) => entry.drive_id === "2-1.1.1",
       )?.result,
     ).toBe("skipped_untouched")
+
+    await watcher.stop()
+  })
+
+  it("⚠️ never sends a close to the ripping drive's own motor", async () => {
+    // The half of the old rule that survives, asserted on the
+    // spawn recorder rather than on a result kind: whatever the
+    // report says, `runTray` must not be called for sr1 while sr1
+    // rips. `open_trays` above opened sr0 only, so this is the
+    // press with the widest possible close set.
+    const ripper = controllableRipper()
+    const tray = trayRecorder()
+
+    const watcher = startWatcher(
+      {
+        config: noopConfig,
+        governor: createGovernor({ maxConcurrentRips: 9 }),
+      },
+      watcherDeps({
+        probeDrives: async () => [
+          probedDrive({
+            driveId: "2-1.1.0",
+            kernelName: "sr0",
+            sizeSectors: EMPTY_TRAY_SECTORS,
+          }),
+          probedDrive({
+            driveId: "2-1.1.1",
+            kernelName: "sr1",
+            sizeSectors: BLURAY_SECTORS,
+          }),
+        ],
+        runBayRip: ripper.runBayRip,
+        runTray: tray.runTray,
+      }),
+    )
+
+    await watcher.tickNow()
+    await watcher.runTrayCommand({
+      request: { kind: "open_trays" },
+    })
+    tray.moved.length = 0
+
+    await watcher.runTrayCommand({
+      request: { kind: "close_trays" },
+    })
+
+    expect(
+      tray.moved.some(
+        (move) => move.devPath === "/dev/sr1",
+      ),
+    ).toBe(false)
 
     await watcher.stop()
   })

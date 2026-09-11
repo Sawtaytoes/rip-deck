@@ -76,6 +76,22 @@ import type { BayObservation, BayState } from "./watcher.ts"
  * was harmless but noisy; closing only what is open is the honest
  * report.
  *
+ * ⚠️ **A running rip does not stop a Close press any more, and
+ * that is deliberate**
+ * ([decision](docs/decisions/2026-09-11-close-trays-closes-the-safe-bays-during-a-rip.md)).
+ * Between 2026-08-29 and 2026-09-11 a bulk Close was a tower-wide
+ * no-op whenever any bay was `starting` or `ripping`. That guard
+ * was written the same day bulk moves became SERIAL, after a
+ * PARALLEL close reset the shared hub and destroyed three rips. The
+ * serial rule is the guard that fixed the hardware fault; the block
+ * was a second one over the top of it, and it is what made the
+ * button do nothing in the state the owner needs it most — a rack
+ * full of open drawers and a rip still running. `open_trays` has
+ * moved trays serially during live rips every day since, on the
+ * same motors and the same hub, with no disconnect. Close is now
+ * symmetric with it: the ripping bay's own drawer is still never
+ * touched, every other open drawer closes, one motor at a time.
+ *
  * ## Tower off → power on
  *
  * An `open_trays` press against an OFF tower (no drives on the bus)
@@ -626,14 +642,6 @@ export const decideTrayBayAction = (input: {
   bay: BayState | null
   observation: BayObservation
   /**
-   * A rip owns any bay on this shared USB tree.
-   *
-   * Bulk CLOSE uses this tower-wide fact. The live tower proved
-   * that closing other drawers in parallel can reset the hub and
-   * make an untouched ripping drive vanish too.
-   */
-  hasActiveRip?: boolean
-  /**
    * A bulk Open press has at least one safe tray that is not
    * already known open. Active bays are quiet while this is true.
    */
@@ -705,21 +713,23 @@ export const decideTrayBayAction = (input: {
       bay.phase === "starting"
 
     if (!isHarmlessPowerCut) {
-      // A bulk Close press is intentionally a tower-wide no-op
-      // while any rip is active. The shared USB tree cannot safely
-      // take even an idle tray's motor load, but that safety guard
-      // is not a refusal: Close was asked to handle the safe set,
-      // and there is no safe set until the rip ends. Classifying
-      // the active bay as `refused_ripping` made the dashboard and
-      // Home Assistant report an error for the expected no-op.
-      // Targeted close still reaches the refusal below.
+      // A bulk Close leaves the RIPPING BAY alone and says so
+      // quietly. Its drawer is shut already — that is what
+      // ripping means — so there is nothing to close, and
+      // sending its motor a command mid-read is the one act
+      // this file exists to prevent. It is a skip and not a
+      // refusal because the operator did not aim at this bay:
+      // a bulk press asks for the safe set, and answering
+      // `refused_ripping` made the dashboard and Home Assistant
+      // report an error for an expected no-op. A targeted
+      // `close_bay` names this drawer on purpose and still
+      // reaches the refusal below.
       if (request.kind === "close_trays") {
         return {
           action: "skip",
           resultKind: "skipped_untouched",
           detail:
-            "a rip is active, so the tower-wide close command " +
-            "moved no trays",
+            "this bay is ripping, so its tray was not touched",
         }
       }
 
@@ -755,24 +765,27 @@ export const decideTrayBayAction = (input: {
     }
   }
 
-  // A per-bay refusal was not enough. On 2026-08-29, three
-  // ripping bays were correctly refused while Close Trays moved
-  // the other drawers. The motor load reset the shared USB hub;
-  // all nine drives disconnected and all three rips failed with
-  // ENODEV. A bulk close is therefore all-or-nothing while any
-  // rip is active: every non-ripping bay is skipped too.
-  if (
-    request.kind === "close_trays" &&
-    input.hasActiveRip === true
-  ) {
-    return {
-      action: "skip",
-      resultKind: "skipped_untouched",
-      detail:
-        "another bay is ripping, so the tower-wide close " +
-        "command moved no trays",
-    }
-  }
+  // ⚠️ A tower-wide block used to sit here, and it was REMOVED on
+  // 2026-09-11
+  // ([decision](docs/decisions/2026-09-11-close-trays-closes-the-safe-bays-during-a-rip.md)).
+  // Do not put it back without new hardware evidence.
+  //
+  // On 2026-08-29 a bulk Close moved several drawers AT ONCE while
+  // three bays ripped, the shared hub reset, and all three rips
+  // died. The repair that day did two things: it made every bulk
+  // tray move serial, and it also made a bulk Close move nothing at
+  // all while any rip ran. Only the first of those addresses the
+  // fault. The second left the owner with a button that does
+  // nothing in the exact state he presses it in — drawers open,
+  // discs collected, one long rip still running — and he reported
+  // it four times.
+  //
+  // The asymmetry is the argument. `open_trays` already drives
+  // these same motors on this same hub, serially, while other bays
+  // rip; that is its normal daily use and it has never reset the
+  // bus. A close is the identical motor travelling the other way.
+  // So the safe set is exactly what it says: every bay rip-deck
+  // opened and no bay that is ripping, closed one at a time.
 
   switch (request.kind) {
     case "open_bay":
@@ -1127,20 +1140,28 @@ export const buildTrayCommandMessage = (input: {
   // Nothing moved. Say WHICH nothing: `close_trays` is silent when
   // no bay was open to close, and an idle tower with every tray
   // empty is one way ▲ can be.
+  //
+  // The order matters. A rack where slot 4 rips and every other
+  // drawer is already shut has BOTH a `skipped_untouched` (the
+  // ripping bay) and `skipped_already_closed` bays, and "none are
+  // open" is the true answer there. Naming the rip first would
+  // blame it for a press that had nothing to do anyway — which is
+  // how the old wording read as "Close trays does not work during a
+  // rip" even after it started working.
   if (input.request.kind === "close_trays") {
-    const untouched = countOf(results, "skipped_untouched")
-
-    if (untouched.length > 0) {
-      return "Close trays skipped while a rip is active."
-    }
-
     const closable = countOf(
       results,
       "skipped_already_closed",
     )
 
-    return closable.length > 0
-      ? "No trays to close — none are open."
+    if (closable.length > 0) {
+      return "No trays to close — none are open."
+    }
+
+    const untouched = countOf(results, "skipped_untouched")
+
+    return untouched.length > 0
+      ? "No trays to close — every bay on the bus is ripping."
       : "No trays to close — no drives are on the bus."
   }
 
