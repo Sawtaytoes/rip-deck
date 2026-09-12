@@ -9,7 +9,7 @@ default instinct.
 
 | Date | Decision |
 | --- | --- |
-| 2026-09-11 | [Close trays closes the safe bays during a rip](2026-09-11-close-trays-closes-the-safe-bays-during-a-rip.md) — the tower-wide veto is REMOVED: a bulk Close now shuts every drawer Rip Deck opened while another bay rips, one motor at a time. The ripping bay's own drawer is still never commanded, and a targeted `close_bay` still refuses. Serial motion is now the only motor-load guard. **Supersedes** clause 1 of the 2026-08-29 safety decision and the 2026-09-08 quiet-skip decision in full. |
+| 2026-09-11 | [Close trays closes the safe bays during a rip](2026-09-11-close-trays-closes-the-safe-bays-during-a-rip.md) — the tower-wide veto is REMOVED: a bulk Close now shuts every drawer Rip Deck opened while another bay rips, one motor at a time. The ripping bay's own drawer is still never commanded, and a targeted `close_bay` still refuses. Serial motion is now the only motor-load guard. **Measured on the rack the same day**: four open-and-close cycles, 28 close commands to real motors while two rips ran, both rips survived, no USB reset or disconnect. **Supersedes** clause 1 of the 2026-08-29 safety decision and the 2026-09-08 quiet-skip decision in full. |
 | 2026-09-10 | [A kiosk row is one line, and its background is the progress](2026-09-10-a-kiosk-row-is-one-line-and-its-background-is-the-progress.md) |
 | 2026-09-10 | [The kiosk uses the fleet sans, not Arial](2026-09-10-the-kiosk-uses-the-fleet-sans-not-arial.md) |
 | 2026-09-08 | [A kiosk row is tinted by its state and headlines the rip name](2026-09-08-a-kiosk-row-is-tinted-by-its-state-and-headlines-the-rip-name.md) |
