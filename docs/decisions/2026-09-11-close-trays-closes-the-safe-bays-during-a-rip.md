@@ -60,16 +60,18 @@ answered the symptom he described rather than the thing he asked for.
   that is what ripping means. Clause 2 costs nothing and keeps the one motor
   command that could destroy written bytes off the bus.
 
-## Risk accepted
+## Risk accepted, then measured
 
-Residual risk is not zero. Serial closing during a live rip has not been proven
-on this hardware the way serial opening has. It is accepted because the owner
-asked for the behaviour four times, the hub reset is attributed to parallel
-motion, and the failure mode is recoverable: a lost rip costs a re-read, and
-Rip Deck keeps the partial output.
+This section was written before the behaviour had been exercised on the rack.
+It said the residual risk was not zero, because serial closing during a live rip
+had not been proven on this hardware the way serial opening had. It was accepted
+because the owner asked for the behaviour four times, the hub reset is
+attributed to parallel motion, and the failure mode is recoverable.
 
-If a hub reset is ever observed during a **serial** close, the repair is a
-settle delay between moves, not a restored tower-wide block.
+**It has since been measured, and the hub was untouched.** See the added
+evidence below. The stated repair if a reset is ever seen during a *serial*
+close is unchanged: a settle delay between moves, never a restored tower-wide
+block.
 
 ## Evidence
 
@@ -85,3 +87,39 @@ settle delay between moves, not a restored tower-wide block.
   recorded and no command at all for `/dev/sr1`.
 - `trayCommand.test.ts` asserts that a per-bay close decision for an idle opened
   bay is `{ action: "close" }` with no tower-wide input available to it.
+
+### Added 2026-09-11, after deployment: measured on the rack
+
+The owner had no discs loaded, so the during-a-rip path could not be reached by
+ripping something. He asked for it to be faked instead. A scratch harness ran
+the daemon **from source** with three things real and one fake:
+
+- **Real:** `decideTrayBayAction`, the watcher, `POST /api/tray`, the dashboard,
+  and the tray motors. `runTray` was the default one, pointed at the rip-deck
+  container's own `eject` through the documented command-vector hatch, so every
+  drawer really moved on the rack.
+- **Fake:** `probeDrives` returned the nine real drives with a disc in each, and
+  `runBayRip` never resolved for slots 4 and 7. Those two bays sat in `ripping`
+  for the life of the process, narrating progress so the dashboard rendered them.
+
+Result, with slots 4 and 7 ripping throughout:
+
+| Check | Result |
+| --- | --- |
+| Targeted `close_bay` on slot 4 | `Refused to close slot 4: still ripping.` |
+| `open_trays` | `Opened 7 drives: slots 1, 2, 3, 5, 6, 8 and 9.` |
+| Kernel `CDROM_DRIVE_STATUS` after open | 7 drives report `TRAY OPEN`; slots 4 and 7 shut |
+| `close_trays` | `Closed 7 drives: slots 1, 2, 3, 5, 6, 8 and 9.` |
+| Kernel `CDROM_DRIVE_STATUS` after close | all 9 shut |
+| `runTray` calls for the ripping drives | none |
+
+Four complete open-and-close cycles were run this way — **28 close commands to
+real motors while two rips were live**. Both rips survived, reaching 40.5
+percent. `dmesg` recorded **no USB reset and no disconnect** at any point after
+the tower powered on at 21:14:24; the last such events on the log predate the
+test entirely.
+
+That is the specific failure this decision removed a guard against, exercised
+four times on the hardware that produced it, with no recurrence. The tray state
+was read with the `CDROM_DRIVE_STATUS` ioctl rather than inferred from the
+daemon's own report, so the two sources are independent.
