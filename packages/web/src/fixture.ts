@@ -26,7 +26,13 @@ export const FIXTURE_NAMES = [
   "held-at-startup",
   "unmeasured",
   "usb-flap",
+  // ⚠️ The daemon also has `three-outcomes`, and this list has
+  // never carried it — so `?fake=three-outcomes` quietly shows
+  // the real rack. Left alone here rather than guessed at: the
+  // mock needs a scenario built to match, and inventing one
+  // would demonstrate a state the daemon does not produce.
   "showcase",
+  "data-disc",
 ] as const
 
 export type FixtureName = (typeof FIXTURE_NAMES)[number]

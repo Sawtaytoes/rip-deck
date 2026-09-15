@@ -314,7 +314,10 @@ describe("the disc-type fork", () => {
       }),
     ).toEqual({
       kind: "rip",
-      discType: "cd",
+      // `cd_rom`, not `cd` — the card, the kiosk row and the ARM
+      // `kind` all read this, and a data disc labelled "Audio
+      // CD" is what the first build of this branch produced.
+      discType: "cd_rom",
       ripper: "ddrescue",
       capacityBytes: SECTORS.audioCd * 512,
       hasDataTracks: true,

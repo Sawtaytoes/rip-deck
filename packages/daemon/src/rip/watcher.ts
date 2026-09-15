@@ -2015,7 +2015,7 @@ const ripDataDisc = async (context: {
   const folderName = buildDataImageFolderName({ title })
 
   input.note(`identified as "${folderName}"`)
-  input.onIdentified?.({ title, discType: "cd" })
+  input.onIdentified?.({ title, discType: "cd_rom" })
 
   const prepared = prepareDestination({
     rootPath: config.destinationRoot,

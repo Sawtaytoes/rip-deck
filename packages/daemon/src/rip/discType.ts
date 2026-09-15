@@ -522,7 +522,11 @@ export const decideDiscType = (input: {
 
     return {
       kind: "rip",
-      discType: "cd",
+      // `cd_rom`, not `cd`: this disc is not media, and the card,
+      // the kiosk row and the ARM `kind` all read this field. The
+      // first build of this branch said `cd` and the dashboard
+      // labelled a sound library "Audio CD".
+      discType: "cd_rom",
       ripper: "ddrescue",
       capacityBytes,
       // True by definition on this branch: it is reached only
