@@ -539,6 +539,7 @@ const readOutcome = (outcome: BayOutcome): BayOutcome => {
 const DISC_TYPES: readonly DiscType[] = [
   "none",
   "cd",
+  "cd_rom",
   "dvd",
   "bluray",
   "uhd",

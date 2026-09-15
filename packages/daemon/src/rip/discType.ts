@@ -12,6 +12,12 @@ import {
  * BD uses MakeMKV Backup mode." Requirement A3 pins cyanrip over
  * abcde; A1 pins `backup --decrypt` for everything else.
  *
+ * It is a three-way fork now. A CD is not one kind of disc: an
+ * AUDIO CD goes to cyanrip and a DATA CD-ROM goes to ddrescue
+ * (requirement A4), because neither of the other two tools can
+ * read one. That branch was a refusal until 2026-09-15
+ * ([decision](../../../docs/decisions/2026-09-15-a-data-disc-is-imaged-with-ddrescue-and-an-image-is-judged-by-its-mapfile.md)).
+ *
  * The hard part is not the fork, it is deciding which side of it
  * a disc is on WITHOUT guessing — because the two mistakes are
  * not symmetric. Handing a Blu-ray to cyanrip wastes a slot;
@@ -29,7 +35,9 @@ import {
  * from UHD BD perfectly well — the tiers are orders of magnitude
  * apart — but it cannot separate an **audio CD** from a **data
  * CD-ROM**, because they are the same size and the same shape.
- * That distinction is the whole cyanrip fork.
+ * That distinction is the whole CD fork, and it now picks
+ * between two different rippers rather than between a ripper
+ * and a refusal.
  *
  * So the authoritative source for the disc *family* is udev's
  * `cdrom_id`, which issues the SCSI `GET CONFIGURATION` and
@@ -74,7 +82,7 @@ import {
  * the tool, and conflating the two is what let a `mkv`-mode
  * success test fail a perfect `backup` (HANDOFF §2.3).
  */
-export type RipperKind = "makemkv" | "cyanrip"
+export type RipperKind = "makemkv" | "cyanrip" | "ddrescue"
 
 /** Largest a Red Book CD can be, rounded generously up. */
 const CD_CAPACITY_CEILING_BYTES = 1024 * 1024 * 1024
@@ -90,8 +98,6 @@ export type DiscAttentionReason =
    * hardware evidence behind it.
    */
   | "audio_cd_unconfirmed"
-  /** A data disc. ISO support is requirement A4, deferred. */
-  | "data_disc_deferred"
   /** Blank, recordable media. Nothing to rip; do not eject. */
   | "blank_media"
   /** udev and sysfs disagree about what is in the drive. */
@@ -497,11 +503,40 @@ export const decideDiscType = (input: {
   }
 
   if (media.family === "cd") {
-    // CD-sized, no audio tracks: a data CD-ROM. Requirement A4
-    // (data disc -> ISO) is explicitly deferred, so there is no
-    // ripper for this and pretending otherwise would produce
-    // either a silent no-op or a garbage rip.
-    return attention("data_disc_deferred", capacityBytes)
+    // CD-sized, no audio tracks: a data CD-ROM, and requirement
+    // A4's ripper. This branch used to be a refusal, because
+    // neither of the other two tools can read one — MakeMKV
+    // does not handle data discs and cyanrip rips audio tracks
+    // this disc does not have.
+    //
+    // The capacity guard is the same backstop the audio branch
+    // carries, and it is needed for the same reason: udev
+    // saying "cd" about a multi-gigabyte disc means the record
+    // describes a disc that is no longer in the tray.
+    if (capacityBytes >= CD_CAPACITY_CEILING_BYTES) {
+      return attention(
+        "conflicting_evidence",
+        capacityBytes,
+      )
+    }
+
+    return {
+      kind: "rip",
+      // `cd_rom`, not `cd`: this disc is not media, and the card,
+      // the kiosk row and the ARM `kind` all read this field. The
+      // first build of this branch said `cd` and the dashboard
+      // labelled a sound library "Audio CD".
+      discType: "cd_rom",
+      ripper: "ddrescue",
+      capacityBytes,
+      // True by definition on this branch: it is reached only
+      // when udev counted zero audio tracks on a CD, which
+      // leaves data. Carried anyway rather than hard-coded at
+      // the call site, so a card reading the field never has to
+      // know which branch produced it.
+      hasDataTracks: true,
+      volumeLabel,
+    }
   }
 
   if (media.family === "dvd" || media.family === "bd") {
@@ -560,10 +595,14 @@ const decideFromCapacityAlone = (input: {
   }
 
   if (discType === "cd") {
-    // Capacity cannot tell an album from a driver CD, and
-    // guessing "album" would hand a data disc to a tool that
-    // rips audio tracks it does not have. One click from the
-    // owner beats a wrong rip.
+    // Capacity cannot tell an album from a driver CD, and both
+    // now have a ripper — so this refusal is no longer "there
+    // is nothing to do with a data disc", it is "two tools are
+    // available and nothing here can say which one is right".
+    // Guessing wrong in either direction produces output: a
+    // silent no-op from cyanrip on a data disc, or a raw image
+    // of an album nobody can play. One click from the owner
+    // beats both.
     return attention(
       "audio_cd_unconfirmed",
       input.capacityBytes,

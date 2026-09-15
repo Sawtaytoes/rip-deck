@@ -293,6 +293,26 @@ RUN makemkvcon -r --cache=1 info disc:9999 \
 # supplies — the two rippers share this filesystem and nothing
 # else.
 #
+# `gddrescue` is the data-CD third of that same fork (plan A4:
+# a data disc becomes a raw image plus a mapfile). Neither of the
+# other two rippers can read one — MakeMKV does not handle data
+# discs, and cyanrip rips audio tracks a data disc does not have.
+#
+# ⚠️ **The package is `gddrescue` and the binary is `ddrescue`.**
+# There is no package called `ddrescue` in trixie, so the line an
+# author writes by reflex fails this build outright. Checked
+# against the archive on 2026-09-15.
+#
+# Deliberately UNPINNED for the same reason as cyanrip: Debian
+# main, so the base tag pins it. `node:26-trixie-slim` gives GNU
+# ddrescue 1.29-1 today.
+#
+# Provenance (workspace J6): GNU ddrescue is by **Antonio Diaz
+# Diaz**, part of the GNU project, GPLv2+, whose `--version`
+# prints `Copyright (C) 2025 Antonio Diaz Diaz`. It has no
+# dependencies beyond libc and libstdc++, so there is no chain to
+# audit past it.
+#
 # Pinned, per the workspace's version-soak rule. Check
 # https://download.docker.com/linux/static/stable/ before moving
 # it.
@@ -301,9 +321,10 @@ ARG DOCKER_CLI_VERSION=27.5.1
 RUN set -eux; \
   apt-get update; \
   apt-get install -y --no-install-recommends \
-    ca-certificates curl cyanrip eject procps; \
+    ca-certificates curl cyanrip eject gddrescue procps; \
   rm -rf /var/lib/apt/lists/*; \
   cyanrip -V; \
+  ddrescue --version; \
   case "$(dpkg --print-architecture)" in \
     amd64) dockerArch=x86_64 ;; \
     arm64) dockerArch=aarch64 ;; \

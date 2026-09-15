@@ -9,6 +9,9 @@ import { join } from "node:path"
 import { afterAll, describe, expect, it } from "vitest"
 import {
   applyOutputOwnership,
+  buildDataImageFileName,
+  buildDataImageFolderName,
+  buildDataImagePaths,
   buildFolderName,
   createOutputOwnership,
   DEFAULT_OUTPUT_GID,
@@ -595,5 +598,59 @@ describe("finalising a DVD, which is one ISO file", () => {
     })
 
     expect(finalised.ownershipError).toBeNull()
+  })
+})
+
+describe("naming a data-disc image (A4)", () => {
+  it("marks the folder [DATA], not [BACKUP]", () => {
+    // Two different chores. `[BACKUP]` means a video disc
+    // structure whose titles still have to be pulled out in
+    // MakeMKV; a data image is finished work that simply is not
+    // media.
+    expect(
+      buildDataImageFolderName({
+        title: "PROTEUS SOUND LIBRARY 1",
+      }),
+    ).toBe("[DATA] PROTEUS SOUND LIBRARY 1")
+  })
+
+  it("gives the image an .iso extension", () => {
+    // ⚠️ Even when the disc holds no ISO 9660 filesystem. It is
+    // wrong as a description and right as an extension: it is
+    // what every loop-mounter and Windows expect on a raw
+    // optical image, and `.bin` would be actively misleading —
+    // that means 2352-byte raw sectors with a cue sheet.
+    expect(
+      buildDataImageFileName({ title: "EMU Vintage Keys" }),
+    ).toBe("EMU Vintage Keys.iso")
+  })
+
+  it("strips what SMB would choke on, in both names", () => {
+    expect(
+      buildDataImageFolderName({
+        title: 'Bank: "A" / B',
+      }),
+    ).toBe("[DATA] Bank A B")
+
+    expect(
+      buildDataImageFileName({ title: 'Bank: "A" / B' }),
+    ).toBe("Bank A B.iso")
+  })
+
+  it("puts the mapfile beside the image, never elsewhere", () => {
+    // The two are worthless apart: the mapfile is what says
+    // which sectors are actually in the image.
+    expect(
+      buildDataImagePaths({
+        incompletePath:
+          "/media/Disc-Rips/.rip-deck-incomplete-a",
+        title: "Vintage Keys",
+      }),
+    ).toEqual({
+      imagePath:
+        "/media/Disc-Rips/.rip-deck-incomplete-a/Vintage Keys.iso",
+      mapfilePath:
+        "/media/Disc-Rips/.rip-deck-incomplete-a/Vintage Keys.iso.map",
+    })
   })
 })

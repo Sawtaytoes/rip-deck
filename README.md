@@ -12,7 +12,8 @@ Rip Deck is a concurrent optical-disc ripper for a multi-drive USB Blu-ray, DVD,
 - Separate `pass`, `warning`, and `fail` outcomes.
 - Health signals from kernel counters and measured throughput.
 - Optional MQTT discovery, commands, and announcements.
-- Blu-ray and DVD backups through MakeMKV, plus CD ripping through cyanrip.
+- Blu-ray and DVD backups through MakeMKV, audio CDs through cyanrip, and data
+  CD-ROMs imaged with GNU ddrescue.
 
 ## Quick start
 

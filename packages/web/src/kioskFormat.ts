@@ -58,13 +58,15 @@ export const kioskBaySummary = (bay: BayView) => {
   const type =
     state.disctype === "cd"
       ? "CD"
-      : state.disctype === "bluray"
-        ? "Blu-ray"
-        : state.disctype === "dvd"
-          ? "DVD"
-          : state.disctype === "uhd"
-            ? "UHD"
-            : (state.disctype ?? "")
+      : state.disctype === "cd_rom"
+        ? "Data CD"
+        : state.disctype === "bluray"
+          ? "Blu-ray"
+          : state.disctype === "dvd"
+            ? "DVD"
+            : state.disctype === "uhd"
+              ? "UHD"
+              : (state.disctype ?? "")
   const eta =
     isActive &&
     state.eta_seconds !== null &&

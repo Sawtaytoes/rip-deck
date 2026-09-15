@@ -17,6 +17,7 @@ import {
   parseBayLedger,
 } from "./bayLedger.ts"
 import type { CyanripCommand } from "./cyanripCommand.ts"
+import type { DdrescueCommand } from "./ddrescueCommand.ts"
 import { createGovernor } from "./governor.ts"
 import type { MakemkvCommand } from "./ripCommand.ts"
 import {
@@ -585,6 +586,11 @@ const noopConfig: WatcherConfig = {
     prefixArgs: [],
     wrapperArgs: null,
   } satisfies CyanripCommand,
+  ddrescue: {
+    command: "true",
+    prefixArgs: [],
+    wrapperArgs: null,
+  } satisfies DdrescueCommand,
   eject: { command: "true", prefixArgs: [] },
   isolation: null,
   ripCacheMb: 1024,

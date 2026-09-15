@@ -40,6 +40,15 @@ describe("readFixtureName", () => {
     // `packages/daemon/src/api/fixtures.ts`. Spelled out here
     // rather than derived so that adding a scenario on one side
     // and not the other is a red test.
+    //
+    // ⚠️ It only catches the half of that it can see. A literal
+    // list is red when THIS list changes, and silent when the
+    // daemon's does — which is how `three-outcomes` came to
+    // exist on the daemon and nowhere here, so
+    // `?fake=three-outcomes` quietly shows the real rack. It is
+    // deliberately still absent below: the browser mock needs a
+    // scenario built to match, and inventing one would
+    // demonstrate a state the daemon does not produce.
     expect([...FIXTURE_NAMES]).toEqual([
       "empty",
       "nine-rips",
@@ -52,6 +61,7 @@ describe("readFixtureName", () => {
       "unmeasured",
       "usb-flap",
       "showcase",
+      "data-disc",
     ])
     expect(isFixtureName("verdicts")).toBe(true)
     expect(isFixtureName("Verdicts")).toBe(false)

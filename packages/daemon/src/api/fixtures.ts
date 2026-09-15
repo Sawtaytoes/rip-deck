@@ -80,6 +80,15 @@ const buildFixtureJob = (input: {
    * a poster would be testing a rack that does not exist.
    */
   isAdopted?: boolean
+  /**
+   * Where this rip landed, when the derived path is wrong.
+   *
+   * A data-disc image publishes a `[DATA] <title>` directory
+   * rather than the bare title, and a card that showed the
+   * derived path would be demonstrating a layout this build
+   * does not produce.
+   */
+  destinationPath?: string
 }): Job => {
   const {
     slot,
@@ -95,6 +104,7 @@ const buildFixtureJob = (input: {
     warnings = [],
     elapsedMs = 8 * 60_000,
     isAdopted = false,
+    destinationPath = null,
   } = input
 
   return {
@@ -151,9 +161,11 @@ const buildFixtureJob = (input: {
     // Set for an adopted bay too, like `towerFeed.buildJob`:
     // the ledger records where the previous daemon's rip
     // landed, folder marker and all.
-    destinationPath: isAdopted
-      ? `/media/Disc-Rips/[BACKUP] ${title}`
-      : `/media/Disc-Rips/${title}`,
+    destinationPath:
+      destinationPath ??
+      (isAdopted
+        ? `/media/Disc-Rips/[BACKUP] ${title}`
+        : `/media/Disc-Rips/${title}`),
     readErrorCount,
     warnings,
     isAdopted,
@@ -850,6 +862,104 @@ const buildThreeOutcomes = (nowMs: number): TowerSnapshot =>
     ],
   })
 
+/**
+ * The three states a DATA CD-ROM leaves a bay in (A4).
+ *
+ * Added with the ddrescue path itself, because none of the
+ * twelve fixtures before it could show one: on every earlier
+ * build a data disc produced exactly one card — a refusal —
+ * and there was nothing else to look at.
+ *
+ * The three bays are the three outcomes that path can reach:
+ *
+ *  1. **Imaging.** `Imaging the disc` rather than
+ *     `Backing up disc`, and no `n of m` file counter: a raw
+ *     image is one file. Progress is the image's own length, so
+ *     it stops climbing during ddrescue's trim and scrape
+ *     phases while the rip is still running.
+ *  2. **Finished, with no ISO 9660 filesystem.** ⚠️ The line
+ *     that looks like a fault and is not. A sampler library
+ *     disc carries the sampler's own on-disc format, so the
+ *     absence is normal and the success sentence says so.
+ *  3. **Held for a name.** The common state for that same kind
+ *     of disc: no filesystem means no volume label, and
+ *     `makemkvcon` cannot read a data disc, so there is nobody
+ *     left to ask but the operator.
+ */
+const buildDataDiscs = (nowMs: number): TowerSnapshot =>
+  createTowerSnapshot({
+    isMqttEnabled: true,
+    bays: [
+      buildFixtureBay({
+        slot: 1,
+        job: buildFixtureJob({
+          slot: 1,
+          nowMs,
+          title: "Proteus Sound Library Vol 1",
+          discType: "cd_rom",
+          destinationPath:
+            "/media/Disc-Rips/[DATA] Proteus Sound Library Vol 1",
+          progress: {
+            totalFraction: 0.61,
+            currentFraction: 0.61,
+            totalLabel: "Imaging the disc",
+            currentLabel: null,
+            fileIndex: null,
+            fileCount: null,
+            bytesWritten: 403_701_760,
+            throughputBytesPerSec: 6 * 1024 * 1024,
+            etaSeconds: 41,
+            etaTrend: null,
+          },
+        }),
+      }),
+      buildFixtureBay({
+        slot: 2,
+        job: buildFixtureJob({
+          slot: 2,
+          nowMs,
+          state: "completed",
+          title: "Vintage Keys Sample Disc",
+          discType: "cd_rom",
+          destinationPath:
+            "/media/Disc-Rips/[DATA] Vintage Keys Sample Disc",
+          progress: {
+            totalFraction: 1,
+            // ⚠️ The defaults here are MakeMKV's, and a data rip
+            // copies one file. Left alone, a finished sound
+            // library would read "Saving file 3 of 78".
+            totalLabel: "Imaging the disc",
+            currentLabel: null,
+            throughputBytesPerSec: null,
+            etaSeconds: null,
+            etaTrend: null,
+          },
+        }),
+      }),
+      buildFixtureBay({
+        slot: 3,
+        job: buildFixtureJob({
+          slot: 3,
+          nowMs,
+          state: "needs_attention",
+          title: "Unnamed data disc",
+          discType: "cd_rom",
+          verdictKind: "unknown",
+          confidence: "suspected",
+          evidence: [
+            "this data disc carries no volume label, and " +
+              "nothing can read a name off it — makemkvcon " +
+              "does not handle data discs. Common on a sampler " +
+              "or console disc, which has no ISO 9660 " +
+              "filesystem to hold a label. Type its name on " +
+              "this card and press Rip.",
+          ],
+        }),
+      }),
+      ...buildIdleBays([4, 5, 6, 7, 8, 9]),
+    ],
+  })
+
 export const FIXTURE_NAMES = [
   "empty",
   "nine-rips",
@@ -863,6 +973,7 @@ export const FIXTURE_NAMES = [
   "usb-flap",
   "three-outcomes",
   "showcase",
+  "data-disc",
 ] as const
 
 export type FixtureName = (typeof FIXTURE_NAMES)[number]
@@ -903,5 +1014,7 @@ export const createFixtureSnapshot = (input: {
       return buildThreeOutcomes(nowMs)
     case "showcase":
       return buildShowcase(nowMs)
+    case "data-disc":
+      return buildDataDiscs(nowMs)
   }
 }

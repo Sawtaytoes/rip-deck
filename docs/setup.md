@@ -81,6 +81,7 @@ See [Drive and tower hardware](hardware.md) and the [drive identity decision](de
 | `RIP_DECK_RIP_CACHE_MB` | `1024` | Independent MakeMKV cache for each video rip, in MiB. |
 | `RIP_DECK_MAX_CONCURRENT_RIPS` | configured default | Optional concurrency limit. The normal watcher supports all configured drives. |
 | `RIP_DECK_API_PORT` | `3007` | Dashboard and API port. |
+| `RIP_DECK_DDRESCUE` | `ddrescue` | How to reach GNU ddrescue, which images data CD-ROMs. Set it only to run ddrescue somewhere else, such as `docker exec <name> ddrescue`. |
 
 The isolation image must see the same destination and MakeMKV configuration paths as the daemon.
 

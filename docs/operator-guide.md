@@ -14,6 +14,28 @@ A finished rip has three operator outcomes:
 
 A warning is not downgraded to a pass and is not promoted to a failure when a verified copy exists. See the [read-error decision](decisions/2026-08-27-a-read-error-on-a-verified-backup-is-a-warning-not-a-failure.md).
 
+## Rip a data CD-ROM
+
+Rip Deck reads a data CD-ROM with GNU ddrescue and publishes a folder named
+`[DATA] <title>`. The folder holds the raw image and ddrescue's mapfile.
+
+Three operator points:
+
+1. **A data disc usually needs you to type its name.** Rip Deck reads a name
+   from the disc's volume label when there is one. Many data CD-ROMs — sampler
+   libraries especially — carry no filesystem and therefore no label, and
+   nothing else can read a name off one. The card asks. Type the name from the
+   sleeve and press Rip.
+2. **Keep the mapfile.** It records every sector the drive could not read. A
+   later ddrescue run resumes from it and tries only those sectors again.
+   Deleting it makes a partial image unrepairable.
+3. **"No ISO 9660 filesystem" on a success line is normal.** Many data discs
+   hold no filesystem. The image is still complete. The line that reports
+   completeness is the sector count, not the filesystem.
+
+A disc that carries **both** audio tracks and a data session is ripped as an
+audio CD, and its data session is not imaged. The bay card says so.
+
 ## Control a rip
 
 The dashboard can cancel a running rip. Cancellation waits for that job to stop before it opens only the matching tray.

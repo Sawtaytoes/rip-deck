@@ -234,9 +234,16 @@ const bayDriveId = (slot: number): string =>
 const devPathOf = (slot: number): string =>
   `/dev/sr${9 - slot}`
 
-/** `armView.toArmKind` — `cd` is ARM's `music`; `uhd` stays. */
-const toArmKind = (discType: DiscType): string =>
-  discType === "cd" ? "music" : discType
+/**
+ * `armView.toArmKind` — `cd` is ARM's `music`, `cd_rom` is
+ * `data`, and `uhd` stays as it is.
+ */
+const toArmKind = (discType: DiscType): string => {
+  if (discType === "cd") return "music"
+  if (discType === "cd_rom") return "data"
+
+  return discType
+}
 
 /** `armView.toArmStatus`. */
 const toArmStatus = (state: JobState): string => {
@@ -263,6 +270,8 @@ const discTypeLabelOf = (
   discType: DiscType,
 ): string | null => {
   switch (discType) {
+    case "cd_rom":
+      return "Data CD"
     case "dvd":
       return "DVD"
     case "bluray":
@@ -291,6 +300,7 @@ const discSectorsOf = (discType: DiscType): number => {
     case "dvd":
       return 9_200_000
     case "cd":
+    case "cd_rom":
       return 1_400_000
     default:
       return 48_000_000
@@ -1241,6 +1251,74 @@ const buildUnmeasured = (): RipDeckState =>
     ],
   })
 
+/**
+ * The three states a data CD-ROM leaves a bay in (A4).
+ *
+ * Mirrors `buildDataDiscs` in
+ * `packages/daemon/src/api/fixtures.ts`. Imaging, finished with
+ * no ISO 9660 filesystem, and held because the disc carries no
+ * name anything can read.
+ */
+const buildDataDiscs = (): RipDeckState =>
+  buildState({
+    fixture: "data-disc",
+    bays: [
+      {
+        slot: 1,
+        job: {
+          state: "ripping",
+          title: "Proteus Sound Library Vol 1",
+          discType: "cd_rom",
+          totalFraction: 0.61,
+          // One raw image, so there is no `n of m` counter to
+          // show — and the stage is the disc, not a file.
+          totalLabel: "Imaging the disc",
+          currentLabel: null,
+          throughputBytesPerSec: 6 * 1024 * 1024,
+          etaSeconds: 41,
+          etaTrend: null,
+        },
+      },
+      {
+        slot: 2,
+        job: {
+          state: "completed",
+          title: "Vintage Keys Sample Disc",
+          discType: "cd_rom",
+          totalFraction: 1,
+          // ⚠️ Both nulled deliberately. The defaults are
+          // MakeMKV's — "Saving file 3 of 78" — and a data rip
+          // copies one file, so leaving them would put a stage
+          // this path never reaches on the card.
+          totalLabel: "Imaging the disc",
+          currentLabel: null,
+          throughputBytesPerSec: null,
+          etaSeconds: null,
+          etaTrend: null,
+        },
+      },
+      {
+        slot: 3,
+        job: {
+          state: "needs_attention",
+          title: "Unnamed data disc",
+          discType: "cd_rom",
+          verdictKind: "unknown",
+          confidence: "suspected",
+          evidence: [
+            "this data disc carries no volume label, and " +
+              "nothing can read a name off it — makemkvcon " +
+              "does not handle data discs. Common on a sampler " +
+              "or console disc, which has no ISO 9660 " +
+              "filesystem to hold a label. Type its name on " +
+              "this card and press Rip.",
+          ],
+        },
+      },
+      ...idleBays([4, 5, 6, 7, 8, 9]),
+    ],
+  })
+
 export const createFixtureState = (
   fixture: FixtureName,
 ): RipDeckState => {
@@ -1267,6 +1345,8 @@ export const createFixtureState = (
       return buildUsbFlap()
     case "showcase":
       return buildShowcase()
+    case "data-disc":
+      return buildDataDiscs()
   }
 }
 

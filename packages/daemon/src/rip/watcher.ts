@@ -62,11 +62,22 @@ import {
   resolveCyanripCommand,
 } from "./cyanripCommand.ts"
 import {
+  buildDdrescueInvocation,
+  buildDdrescueKillArgs,
+  DATA_DISC_SECTOR_BYTES,
+  type DdrescueCommand,
+  resolveDdrescueCommand,
+} from "./ddrescueCommand.ts"
+import {
   applyOutputOwnership,
+  buildDataImageFolderName,
+  buildDataImagePaths,
   buildFolderName,
   checkFreeSpace,
   createOutputOwnership,
+  finaliseDestination,
   incompleteDirName,
+  prepareDestination,
 } from "./destination.ts"
 import { enumerateDrives } from "./discIndex.ts"
 import {
@@ -136,6 +147,7 @@ import {
   type UsbStability,
   type UsbTransition,
 } from "./usbStability.ts"
+import { verifyDiscImage } from "./verifyDiscImage.ts"
 
 /**
  * The watcher — insert a disc, get a rip.
@@ -1051,6 +1063,7 @@ export type WatcherConfig = {
   registryPath: string
   makemkv: MakemkvCommand
   cyanrip: CyanripCommand
+  ddrescue: DdrescueCommand
   /**
    * How to move a tray. Operator commands only — see `tray.ts`.
    */
@@ -1072,6 +1085,7 @@ export const createWatcherConfig = (
     env.RIP_DECK_DRIVES_CONFIG ?? "config/drives.json",
   makemkv: resolveMakemkvCommand(env.RIP_DECK_MAKEMKVCON),
   cyanrip: resolveCyanripCommand(env.RIP_DECK_CYANRIP),
+  ddrescue: resolveDdrescueCommand(env.RIP_DECK_DDRESCUE),
   eject: resolveEjectCommand(env.RIP_DECK_EJECT),
   isolation: resolveRipIsolation(env),
   ripCacheMb: resolveRipCacheMb(env.RIP_DECK_RIP_CACHE_MB),
@@ -1157,14 +1171,11 @@ export const describeAttentionReason = (
   switch (reason) {
     case "audio_cd_unconfirmed":
       return (
-        "CD-sized, but nothing confirmed it carries audio " +
-        "tracks — udev's database was unreadable, and " +
-        "cyanrip is never chosen on capacity alone."
-      )
-    case "data_disc_deferred":
-      return (
-        "A data CD-ROM. Ripping data discs to ISO is not " +
-        "built yet (A4), so there is no ripper for this."
+        "CD-sized, but udev's database was unreadable, so " +
+        "nothing can say whether this is an audio CD or a " +
+        "data CD-ROM. Those take different rippers and " +
+        "capacity alone cannot choose. Type its name on this " +
+        "card and press Rip."
       )
     case "blank_media":
       return "Blank recordable media. Nothing to rip."
@@ -1247,9 +1258,16 @@ export const runBayRip = async (
   )
 
   if (typed.hasDataTracks && typed.ripper === "cyanrip") {
+    // ⚠️ The mixed-mode gap, stated rather than hidden. A disc
+    // carrying BOTH audio tracks and a data session goes to
+    // cyanrip whole, so the data half is not imaged even now
+    // that a data ripper exists. Ripping one disc with two
+    // tools in sequence is a change this one deliberately did
+    // not make; naming it is how it stays visible.
     input.note(
       "this disc also carries a data session; cyanrip rips " +
-        "the audio tracks and leaves that behind.",
+        "the audio tracks and leaves that behind. Imaging the " +
+        "data half of a mixed disc is not built.",
     )
   }
 
@@ -1269,17 +1287,28 @@ export const runBayRip = async (
     )
   }
 
-  return typed.ripper === "cyanrip"
-    ? await ripAudioCd({
+  switch (typed.ripper) {
+    case "cyanrip":
+      return await ripAudioCd({
         input,
         capacityBytes: typed.capacityBytes,
       })
-    : await ripWithMakemkv({
+
+    case "ddrescue":
+      return await ripDataDisc({
+        input,
+        capacityBytes: typed.capacityBytes,
+        volumeLabel: typed.volumeLabel,
+      })
+
+    case "makemkv":
+      return await ripWithMakemkv({
         input,
         discType: typed.discType,
         capacityBytes: typed.capacityBytes,
         volumeLabel: typed.volumeLabel,
       })
+  }
 }
 
 /**
@@ -1895,6 +1924,394 @@ const publishAlbum = async (input: {
         ? ""
         : ` — WRONG OWNER: ${ownershipError}. Plex cannot ` +
           `read it until you chown it.`),
+  }
+}
+
+/**
+ * The data-disc path: ddrescue to a raw image (requirement A4).
+ *
+ * ⚠️ **Nothing here has ever met a disc.** Same standing as the
+ * cyanrip path on the day it was written, and the same warning
+ * applies: the first real data CD should be expected to correct
+ * some of it. What it does have is a binary whose every flag was
+ * read out of `ddrescue --help` rather than out of a web page —
+ * see `ddrescueCommand.ts`.
+ *
+ * ## Three things it does differently from the other two paths
+ *
+ *  1. **The exit code does not decide the outcome.**
+ *     `verifyDiscImage` does, from ddrescue's mapfile. A
+ *     non-zero exit on a complete image is a warning — it is
+ *     what the `--timeout` guard produces after the last
+ *     handful of sectors were already recovered — and a ZERO
+ *     exit proves nothing at all, which is the assumption this
+ *     repository exists because of.
+ *  2. **There is no identify step.** `makemkvcon` cannot read a
+ *     data disc, so the two name sources are the operator and
+ *     udev's volume label, and a disc with neither is held
+ *     rather than named. That is B3 unchanged, and it is not a
+ *     rare path: a sampler library with no ISO 9660 filesystem
+ *     has no volume label to read, so those discs always want a
+ *     name typed on the card.
+ *  3. **It publishes a DIRECTORY holding two files.** The image
+ *     is worth little without the mapfile that says which
+ *     sectors are in it, so they travel together —
+ *     `finaliseDestination` moves the whole incomplete
+ *     directory, which also gets the collision, ownership and
+ *     EXDEV rules for free.
+ */
+const ripDataDisc = async (context: {
+  input: BayRipInput
+  capacityBytes: number
+  /** The disc's volume label as udev recorded it, or null. */
+  volumeLabel: string | null
+}): Promise<BayOutcome> => {
+  const { input } = context
+  const { config } = input
+
+  const space = await checkFreeSpace({
+    rootPath: config.destinationRoot,
+    discBytes: context.capacityBytes,
+  })
+
+  if (!space.hasEnoughSpace) {
+    return {
+      kind: "failed",
+      detail: "not enough free space; refusing to start",
+    }
+  }
+
+  const nameSource = chooseDiscNameSource({
+    explicitName: input.explicitName ?? null,
+    volumeLabel: context.volumeLabel,
+  })
+
+  if (nameSource.kind === "identify") {
+    // The one branch `ripWithMakemkv` answers with a drive read
+    // and this one cannot: `makemkvcon` does not handle data
+    // discs at all, so there is no third source to fall back
+    // to. Refusing beats inventing (B3) — a disc filed under a
+    // made-up name is a disc nobody finds again.
+    return {
+      kind: "needs_attention",
+      detail:
+        "this data disc carries no volume label, and nothing " +
+        "can read a name off it — makemkvcon does not handle " +
+        "data discs. Common on a sampler or console disc, " +
+        "which has no ISO 9660 filesystem to hold a label. " +
+        "Type its name on this card and press Rip.",
+    }
+  }
+
+  const title = nameSource.discName
+
+  if (nameSource.kind === "volume_label") {
+    input.note(
+      `named "${title}" from the disc's own volume label — ` +
+        "no drive read needed",
+    )
+  }
+
+  const folderName = buildDataImageFolderName({ title })
+
+  input.note(`identified as "${folderName}"`)
+  input.onIdentified?.({ title, discType: "cd_rom" })
+
+  const prepared = prepareDestination({
+    rootPath: config.destinationRoot,
+    folderName,
+    jobUuid: input.jobUuid,
+  })
+
+  // ⚠️ CREATED here, unlike the makemkv path. `makemkvcon`
+  // refuses a destination that already exists (MSG:5068) and
+  // creates its own; ddrescue does the opposite and will not
+  // create a directory for its output file. The two disagree on
+  // purpose — do not "consolidate" them.
+  await mkdir(prepared.incompletePath, { recursive: true })
+
+  const { imagePath, mapfilePath } = buildDataImagePaths({
+    incompletePath: prepared.incompletePath,
+    title,
+  })
+
+  const invocation = buildDdrescueInvocation({
+    ddrescue: config.ddrescue,
+    rip: {
+      devPath: input.devPath,
+      imagePath,
+      mapfilePath,
+    },
+  })
+
+  input.onRipStarted()
+  input.note(
+    "imaging with ddrescue (never verified on this rig)",
+  )
+
+  const stopProgress = startImageProgress({
+    imagePath,
+    discBytes: context.capacityBytes,
+    onProgress: input.onProgress,
+  })
+
+  const spawned = await spawnDdrescue({
+    invocation,
+    ddrescue: config.ddrescue,
+    devPath: input.devPath,
+    signal: input.signal,
+  }).finally(stopProgress)
+
+  const verification = await verifyDiscImage({
+    imagePath,
+    mapfilePath,
+    discBytes: context.capacityBytes,
+  })
+
+  const warnings = [...verification.warnings]
+
+  if (spawned.exitCode !== 0) {
+    warnings.push(
+      `ddrescue exited ${String(spawned.exitCode)}` +
+        (spawned.stderrTail === ""
+          ? "."
+          : `: ${spawned.stderrTail}`),
+    )
+  }
+
+  if (!verification.isVerified) {
+    return {
+      kind: "failed",
+      // The two ways this fails are genuinely different faults
+      // and the card should not flatten them: sectors the drive
+      // could not read is a DISC problem, and an image or
+      // mapfile that never appeared is a deployment one.
+      failureReason:
+        verification.unrecoveredBytes !== null &&
+        verification.unrecoveredBytes > 0
+          ? "read_errors"
+          : "empty_output",
+      detail:
+        `${verification.reason}. Partial output KEPT at ` +
+        prepared.incompletePath,
+      warnings,
+      // Every unrecovered sector is a read error, and reporting
+      // zero here on a disc the drive could not read would put
+      // a clean number beside a failure sentence.
+      readErrorCount: countUnrecoveredSectors(
+        verification.unrecoveredBytes,
+      ),
+    }
+  }
+
+  const finalised = await finaliseDestination(prepared)
+
+  input.onDestination?.(finalised.path)
+
+  return {
+    kind:
+      warnings.length === 0
+        ? "completed"
+        : "completed_with_warnings",
+    detail:
+      `${finalised.path} — ${verification.reason}` +
+      (finalised.hasCollision
+        ? " (landed beside an existing folder of the same " +
+          "name — decide which copy to keep)"
+        : "") +
+      (finalised.ownershipError === null
+        ? ""
+        : ` — ${finalised.ownershipError}`),
+    warnings,
+    readErrorCount: countUnrecoveredSectors(
+      verification.unrecoveredBytes,
+    ),
+  }
+}
+
+/** Unrecovered bytes as the sector count a person acts on. */
+const countUnrecoveredSectors = (
+  unrecoveredBytes: number | null,
+): number =>
+  unrecoveredBytes === null || unrecoveredBytes <= 0
+    ? 0
+    : Math.ceil(unrecoveredBytes / DATA_DISC_SECTOR_BYTES)
+
+/** How often the image is measured while ddrescue runs. */
+const IMAGE_PROGRESS_INTERVAL_MS = 2_000
+
+/**
+ * Report progress by MEASURING THE IMAGE, not by parsing output.
+ *
+ * ddrescue's status display is a redrawn block of text meant for
+ * a person watching a terminal — rates with unit suffixes, a
+ * moving cursor, fields that differ between versions. The length
+ * of the output file is a fact the kernel reports, costs one
+ * `stat`, and cannot be mis-parsed.
+ *
+ * ⚠️ **It stops climbing before the rip is finished, and that is
+ * correct.** ddrescue copies, then trims, then scrapes, and only
+ * the first of those three extends the file. On a clean disc the
+ * later phases have nothing to do and the rip ends at once; on a
+ * damaged one the bar sits near its top while the drive works
+ * through the bad areas. Do not "fix" this by preallocating the
+ * image — the outcome is decided by the image's length, so a
+ * preallocated file would verify a dead rip as complete.
+ */
+const startImageProgress = (input: {
+  imagePath: string
+  discBytes: number
+  onProgress?: (progress: JobProgress) => void
+}): (() => void) => {
+  const { onProgress } = input
+
+  if (onProgress === undefined) return () => {}
+
+  let previousBytes = 0
+  let previousAtMs = Date.now()
+
+  const timer = setInterval(() => {
+    void stat(input.imagePath)
+      .then((info) => {
+        const nowMs = Date.now()
+        const elapsedSeconds = (nowMs - previousAtMs) / 1000
+        const gainedBytes = info.size - previousBytes
+
+        previousBytes = info.size
+        previousAtMs = nowMs
+
+        const throughputBytesPerSec =
+          elapsedSeconds <= 0 || gainedBytes <= 0
+            ? null
+            : gainedBytes / elapsedSeconds
+
+        const fraction =
+          input.discBytes <= 0
+            ? 0
+            : Math.min(info.size / input.discBytes, 1)
+
+        onProgress({
+          totalFraction: fraction,
+          currentFraction: fraction,
+          totalLabel: "Imaging the disc",
+          currentLabel: null,
+          fileIndex: null,
+          fileCount: null,
+          bytesWritten: info.size,
+          throughputBytesPerSec,
+          etaSeconds:
+            throughputBytesPerSec === null
+              ? null
+              : Math.max(input.discBytes - info.size, 0) /
+                throughputBytesPerSec,
+          // Never claimed. An ETA trend is only meaningful over
+          // a window, and the two later ddrescue phases stop
+          // the file growing entirely — so every damaged disc
+          // would report a "rising" ETA that means nothing.
+          etaTrend: null,
+        })
+      })
+      .catch(() => {
+        // The image is not there yet, or it went away with the
+        // job. Neither is worth a log line every two seconds.
+      })
+  }, IMAGE_PROGRESS_INTERVAL_MS)
+
+  timer.unref()
+
+  return () => {
+    clearInterval(timer)
+  }
+}
+
+export type DdrescueRun = {
+  exitCode: number | null
+  /** The tail of stderr, for the failure sentence. */
+  stderrTail: string
+}
+
+/** How much of ddrescue's stderr is kept for the card. */
+const STDERR_TAIL_LIMIT = 500
+
+/** Run ddrescue, and make sure a cancel actually lands (E5). */
+const spawnDdrescue = async (input: {
+  invocation: {
+    command: string
+    args: string[]
+  }
+  ddrescue: DdrescueCommand
+  devPath: string
+  signal: AbortSignal
+}): Promise<DdrescueRun> => {
+  const child = spawn(
+    input.invocation.command,
+    input.invocation.args,
+    {
+      // stdout ignored and stderr KEPT. ddrescue says why it
+      // gave up on stderr — a device that cannot be opened, a
+      // full pool, an unreadable mapfile — and that sentence is
+      // the difference between a disc fault and a deployment
+      // fault. stdin is closed, matching `ripJob`: a ripper that
+      // decides to ask a question must fail fast rather than sit
+      // holding the drive forever.
+      stdio: ["ignore", "ignore", "pipe"],
+    },
+  )
+
+  let stderr = ""
+
+  child.stderr?.setEncoding("utf8")
+  child.stderr?.on("data", (chunk: string) => {
+    // Bounded, and keeping the TAIL: ddrescue's last words are
+    // the ones that say why it stopped.
+    stderr = (stderr + chunk).slice(-STDERR_TAIL_LIMIT)
+  })
+
+  const onAbort = () => {
+    child.kill("SIGTERM")
+
+    // A wrapper (`docker exec …`, `ssh … ddrescue`) does not
+    // forward signals, so killing our handle would leave a
+    // ddrescue inside the container still holding the drive.
+    // Measured for the makemkvcon twin on Tower 2026-07-25.
+    if (input.ddrescue.wrapperArgs === null) return
+
+    try {
+      spawn(
+        input.ddrescue.command,
+        buildDdrescueKillArgs({
+          wrapperArgs: input.ddrescue.wrapperArgs,
+          devPath: input.devPath,
+          signal: "TERM",
+        }),
+        { stdio: "ignore" },
+      ).on("error", () => {})
+    } catch {
+      // The outer signal has already gone; nothing else to do.
+    }
+  }
+
+  input.signal.addEventListener("abort", onAbort, {
+    once: true,
+  })
+
+  try {
+    return await new Promise<DdrescueRun>((resolve) => {
+      child.once("error", () =>
+        resolve({
+          exitCode: null,
+          stderrTail: stderr.trim(),
+        }),
+      )
+      child.once("close", (code) =>
+        resolve({
+          exitCode: code,
+          stderrTail: stderr.trim(),
+        }),
+      )
+    })
+  } finally {
+    input.signal.removeEventListener("abort", onAbort)
   }
 }
 
