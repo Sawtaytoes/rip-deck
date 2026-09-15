@@ -1380,6 +1380,11 @@ describe("the watcher, feeding the store", () => {
             prefixArgs: [],
             wrapperArgs: null,
           },
+          ddrescue: {
+            command: "true",
+            prefixArgs: [],
+            wrapperArgs: null,
+          },
           eject: { command: "true", prefixArgs: [] },
           isolation: null,
           ripCacheMb: 1024,
