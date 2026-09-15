@@ -167,7 +167,25 @@ export const EMPTY_TRAY_SECTORS = 2097151
 
 export type DiscType =
   | "none"
+  /** An AUDIO CD. Data CD-ROMs are `cd_rom`. */
   | "cd"
+  /**
+   * A data CD-ROM — a disc that is not media at all.
+   *
+   * ⚠️ **`inferDiscType` never returns this**, and cannot: a
+   * data CD-ROM and an audio CD are the same size and the same
+   * shape, so capacity alone cannot separate them. Only
+   * `decideDiscType` produces it, from udev having counted zero
+   * audio tracks on a CD.
+   *
+   * Its own member rather than a flag beside `cd`, because every
+   * reader of this union already switches on it — the card, the
+   * kiosk row, the logo, the ARM `kind` — and a flag would be a
+   * second thing each of them had to remember to check. The
+   * first build of the ddrescue path did use `cd`, and the
+   * dashboard called a Proteus sound library "Audio CD".
+   */
+  | "cd_rom"
   | "dvd"
   | "bluray"
   | "uhd"
@@ -181,6 +199,10 @@ const GIB = 1024 * 1024 * 1024
  * UHD is inferred at >= 55 GB because a BD-100 triple-layer is
  * UHD-only in practice, and a dual-layer BD-50 tops out around
  * 50 GB. Anything above the BD-50 ceiling is 4K.
+ *
+ * ⚠️ A CD-sized disc always answers `"cd"`, never `"cd_rom"`.
+ * Capacity cannot tell an album from a driver disc, and a caller
+ * that needs that answer has to ask udev — see `decideDiscType`.
  */
 export const inferDiscType = (
   sizeSectors: number,
@@ -205,6 +227,11 @@ export const discTypeLabel = (
   discType: DiscType,
 ): string | null => {
   switch (discType) {
+    // Display only. A data image names itself through
+    // `buildDataImageFolderName`, which appends no type suffix,
+    // so this label reaches a card and never a folder.
+    case "cd_rom":
+      return "Data CD"
     case "dvd":
       return "DVD"
     case "bluray":

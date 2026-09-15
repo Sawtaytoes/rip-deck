@@ -33,7 +33,13 @@ This boundary allows Rip Deck to report mid-rip stalls and to keep the same heal
 
 ## Output shapes
 
-MakeMKV produces a directory for Blu-ray and UHD backup. It produces one decrypted ISO file for DVD backup. CD work uses cyanrip.
+MakeMKV produces a directory for Blu-ray and UHD backup. It produces one decrypted ISO file for DVD backup. An audio CD uses cyanrip, which writes a tagged FLAC album directory.
+
+A data CD-ROM uses GNU ddrescue. It publishes a directory named `[DATA] <title>` holding two files: `<title>.iso`, the raw image, and `<title>.iso.map`, ddrescue's mapfile.
+
+The mapfile is not a debug artifact. It records every sector the drive could not read, so a data rip's outcome is counted rather than estimated, and a later run can resume from it. An image with no readable mapfile is refused.
+
+⚠️ A data image is never required to carry an ISO 9660 signature. Many data CD-ROMs hold no filesystem at all, so a missing signature is recorded and reported, never treated as a failure.
 
 Rip Deck writes into an incomplete destination and finalizes the name only after verification. Duplicate destinations receive a marker instead of overwriting an existing copy.
 

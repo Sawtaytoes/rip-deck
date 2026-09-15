@@ -295,6 +295,79 @@ describe("the disc-type fork", () => {
     expect(decision.hasDataTracks).toBe(true)
   })
 
+  it("routes a data CD-ROM to ddrescue", () => {
+    // Requirement A4, and the branch that used to be a refusal.
+    // Neither other ripper can read this disc: MakeMKV does not
+    // handle data discs, and cyanrip rips audio tracks it does
+    // not have.
+    expect(
+      decideDiscType({
+        sizeSectors: SECTORS.audioCd,
+        udevProperties: udev({
+          ID_CDROM: "1",
+          ID_CDROM_MEDIA: "1",
+          ID_CDROM_MEDIA_CD: "1",
+          ID_CDROM_MEDIA_STATE: "complete",
+          ID_CDROM_MEDIA_TRACK_COUNT_DATA: "1",
+          ID_FS_LABEL: "PROTEUS_LIB_1",
+        }),
+      }),
+    ).toEqual({
+      kind: "rip",
+      // `cd_rom`, not `cd` — the card, the kiosk row and the ARM
+      // `kind` all read this, and a data disc labelled "Audio
+      // CD" is what the first build of this branch produced.
+      discType: "cd_rom",
+      ripper: "ddrescue",
+      capacityBytes: SECTORS.audioCd * 512,
+      hasDataTracks: true,
+      volumeLabel: "PROTEUS_LIB_1",
+    })
+  })
+
+  it("images a data CD that has no volume label at all", () => {
+    // ⚠️ The normal state for a sampler or console disc, not an
+    // edge case: those carry the sampler's own on-disc format
+    // rather than ISO 9660, so there is no filesystem for udev
+    // to read a label out of. Routing still has to succeed —
+    // naming the disc is the watcher's problem, and it asks the
+    // operator.
+    const decision = decideDiscType({
+      sizeSectors: SECTORS.audioCd,
+      udevProperties: udev({
+        ID_CDROM: "1",
+        ID_CDROM_MEDIA: "1",
+        ID_CDROM_MEDIA_CD: "1",
+        ID_CDROM_MEDIA_STATE: "complete",
+        ID_CDROM_MEDIA_TRACK_COUNT_DATA: "1",
+      }),
+    })
+
+    assertRip(decision)
+    expect(decision.ripper).toBe("ddrescue")
+    expect(decision.volumeLabel).toBeNull()
+  })
+
+  it("refuses a CD-sized data disc that udev calls multi-gigabyte", () => {
+    // The stale-record backstop, the same one the audio branch
+    // carries. A disc with a CD's family and a Blu-ray's
+    // capacity is a udev record describing a disc that has
+    // already left the tray.
+    const decision = decideDiscType({
+      sizeSectors: SECTORS.bluray,
+      udevProperties: udev({
+        ID_CDROM: "1",
+        ID_CDROM_MEDIA: "1",
+        ID_CDROM_MEDIA_CD: "1",
+        ID_CDROM_MEDIA_STATE: "complete",
+        ID_CDROM_MEDIA_TRACK_COUNT_DATA: "1",
+      }),
+    })
+
+    assertAttention(decision)
+    expect(decision.reason).toBe("conflicting_evidence")
+  })
+
   it("routes DVD, BD and UHD BD to makemkv", () => {
     // Nothing different from before: the proven Stage 3 path.
     for (const [sectors, record, discType] of [
@@ -427,25 +500,6 @@ describe("failing closed", () => {
 
     assertAttention(decision)
     expect(decision.reason).toBe("conflicting_evidence")
-  })
-
-  it("refuses a data CD, because ISO support is deferred", () => {
-    // A4 is explicitly deferred, so there is no ripper for
-    // this. Pretending otherwise produces a silent no-op or a
-    // garbage rip.
-    const decision = decideDiscType({
-      sizeSectors: SECTORS.audioCd,
-      udevProperties: udev({
-        ID_CDROM: "1",
-        ID_CDROM_MEDIA: "1",
-        ID_CDROM_MEDIA_CD: "1",
-        ID_CDROM_MEDIA_STATE: "complete",
-        ID_CDROM_MEDIA_TRACK_COUNT_DATA: "1",
-      }),
-    })
-
-    assertAttention(decision)
-    expect(decision.reason).toBe("data_disc_deferred")
   })
 
   it("flags blank media rather than calling it an empty tray", () => {

@@ -71,6 +71,99 @@ export const incompleteDirName = (
 export const BACKUP_FOLDER_PREFIX = "[BACKUP] "
 
 /**
+ * Marks a folder as a RAW DATA-DISC IMAGE (requirement A4).
+ *
+ * A sibling to `BACKUP_FOLDER_PREFIX`, and separate from it on
+ * purpose. `[BACKUP]` means "a video disc structure whose real
+ * titles still have to be pulled out in MakeMKV" — a chore. A
+ * data image is finished work that simply is not media: nothing
+ * in the library will ever play it, and a scanner that tries
+ * should be told so by the name rather than by opening it.
+ *
+ * Leading and bracketed for the same two reasons: it groups
+ * these together at the top of an alphabetical listing, and `[`
+ * survives `sanitiseFolderName` on both POSIX and SMB.
+ */
+export const DATA_IMAGE_PREFIX = "[DATA] "
+
+/**
+ * What a data disc's folder is called once it lands.
+ *
+ * A DIRECTORY, not a bare file, and that is the deliberate part.
+ * A data rip produces two artefacts that are worthless apart —
+ * the image, and the ddrescue mapfile that says which sectors
+ * are actually in it — so publishing the image alone would
+ * strand the evidence in a dot-directory nobody looks in, and
+ * publishing both flat would scatter pairs across the library
+ * root with nothing tying them together.
+ *
+ * No year and no type suffix: `discTypeLabel("cd")` is null
+ * anyway, and a sampler library has no release year anyone
+ * would agree on.
+ */
+export const buildDataImageFolderName = (input: {
+  title: string
+}): string =>
+  DATA_IMAGE_PREFIX +
+  sanitiseFolderName(
+    input.title,
+    MAX_FOLDER_NAME_LENGTH - DATA_IMAGE_PREFIX.length,
+  )
+
+/**
+ * What the image inside that folder is called.
+ *
+ * ⚠️ **`.iso` even when the disc holds no ISO 9660 filesystem.**
+ * It is wrong as a description and right as an extension: it is
+ * what every loop-mounter, every emulator and Windows itself
+ * expect on a raw optical image, and an image with no extension
+ * is one the owner cannot open by double-clicking. The
+ * alternative a purist reaches for — `.bin` — is worse than
+ * imprecise, it is actively misleading: `.bin` means a
+ * 2352-byte-per-sector raw-mode image with a `.cue` beside it,
+ * and this is 2048-byte user data with no cue sheet.
+ *
+ * The folder's own `[DATA]` prefix, and the mapfile beside it,
+ * carry the truth that the extension cannot.
+ */
+export const buildDataImageFileName = (input: {
+  title: string
+}): string =>
+  sanitiseFolderName(
+    input.title,
+    MAX_FOLDER_NAME_LENGTH - ISO_SUFFIX.length,
+  ) + ISO_SUFFIX
+
+/** ddrescue's mapfile, named for the image it describes. */
+export const DATA_IMAGE_MAP_SUFFIX = ".map"
+
+/**
+ * Both paths a data rip writes, inside its own incomplete dir.
+ *
+ * One function rather than two call sites, because the mapfile
+ * has to land BESIDE the image and stay beside it through the
+ * publish — and `ripDataDisc` in `watcher.ts` cannot be reached
+ * from a test, so this is the link a test can execute. A
+ * mapfile written somewhere else is not a crash: ddrescue
+ * succeeds, and the rip is then refused at verification with a
+ * message about missing evidence that names the wrong cause.
+ */
+export const buildDataImagePaths = (input: {
+  incompletePath: string
+  title: string
+}): { imagePath: string; mapfilePath: string } => {
+  const imagePath = join(
+    input.incompletePath,
+    buildDataImageFileName({ title: input.title }),
+  )
+
+  return {
+    imagePath,
+    mapfilePath: `${imagePath}${DATA_IMAGE_MAP_SUFFIX}`,
+  }
+}
+
+/**
  * Folder name per requirement B2: `{title} ({year}) - {type}`,
  * optionally prefixed `[BACKUP] ` when the folder holds a whole
  * disc awaiting title extraction.

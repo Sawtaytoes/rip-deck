@@ -199,14 +199,23 @@ export const toArmStatus = (state: JobState): string => {
  * ARM's `kind`, which drives the card icon.
  *
  * `cd` becomes `music` because that is ARM's name for an audio
- * disc. `uhd` is left alone: the viewer tolerates unknown kinds
- * with a generic disc icon, and calling a 4K disc a Blu-ray to
- * win a prettier glyph would be a lie on the card. A
- * rip-deck-aware UI reads `disctype_label` ("4K").
+ * disc. `cd_rom` becomes `data`, which the dashboard already
+ * knows: `kindLabel` answers "Data" and `DiscKindLogo` sends it
+ * to the generic mark on purpose, because a data CD-ROM has no
+ * logo to be right about. `uhd` is left alone: the viewer
+ * tolerates unknown kinds with a generic disc icon, and calling
+ * a 4K disc a Blu-ray to win a prettier glyph would be a lie on
+ * the card. A rip-deck-aware UI reads `disctype_label` ("4K",
+ * "Data CD").
  */
 export const toArmKind = (
   discType: DiscType,
-): ArmMediaKind => (discType === "cd" ? "music" : discType)
+): ArmMediaKind => {
+  if (discType === "cd") return "music"
+  if (discType === "cd_rom") return "data"
+
+  return discType
+}
 
 /**
  * Overall percent, or null for "indeterminate".
