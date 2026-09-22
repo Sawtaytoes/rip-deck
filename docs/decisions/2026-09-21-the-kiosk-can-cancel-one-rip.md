@@ -53,3 +53,27 @@ The live-path check sent exactly
 rendered the daemon's success report. See the [detail
 view](../previews/kiosk-disc-details.png) and [confirmation
 view](../previews/kiosk-cancel-confirmation.png).
+
+## Deployment verification
+
+Pull request [#65](https://github.com/Sawtaytoes/rip-deck/pull/65) merged as
+`dc37fcd0954a0bd0dcc09b05f8573129656641b9`. Main-branch CI passed all checks and
+published the image. The required fail-closed `/json` check reported zero active
+rips before the TrueNAS update.
+
+TrueNAS `app.pull_images` job 3490 completed successfully and redeployed the YAML
+app. The running container changed from image
+`sha256:53a5401bc06c44da0b4eb6116e36530f630da7c24c419dffb73ed996cc38d973` to
+`sha256:5fd4dcebfcdafc4005c77f9f21298411e3da53156edbc420b5c8b99a52efe14d`.
+The deployed `/assets/index-CsNsCBqx.js` contains all three new-build markers:
+`Cancel this rip?`, `confirm-cancel:`, and `Keep ripping`. The live state feed
+reported no error and every host healthy.
+
+TrueNAS `app.redeploy` job 3496 then restarted `castkit-remote-display` so its
+browser loaded the new Rip Deck bundle. The renderer logged
+`castkit-remote-display-v1 starting`, connected to firmware
+`2026-09-18 23:09:18 -0500`, and acknowledged new frames. A final production
+browser check at 480×320 found the disabled preview control with the stable
+identity
+`cancel:usb-2-1-1-2-4-4-2:fixture-job-2:ripping` and the complete visible effect
+text.
