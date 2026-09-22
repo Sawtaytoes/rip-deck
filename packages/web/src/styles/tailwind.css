@@ -328,11 +328,37 @@ body {
   gap: 6px;
   flex: none;
 }
+.rip-kiosk-actions[data-has-cancel="true"] {
+  grid-template-columns: 1fr 1fr 1.65fr 1.2fr 1fr;
+}
 .rip-kiosk .rip-kiosk-actions > * {
   min-inline-size: 0;
   padding-inline: 4px;
   font-size: 16px;
   block-size: 46px;
+}
+.rip-kiosk-cancel {
+  inline-size: min(440px, calc(100vw - 24px));
+  gap: 12px;
+  padding: 16px;
+}
+.rip-kiosk-cancel h2 {
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: bold;
+}
+.rip-kiosk-cancel p {
+  font-size: 16px;
+  line-height: 21px;
+}
+.rip-kiosk-cancel-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.rip-kiosk-cancel .rip-kiosk-cancel-actions > * {
+  block-size: 48px;
+  font-size: 16px;
 }
 .rip-kiosk-report {
   font-size: 14px;
