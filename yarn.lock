@@ -400,9 +400,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@charcuterie/vitest-config@npm:^1.2.0":
-  version: 1.2.0
-  resolution: "@charcuterie/vitest-config@npm:1.2.0"
+"@charcuterie/vitest-config@npm:^1.3.0":
+  version: 1.3.0
+  resolution: "@charcuterie/vitest-config@npm:1.3.0"
   peerDependencies:
     "@vitest/browser": ">=3"
     "@vitest/browser-playwright": ">=3"
@@ -410,7 +410,7 @@ __metadata:
     vitest: ">=3"
   bin:
     charcuterie-check-optimize-deps: src/cli/checkOptimizeDeps.js
-  checksum: 10c0/492a265a2f237b6cce39e64e839b1ee6160d9f96311ca2929bccea5e10c2592be9913aff1935cad3ef028452d22cddedd86080d454e167276c6accc078cb388f
+  checksum: 10c0/fb61e9418b05abb21a61d420c138065f6bcb07640c1dac293fd00e02b6b11802554b37fd2874be6e87a10ee3c37482d32ec826388812fd3788d3d6f010115641
   languageName: node
   linkType: hard
 
@@ -1279,7 +1279,7 @@ __metadata:
     "@charcuterie/storybook-config": "npm:^0.4.2"
     "@charcuterie/tokens": "npm:^1.10.1"
     "@charcuterie/ui": "npm:^4.8.0"
-    "@charcuterie/vitest-config": "npm:^1.2.0"
+    "@charcuterie/vitest-config": "npm:^1.3.0"
     "@rip-deck/contracts": "workspace:*"
     "@storybook/addon-a11y": "npm:^10.5.5"
     "@storybook/addon-docs": "npm:^10.5.5"
