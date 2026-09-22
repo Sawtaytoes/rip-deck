@@ -1,5 +1,4 @@
-import { RouterLinkProvider } from "@charcuterie/ui"
-import { ReactRouterLink } from "@charcuterie/ui/react-router"
+import { ReactRouterAdapter } from "@charcuterie/ui/react-router"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import {
@@ -35,8 +34,15 @@ if (rootElement) {
           browser tries to execute. That is also what makes a RELOAD on
           `/history` work rather than 404 — the SPA fallback and the route are
           the same change, as the fleet rule requires. */}
-      <RouterLinkProvider link={ReactRouterLink}>
-        <BrowserRouter>
+      <BrowserRouter>
+        {/* One component at the root carries every seam of its kind —
+            the link seam this app already had, and the scroll memory
+            `@charcuterie/ui` 4.0 moved off `Main`'s `scrollKey` prop
+            onto a context. A prop was the wrong shape: the library
+            shipped the memory and three apps carried on losing the
+            reader's place with the fix sitting in a dependency they
+            already had. */}
+        <ReactRouterAdapter>
           <AppProviders>
             <Routes>
               <Route element={<Dashboard />} path="/" />
@@ -59,8 +65,8 @@ if (rootElement) {
               />
             </Routes>
           </AppProviders>
-        </BrowserRouter>
-      </RouterLinkProvider>
+        </ReactRouterAdapter>
+      </BrowserRouter>
     </StrictMode>,
   )
 }
