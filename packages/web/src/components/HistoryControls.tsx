@@ -131,7 +131,6 @@ export function HistoryControls({
               onChange({ ...filters, search: "" })
             }}
             placeholder="Disc name, bay, drive id…"
-            size="sm"
             value={filters.search}
           />
         </Field>
