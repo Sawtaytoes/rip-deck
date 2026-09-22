@@ -49,6 +49,12 @@ export type BayActionState = {
   msg?: string
 }
 
+type BayActionInput = {
+  driveId: string
+  label: string
+  action: BayAction
+}
+
 /**
  * Actions that throw away work and therefore ask first.
  *
@@ -99,16 +105,16 @@ export function useBayActions() {
     }
   }, [])
 
-  const runAction = useCallback(
-    async (input: {
-      driveId: string
-      label: string
-      action: BayAction
-    }) => {
+  const performAction = useCallback(
+    async (
+      input: BayActionInput,
+      isAlreadyConfirmed: boolean,
+    ) => {
       const { driveId, label, action } = input
 
       if (
         CONFIRMED_ACTIONS.includes(action) &&
+        !isAlreadyConfirmed &&
         !window.confirm(
           action === "reset_bay"
             ? `Reset ${label}? This reconnects only this drive and makes Rip Deck inspect it again.`
@@ -166,11 +172,31 @@ export function useBayActions() {
     [dataSource, queryClient],
   )
 
+  const runAction = useCallback(
+    (input: BayActionInput) => performAction(input, false),
+    [performAction],
+  )
+
+  /**
+   * Run an action after an app-owned confirmation UI has already
+   * collected the operator's answer.
+   *
+   * The physical kiosk cannot answer a browser-native `confirm()`:
+   * CastKit returns touches only to named targets in the page. Its
+   * confirmation is therefore a Charcuterie modal whose explicit
+   * confirm button calls this path. Other callers use `runAction`
+   * and retain the native safeguard.
+   */
+  const runConfirmedAction = useCallback(
+    (input: BayActionInput) => performAction(input, true),
+    [performAction],
+  )
+
   const actionFor = useCallback(
     (driveId: string): BayActionState | undefined =>
       stateByDriveId[driveId],
     [stateByDriveId],
   )
 
-  return { runAction, actionFor }
+  return { runAction, runConfirmedAction, actionFor }
 }

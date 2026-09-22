@@ -137,6 +137,33 @@ describe("useBayActions", () => {
     ).toBeUndefined()
   })
 
+  it("accepts an action confirmed by an app-owned dialog", async () => {
+    const confirmMock = vi.fn(() => false)
+    const runBayAction = vi.fn(() =>
+      Promise.resolve({ ok: true, msg: "cancelled" }),
+    )
+
+    vi.stubGlobal("confirm", confirmMock)
+
+    const { result } = renderBayActions(
+      buildDataSource(runBayAction),
+    )
+
+    await act(async () => {
+      await result.current.runConfirmedAction({
+        driveId: DRIVE_ID,
+        label: "05 - Pioneer BDR-211M",
+        action: "cancel",
+      })
+    })
+
+    expect(confirmMock).not.toHaveBeenCalled()
+    expect(runBayAction).toHaveBeenCalledWith({
+      driveId: DRIVE_ID,
+      action: "cancel",
+    })
+  })
+
   it("explains that a bay reset reconnects only that drive", async () => {
     const confirmMock = vi.fn(() => false)
     const runBayAction = vi.fn(() =>

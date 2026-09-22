@@ -5,7 +5,7 @@ import {
 } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { Navigate, Route, Routes } from "react-router"
-import { expect, test, vi } from "vitest"
+import { afterEach, expect, test, vi } from "vitest"
 import { mockDataSource } from "../api/mockDataSource"
 import { renderWithProviders } from "../testing/renderWithProviders"
 import {
@@ -27,6 +27,10 @@ const routes = (
     />
   </Routes>
 )
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 test("shows nine rows, disc artwork and targeted controls, with a route back", async () => {
   const fixture =
@@ -167,7 +171,90 @@ test("disables all physical controls for preview data and an active rip", async 
   expect(
     screen.getByRole("button", { name: "Disc removed" }),
   ).toBeDisabled()
+  expect(
+    screen.getByRole("button", { name: "Cancel rip" }),
+  ).toBeDisabled()
   expect(runTrayCommand).not.toHaveBeenCalled()
+})
+
+test("confirms and cancels one live rip without a browser dialog", async () => {
+  const fixture =
+    await mockDataSource.fetchState("nine-rips")
+  const tower = fixture.ripDeck
+  const bay = tower?.bays[0]
+  if (!tower || !bay?.state.title)
+    throw new Error("Fixture needs an active named bay")
+
+  const state = {
+    ...fixture,
+    ripDeck: { ...tower, is_fake: false },
+  }
+  const runBayAction = vi.fn(async () => ({
+    ok: true,
+    msg: `Cancelled ${bay.state.title} and opened its tray.`,
+  }))
+  const browserConfirm = vi.fn(() => {
+    throw new Error(
+      "The remote kiosk cannot answer this dialog",
+    )
+  })
+  vi.stubGlobal("confirm", browserConfirm)
+
+  renderWithProviders(
+    routes,
+    createStubDataSource({
+      fetchState: async () => state,
+      runBayAction,
+    }),
+  )
+
+  await userEvent.click(
+    await screen.findByRole("link", { name: /^Slot 1:/ }),
+  )
+  expect(
+    screen.getByText(
+      "Cancel stops the rip, keeps its partial output, and opens its tray after the ripper exits.",
+    ),
+  ).toBeVisible()
+
+  await userEvent.click(
+    screen.getByRole("button", { name: "Cancel rip" }),
+  )
+  let dialog = screen.getByRole("alertdialog", {
+    name: "Cancel this rip?",
+  })
+  expect(dialog).toHaveTextContent(bay.state.title)
+  await userEvent.click(
+    within(dialog).getByRole("button", {
+      name: "Keep ripping",
+    }),
+  )
+  expect(runBayAction).not.toHaveBeenCalled()
+
+  await userEvent.click(
+    screen.getByRole("button", { name: "Cancel rip" }),
+  )
+  dialog = screen.getByRole("alertdialog", {
+    name: "Cancel this rip?",
+  })
+  await userEvent.click(
+    within(dialog).getByRole("button", {
+      name: "Cancel rip",
+    }),
+  )
+
+  await waitFor(() =>
+    expect(runBayAction).toHaveBeenCalledWith({
+      driveId: bay.drive_id,
+      action: "cancel",
+    }),
+  )
+  expect(browserConfirm).not.toHaveBeenCalled()
+  expect(
+    await screen.findByText(
+      `Cancelled ${bay.state.title} and opened its tray.`,
+    ),
+  ).toBeVisible()
 })
 
 test("says the tower is off when no drive answered", async () => {

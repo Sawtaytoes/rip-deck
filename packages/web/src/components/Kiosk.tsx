@@ -2,11 +2,14 @@ import {
   Badge,
   Button,
   ButtonLink,
+  Modal,
   ProgressBar,
 } from "@charcuterie/ui"
+import { useState } from "react"
 import { useLocation, useParams } from "react-router"
 import { readFixtureName } from "../fixture"
 import { trayActionsFor } from "../format"
+import { useBayActions } from "../hooks/useBayActions"
 import { useRipDeckState } from "../hooks/useRipDeckState"
 import { useTrayCommand } from "../hooks/useTrayCommand"
 import { kioskBaySummary } from "../kioskFormat"
@@ -14,6 +17,16 @@ import type { BayView } from "../types"
 
 const slotPath = (bay: BayView) =>
   `/kiosk/slots/${encodeURIComponent(bay.drive_id)}`
+
+const CANCEL_HELP =
+  "Cancel stops the rip, keeps its partial output, and opens its tray after the ripper exits."
+
+type CancelTarget = {
+  driveId: string
+  identity: string
+  label: string
+  title: string
+}
 
 /** All configured slots in physical order, with dedicated full-size controls. */
 export const Kiosk = () => {
@@ -23,6 +36,9 @@ export const Kiosk = () => {
   const query = useRipDeckState(fixture)
   const { run, pendingDriveIds, lastReport, lastError } =
     useTrayCommand()
+  const { runConfirmedAction, actionFor } = useBayActions()
+  const [cancelTarget, setCancelTarget] =
+    useState<CancelTarget | null>(null)
   const tower = query.data?.ripDeck
   const bays = [...(tower?.bays ?? [])].sort(
     (first, second) =>
@@ -47,13 +63,29 @@ export const Kiosk = () => {
         rip.drive_id === selected?.drive_id &&
         rip.job_uuid === selected?.state.job_id,
     )
-  const isPending =
+  const isTrayPending =
     selected !== undefined &&
     pendingDriveIds.has(selected.drive_id)
   const targetIdentity = selected
     ? `${selected.drive_id}:${selected.state.job_id ?? "empty"}:${selected.state.state}`
     : ""
-  const reportText = lastError ?? lastReport?.message
+  const selectedAction = selected
+    ? actionFor(selected.drive_id)
+    : undefined
+  const isActionPending =
+    selectedAction?.status === "pending"
+  const isPending = isTrayPending || isActionPending
+  const isCancelOffered =
+    selected?.actions.includes("cancel") === true
+  const reportText =
+    selectedAction?.msg ?? lastError ?? lastReport?.message
+  const canConfirmCancel =
+    cancelTarget !== null &&
+    selected !== undefined &&
+    cancelTarget.identity === targetIdentity &&
+    selected.actions.includes("cancel") &&
+    !isReadOnly &&
+    !isPending
   // The house label ("4K") is worth a line only when the summary
   // has not already said it — a location never repeats its type.
   const discTypeLabel =
@@ -154,7 +186,12 @@ export const Kiosk = () => {
               />
             </div>
           </div>
-          <div className="rip-kiosk-actions">
+          <div
+            className="rip-kiosk-actions"
+            data-has-cancel={
+              isCancelOffered ? "true" : "false"
+            }
+          >
             <Button
               size="lg"
               isDisabled={
@@ -208,6 +245,25 @@ export const Kiosk = () => {
             >
               Disc removed
             </Button>
+            {isCancelOffered && (
+              <Button
+                size="lg"
+                intent="danger"
+                isDisabled={isReadOnly || isPending}
+                data-castkit-target={`cancel:${targetIdentity}`}
+                onClick={() =>
+                  setCancelTarget({
+                    driveId: selected.drive_id,
+                    identity: targetIdentity,
+                    label: selected.label,
+                    title:
+                      selected.state.title ?? "this rip",
+                  })
+                }
+              >
+                Cancel rip
+              </Button>
+            )}
             <ButtonLink
               className="rip-kiosk-back"
               href={`/kiosk${search}`}
@@ -218,12 +274,16 @@ export const Kiosk = () => {
             </ButtonLink>
           </div>
           <p className="rip-kiosk-report" role="status">
-            {isPending
-              ? "Working…"
-              : (reportText ??
-                (summary.isActive
-                  ? "Tray controls are unavailable while this slot rips."
-                  : selected.outcome_detail))}
+            {isActionPending
+              ? "Stopping this rip…"
+              : isTrayPending
+                ? "Working…"
+                : (reportText ??
+                  (isCancelOffered
+                    ? CANCEL_HELP
+                    : summary.isActive
+                      ? "Tray controls are unavailable while this slot rips."
+                      : selected.outcome_detail))}
           </p>
         </section>
       ) : !driveId && tower && !tower.is_tower_present ? (
@@ -301,6 +361,51 @@ export const Kiosk = () => {
           </section>
         )
       )}
+      <Modal
+        aria-labelledby="rip-kiosk-cancel-title"
+        className="rip-kiosk-cancel"
+        isDismissable={false}
+        isVisible={cancelTarget !== null}
+        onClose={() => setCancelTarget(null)}
+        role="alertdialog"
+      >
+        <h2 id="rip-kiosk-cancel-title">
+          Cancel this rip?
+        </h2>
+        <p>
+          <strong>{cancelTarget?.title}</strong>
+          {" — "}
+          {CANCEL_HELP}
+        </p>
+        <div className="rip-kiosk-cancel-actions">
+          <Button
+            size="lg"
+            data-castkit-target={`keep-ripping:${cancelTarget?.identity ?? "none"}`}
+            onClick={() => setCancelTarget(null)}
+          >
+            Keep ripping
+          </Button>
+          <Button
+            size="lg"
+            intent="danger"
+            isDisabled={!canConfirmCancel}
+            data-castkit-target={`confirm-cancel:${cancelTarget?.identity ?? "none"}`}
+            onClick={() => {
+              if (!cancelTarget || !canConfirmCancel) return
+
+              const target = cancelTarget
+              setCancelTarget(null)
+              void runConfirmedAction({
+                driveId: target.driveId,
+                label: target.label,
+                action: "cancel",
+              })
+            }}
+          >
+            Cancel rip
+          </Button>
+        </div>
+      </Modal>
     </main>
   )
 }
