@@ -608,8 +608,21 @@ describe("the tower view", () => {
     // D4: "keep trying" is an answer to a bad verdict, so it
     // must not clutter a bay that is simply working.
     expect(troubled.actions).toContain("keep_trying")
-    expect(troubled.actions).toContain("give_up")
+    expect(troubled.actions).not.toContain("give_up")
     expect(healthy.actions).toEqual(["cancel"])
+    for (const kind of ["unknown", "hub_fault"] as const) {
+      const bay = view({
+        bays: [
+          buildBay({
+            slot: 2,
+            job: buildJob({
+              verdict: makeVerdict(kind, "suspected", []),
+            }),
+          }),
+        ],
+      }).bays[0]
+      expect(bay.actions).toEqual(["cancel"])
+    }
   })
 
   it("labels a fixture response as fake", () => {
