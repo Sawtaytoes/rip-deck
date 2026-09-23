@@ -125,7 +125,7 @@ body {
     "Liberation Mono", monospace;
 }
 
-/* The dedicated display has no app chrome. Nine rows fill a 480×320 viewport. */
+/* The dedicated display has no app chrome. Active rows fill a 480×320 viewport. */
 .rip-kiosk {
   block-size: 100dvh;
   inline-size: 100%;
@@ -248,6 +248,72 @@ body {
   color: var(--color-content-muted);
   font-weight: normal;
 }
+/* One to six live rips have room for a second line and larger type. The slot
+   number keeps the physical drive unambiguous, so no idle rows have to stay on
+   screen merely to preserve rack position. Seven to nine rips retain the
+   compact one-line layout that fits the complete tower. */
+.rip-kiosk-rows[data-row-density="focus"] .rip-kiosk-row {
+  grid-template-columns: 48px minmax(0, 1fr) 74px;
+  gap: 12px;
+  padding-inline: 10px;
+}
+.rip-kiosk-rows[data-row-density="focus"]
+  .rip-kiosk-number {
+  inline-size: 48px;
+  block-size: 48px;
+  font-size: 28px;
+}
+.rip-kiosk-rows[data-row-density="focus"] .rip-kiosk-line {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+}
+.rip-kiosk-rows[data-row-density="focus"] .rip-kiosk-title {
+  font-size: 30px;
+  line-height: 34px;
+}
+.rip-kiosk-rows[data-row-density="focus"] .rip-kiosk-meta {
+  flex: none;
+  font-size: 19px;
+  line-height: 22px;
+}
+.rip-kiosk-rows[data-row-density="focus"]
+  .rip-kiosk-percent {
+  font-size: 29px;
+}
+.rip-kiosk-rows[data-row-density="focus"][data-visible-count="1"]
+  .rip-kiosk-title {
+  font-size: 36px;
+  line-height: 40px;
+}
+.rip-kiosk-rows[data-row-density="focus"][data-visible-count="1"]
+  .rip-kiosk-meta {
+  font-size: 22px;
+  line-height: 26px;
+}
+.rip-kiosk-rows[data-row-density="roomy"] .rip-kiosk-row {
+  grid-template-columns: 38px minmax(0, 1fr) 64px;
+  gap: 9px;
+  padding-inline: 7px;
+}
+.rip-kiosk-rows[data-row-density="roomy"]
+  .rip-kiosk-number {
+  inline-size: 38px;
+  block-size: 38px;
+  font-size: 22px;
+}
+.rip-kiosk-rows[data-row-density="roomy"] .rip-kiosk-title {
+  font-size: 24px;
+  line-height: 27px;
+}
+.rip-kiosk-rows[data-row-density="roomy"] .rip-kiosk-meta {
+  font-size: 16px;
+  line-height: 19px;
+}
+.rip-kiosk-rows[data-row-density="roomy"]
+  .rip-kiosk-percent {
+  font-size: 24px;
+}
 /* Everything readable sits above the fill. Last, so nothing less
    specific follows it. */
 .rip-kiosk .rip-kiosk-row > .rip-kiosk-number,
@@ -256,7 +322,8 @@ body {
   position: relative;
   z-index: 1;
 }
-.rip-kiosk-off {
+.rip-kiosk-off,
+.rip-kiosk-idle {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -267,12 +334,14 @@ body {
   text-align: center;
   color: var(--color-content-muted);
 }
-.rip-kiosk-off h1 {
+.rip-kiosk-off h1,
+.rip-kiosk-idle h1 {
   font-size: 34px;
   font-weight: bold;
   color: var(--color-content-primary);
 }
-.rip-kiosk-off p {
+.rip-kiosk-off p,
+.rip-kiosk-idle p {
   font-size: 17px;
   line-height: 22px;
   max-inline-size: 360px;

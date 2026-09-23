@@ -4,7 +4,7 @@
 - **Date:** 2026-09-10
 - **Type:** Display UI requirement
 - **Supersedes:** [2026-09-08 — a kiosk row is tinted by its state and headlines the rip name](2026-09-08-a-kiosk-row-is-tinted-by-its-state-and-headlines-the-rip-name.md) (the 104 px bar column and the two-line row only; the tint, the solid chip and the rip-name headline stand)
-- **Superseded by:** —
+- **Superseded by:** [2026-09-23 — the kiosk focuses on active rips](2026-09-23-the-kiosk-focuses-on-active-rips.md) (the fixed nine-row arrangement and always-one-line treatment only; the row-as-progress treatment stands)
 
 ## Decision
 
