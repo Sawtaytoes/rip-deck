@@ -1,3 +1,5 @@
+import { Button } from "@charcuterie/ui"
+
 import {
   driveName,
   isBayHeld,
@@ -128,6 +130,15 @@ function bayStatus(bay: BayView): {
   }
 
   if (ACTIVE_STATES.has(bay.state.state)) {
+    if (
+      bay.state.state === "stalled" ||
+      bay.state.state === "throttled"
+    ) {
+      return { state: "attention", detail: bay.state.state }
+    }
+    if (bay.state.read_error_count > 0) {
+      return { state: "attention", detail: "read errors" }
+    }
     return {
       state: "ripping",
       detail: `${bay.state.progress_percent}%`,
@@ -159,7 +170,13 @@ function bayStatus(bay: BayView): {
   return { state: "idle", detail: "idle" }
 }
 
-export function DriveRail({ bays }: { bays: BayView[] }) {
+export function DriveRail({
+  bays,
+  onSelect,
+}: {
+  bays: BayView[]
+  onSelect?: (bay: BayView) => void
+}) {
   if (bays.length === 0) return null
 
   return (
@@ -172,14 +189,19 @@ export function DriveRail({ bays }: { bays: BayView[] }) {
             : String(bay.slot).padStart(2, "0")
 
         return (
-          <span
+          <Button
             key={bay.drive_id}
             title={bay.label}
+            aria-label={`Drive ${label}: ${detail}`}
+            aria-haspopup="dialog"
+            appearance="outline"
+            size="sm"
+            onClick={() => onSelect?.(bay)}
             className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-sm tabular-nums ${CHIP[state]}`}
           >
             <span className="font-semibold">{label}</span>
             <span className="opacity-80">{detail}</span>
-          </span>
+          </Button>
         )
       })}
     </div>

@@ -588,18 +588,16 @@ const projectBay = (
 
   if (!isActive) actions.push("reset_bay")
 
-  const isTroubled = verdict.kind !== "ok"
-
-  if (isActive && isTroubled && !isKeepTryingRequested) {
-    actions.push("keep_trying", "give_up")
-  }
+  const isTroubled =
+    verdict.kind !== "ok" && verdict.kind !== "unknown"
 
   if (
+    isActive &&
     isTroubled &&
-    verdict.subject === "disc" &&
-    verdict.confidence === "suspected"
+    verdict.isKeepTryingSensible &&
+    !isKeepTryingRequested
   ) {
-    actions.push("retry_in_another_drive")
+    actions.push("keep_trying")
   }
 
   if (isActive) actions.push("cancel")
@@ -1319,6 +1317,24 @@ const buildDataDiscs = (): RipDeckState =>
     ],
   })
 
+/** Local artwork exercises real poster layout without external image requests. */
+const buildCardShowcase = (): RipDeckState => {
+  const state = buildShowcase()
+  for (const host of state.hosts) {
+    for (const rip of host.rips) {
+      if (rip.slot === 3 || rip.slot === 9) continue
+      const hue = (rip.slot ?? 1) * 42
+      const title = (rip.label ?? "Sample disc")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300"><rect width="200" height="300" fill="hsl(${hue} 40% 20%)"/><circle cx="130" cy="85" r="90" fill="hsl(${hue} 65% 55%)"/><path d="M0 240 200 80V300H0Z" fill="hsl(${hue} 50% 10%)"/><text x="100" y="248" text-anchor="middle" textLength="170" lengthAdjust="spacingAndGlyphs" font-family="sans-serif" font-size="20" fill="white">${title}</text><text x="100" y="277" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#ccc">PREVIEW ARTWORK</text></svg>`
+      rip.poster = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+      rip.logfile = `${rip.job_uuid}.robot.log`
+    }
+  }
+  return state
+}
+
 export const createFixtureState = (
   fixture: FixtureName,
 ): RipDeckState => {
@@ -1344,7 +1360,7 @@ export const createFixtureState = (
     case "usb-flap":
       return buildUsbFlap()
     case "showcase":
-      return buildShowcase()
+      return buildCardShowcase()
     case "data-disc":
       return buildDataDiscs()
   }
