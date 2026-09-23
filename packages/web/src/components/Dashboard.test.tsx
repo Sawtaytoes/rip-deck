@@ -68,16 +68,48 @@ describe("zero drives present", () => {
     expect(
       screen.queryByText(/unreachable/i),
     ).not.toBeInTheDocument()
-    expect(screen.getByText(/0 bays/)).toBeInTheDocument()
+    expect(
+      screen.queryByText(/0 bays/),
+    ).not.toBeInTheDocument()
   })
 })
 
 describe("nine concurrent rips", () => {
+  it("opens drive details from a slot and returns focus when closed", async () => {
+    showFixture("nine-rips")
+    const slot = await screen.findByRole("button", {
+      name: /^Drive 07:/,
+    })
+    await userEvent.click(slot)
+    const dialog = await screen.findByRole("dialog", {
+      name: "Drive 7",
+    })
+    expect(
+      within(dialog).getByText("Fixture Disc 7"),
+    ).toBeInTheDocument()
+    expect(
+      within(dialog).getByText("Serial"),
+    ).toBeInTheDocument()
+    await userEvent.keyboard("{Escape}")
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog"),
+      ).not.toBeInTheDocument(),
+    )
+    expect(slot).toHaveFocus()
+    expect(
+      screen.queryByText("tower", { exact: true }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(/9 bays · 9 ripping/),
+    ).not.toBeInTheDocument()
+  })
+
   it("shows every bay at once", async () => {
     showFixture("nine-rips")
 
     expect(
-      await screen.findByText(/9 bays · 9 ripping/),
+      await screen.findByText("Fixture Disc 1"),
     ).toBeInTheDocument()
 
     // §3 + §12: the slot is its own field and the disc is the
@@ -176,31 +208,28 @@ describe("a hub fault across several bays", () => {
     // `toArmStatus` folds ripping/throttled/stalled into one
     // word. Telling those three apart is most of why this
     // dashboard exists, so the card reads the native state.
-    const slotFour = (
-      await screen.findByText("Fixture Disc 4")
-    ).closest("article")
-
-    expect(slotFour).not.toBeNull()
+    const slotFour = await screen.findByRole("article", {
+      name: "Fixture Disc 4 — 4",
+    })
     expect(
-      within(slotFour as HTMLElement).getByText("stalled"),
+      within(slotFour).getByText("Stalled"),
     ).toBeInTheDocument()
   })
 })
 
 describe("suspected vs confirmed", () => {
-  it("offers a retry on the suspected bay only", async () => {
+  it("explains a suspected diagnosis without offering a second job action", async () => {
     showFixture("confidence")
-
-    const retries = await screen.findAllByRole("button", {
-      name: "Retry in another drive",
-    })
-
-    // Bay 2 is the single-drive sighting; bay 8 is the second
-    // drive that agreed, which is what upgrades it.
-    expect(retries).toHaveLength(1)
     expect(
-      screen.getByText(/retry in another drive to confirm/),
+      await screen.findByText(
+        /retry in another drive to confirm/,
+      ),
     ).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", {
+        name: "Retry in another drive",
+      }),
+    ).not.toBeInTheDocument()
   })
 
   it("keeps both bays' verdicts in full rather than collapsing them", async () => {
@@ -424,7 +453,7 @@ describe("each verdict kind", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("offers keep-trying and give-up on a troubled live rip", async () => {
+  it("offers Keep trying only on a recoverable issue and never Give up", async () => {
     showFixture("verdicts")
 
     // D4: let a struggling rip keep chugging, or stop it. Eight
@@ -433,7 +462,10 @@ describe("each verdict kind", () => {
       await screen.findAllByRole("button", {
         name: "Keep trying",
       }),
-    ).toHaveLength(8)
+    ).toHaveLength(3)
+    expect(
+      screen.queryByRole("button", { name: "Give up" }),
+    ).not.toBeInTheDocument()
   })
 })
 
@@ -488,7 +520,7 @@ describe("finished rips that nothing measured", () => {
   it("does not banner them as a fault", async () => {
     showFixture("unmeasured")
 
-    await screen.findAllByText(/completed/)
+    await screen.findAllByText("done")
 
     // A full-width red "Not enough information to judge this rip
     // yet." was the loudest thing on the page, above three
@@ -503,7 +535,7 @@ describe("finished rips that nothing measured", () => {
   it("does not file them under needs attention", async () => {
     showFixture("unmeasured")
 
-    await screen.findAllByText(/completed/)
+    await screen.findAllByText("done")
 
     expect(
       screen.queryByText(/needs attention/),
@@ -517,7 +549,7 @@ describe("finished rips that nothing measured", () => {
   it("offers no re-rip control at all", async () => {
     showFixture("unmeasured")
 
-    await screen.findAllByText(/completed/)
+    await screen.findAllByText("done")
 
     expect(
       screen.queryByRole("button", {
@@ -529,7 +561,7 @@ describe("finished rips that nothing measured", () => {
   it("drops the caveat and keeps what the rip did", async () => {
     showFixture("unmeasured")
 
-    await screen.findAllByText(/completed/)
+    await screen.findAllByText("done")
 
     // ⚠️ This used to assert the OPPOSITE — that "Not enough
     // information to judge this rip yet." stayed on the card,
@@ -562,7 +594,7 @@ describe("finished rips that nothing measured", () => {
   it("says nothing where it has no disc name", async () => {
     showFixture("unmeasured")
 
-    await screen.findAllByText(/completed/)
+    await screen.findAllByText("done")
 
     // Every card read `disc (unknown)` on the live page. The
     // name is not recoverable on this side: `towerFeed` gives an
@@ -723,7 +755,7 @@ describe("the column layout", () => {
   it("takes the number the owner picked", async () => {
     showFixture("nine-rips")
 
-    await screen.findByText(/9 bays · 9 ripping/)
+    await screen.findByText("Fixture Disc 1")
     // `radio`, not `button`: the five choices are mutually
     // exclusive and now say so. Five `aria-pressed` buttons said
     // only that each one was independently on or off.
@@ -744,7 +776,7 @@ describe("the column layout", () => {
   it("keeps auto reachable after a manual choice", async () => {
     showFixture("nine-rips")
 
-    await screen.findByText(/9 bays · 9 ripping/)
+    await screen.findByText("Fixture Disc 1")
     await userEvent.click(
       screen.getByRole("radio", { name: "4" }),
     )
@@ -771,7 +803,7 @@ describe("the column layout", () => {
   it("gives every card its own query container", async () => {
     showFixture("nine-rips")
 
-    await screen.findByText(/9 bays · 9 ripping/)
+    await screen.findByText("Fixture Disc 1")
 
     expect(
       document.querySelectorAll(".\\@container\\/bay"),
@@ -788,7 +820,7 @@ describe("the rip card order", () => {
   it("defaults to ascending slot number", async () => {
     showFixture("nine-rips")
 
-    await screen.findByText(/9 bays · 9 ripping/)
+    await screen.findByText("Fixture Disc 1")
 
     expect(displayedDiscOrder()).toEqual(
       Array.from(
@@ -801,7 +833,7 @@ describe("the rip card order", () => {
   it("puts the soonest estimated finish first and remembers the mode", async () => {
     showFixture("nine-rips")
 
-    await screen.findByText(/9 bays · 9 ripping/)
+    await screen.findByText("Fixture Disc 1")
     await userEvent.click(
       screen.getByRole("radio", {
         name: "finishing soonest",

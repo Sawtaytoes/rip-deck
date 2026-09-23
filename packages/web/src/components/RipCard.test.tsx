@@ -28,6 +28,23 @@ const renderCard = (
 ) => renderWithProviders(ui, dataSource)
 
 describe("RipCard", () => {
+  it("names the current activity before a percentage is available", () => {
+    renderCard(
+      <RipCard
+        rip={buildRip({ active: true, percent: null })}
+        onShowLog={noop}
+        onAction={noop}
+        now={NOW}
+      />,
+    )
+    expect(
+      screen.getByText("Preparing disc"),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("progressbar"),
+    ).not.toHaveAttribute("aria-valuenow")
+  })
+
   it("leads with the slot and the disc, not the drive", () => {
     // §12's ranked list: slot, disc, thumbnail — and the drive
     // name tenth, behind the advanced-info disclosure. It was
@@ -44,14 +61,8 @@ describe("RipCard", () => {
     expect(screen.getByText("7")).toBeInTheDocument()
     expect(screen.getByText("Ivanhoe")).toBeInTheDocument()
 
-    // Said TWICE on a card the daemon gave a `disctype_label`:
-    // once as the `DiscKindLogo` mark's accessible name, once in
-    // the detail row. That is the deliberate trade — the mark
-    // has to name itself because `discTypeText` returns null on
-    // every bay adopted from the ledger, and on those cards it
-    // is the only place the type appears at all. A two-word
-    // repeat is cheaper than a silent mark.
-    expect(screen.getAllByText("Blu-ray")).toHaveLength(2)
+    // The logo keeps its accessible name without repeating the type below.
+    expect(screen.getAllByText("Blu-ray")).toHaveLength(1)
     expect(
       screen.getByRole("img", { name: "Blu-ray" }),
     ).toBeInTheDocument()
@@ -69,13 +80,10 @@ describe("RipCard", () => {
       />,
     )
 
-    // With no disc name the drive IS the title — bare, because
-    // the slot is already its own field beside it. Twice: the
-    // headline, and again inside the advanced panel where the
-    // drive properly belongs.
+    // The bare drive model is the fallback title. Drive details live in a modal.
     expect(
       screen.getAllByText("Pioneer BDR-211M"),
-    ).toHaveLength(2)
+    ).toHaveLength(1)
     expect(
       screen.queryByText(/07 - Pioneer/),
     ).not.toBeInTheDocument()
@@ -117,23 +125,14 @@ describe("RipCard", () => {
       />,
     )
 
-    const liveMetrics = screen.getByText(
-      /12m elapsed · ~15m left · .* MB\/s/,
-    )
-    expect(liveMetrics).toBeInTheDocument()
-    // Speed is visible in the phone card. It no longer lives in
-    // the narrow-only hidden detail wrapper.
+    expect(screen.getByText("~15m")).toBeInTheDocument()
     expect(
-      liveMetrics.parentElement?.className,
-    ).not.toContain("@max-md/bay:hidden")
-
-    const finish = screen.getByText(/Estimated finish/)
-    expect(finish).toBeInTheDocument()
-    // The Narrow View hides the detail wrapper. The completion clock is a
-    // direct card child, so it remains visible at every card width.
-    expect(finish.parentElement?.className).not.toContain(
-      "@max-md/bay:hidden",
-    )
+      screen.getByText(/21.0 MB\/s/),
+    ).toBeInTheDocument()
+    expect(screen.getByText("Finishes")).toBeInTheDocument()
+    expect(
+      screen.getByText("12m elapsed"),
+    ).toBeInTheDocument()
   })
 
   it("says nothing about the ETA when the daemon has no rate", () => {
@@ -176,7 +175,7 @@ describe("RipCard", () => {
   // Item 6 of the ranked list. MakeMKV emits PRGC (this title)
   // and PRGT (the whole backup); `/json` serialises only the
   // total as `percent`, and the current item's LABEL as `stage`.
-  it("names the item being written, alongside the overall percent", () => {
+  it("omits the ripper stage and keeps the overall percent", () => {
     renderCard(
       <RipCard
         rip={buildRip({ stage: "Saving title 3" })}
@@ -187,8 +186,8 @@ describe("RipCard", () => {
     )
 
     expect(
-      screen.getByText("Saving title 3"),
-    ).toBeInTheDocument()
+      screen.queryByText("Saving title 3"),
+    ).not.toBeInTheDocument()
     expect(screen.getByText("43.0%")).toBeInTheDocument()
   })
 
@@ -351,54 +350,65 @@ describe("RipCard", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("renders only the actions the daemon published", async () => {
+  it("shows only Cancel for an ordinary live rip even with legacy actions", async () => {
     const onAction = vi.fn()
-
     renderCard(
       <RipCard
-        rip={buildRip()}
+        rip={buildRip({ verdict: "unknown" })}
         bay={buildBayView({
           actions: ["keep_trying", "give_up", "cancel"],
+          state: {
+            ...buildBayView().state,
+            verdict: "unknown",
+          },
         })}
         onShowLog={noop}
         onAction={onAction}
         now={NOW}
       />,
     )
-
-    // `buildBayView` is a RIPPING bay, and opening its tray
-    // destroys 90 GB and an hour. The daemon refuses it as the
-    // first branch of `decideTrayBayAction`; the card must not
-    // offer it at all.
     expect(
-      screen.queryByRole("button", { name: /tray/i }),
+      screen.queryByRole("button", { name: "Keep trying" }),
     ).not.toBeInTheDocument()
-
-    await userEvent.click(
-      screen.getByRole("button", { name: "Keep trying" }),
+    expect(
+      screen.queryByRole("button", { name: "Give up" }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText("Ripping")).toBeInTheDocument()
+    expect(
+      screen.queryByText(/Cancel stops the rip/),
+    ).not.toBeInTheDocument()
+    await userEvent.hover(
+      screen.getByRole("button", { name: "Cancel" }),
     )
-
+    expect(
+      await screen.findByRole("tooltip"),
+    ).toHaveTextContent("keeps its partial output")
+    await userEvent.click(
+      screen.getByRole("button", { name: "Cancel" }),
+    )
     expect(onAction).toHaveBeenCalledWith({
       driveId: "usb-2-1-1-2-4-4-7",
       label: "07 - Pioneer BDR-211M",
-      action: "keep_trying",
+      action: "cancel",
     })
+  })
 
+  it("tints the entire card when a live rip has read errors", () => {
+    renderCard(
+      <RipCard
+        rip={buildRip({ read_error_count: 2 })}
+        onShowLog={noop}
+        onAction={noop}
+        now={NOW}
+      />,
+    )
+    expect(screen.getByRole("article")).toHaveClass(
+      "bg-intent-warning-surface",
+    )
     expect(
-      screen.getByText(
-        "Keep trying disables the automatic stall timeout for this rip.",
-      ),
+      screen.getByText("Needs attention"),
     ).toBeInTheDocument()
-    expect(
-      screen.getByText(
-        "Give up stops the rip and keeps its partial output.",
-      ),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText(
-        "Cancel stops the rip, keeps its partial output, and opens its tray.",
-      ),
-    ).toBeInTheDocument()
+    expect(screen.getByText("43.0%")).toBeInTheDocument()
   })
 
   // §2: "This button should also have an eject icon, not 'open
@@ -569,43 +579,6 @@ describe("RipCard", () => {
         name: /Show the log/,
       }),
     ).not.toBeInTheDocument()
-  })
-
-  // Item 10: "Drive name, serial, and other info like MakeMKV
-  // (I can get that from clicking an 'advanced info' icon or
-  // something)."
-  it("keeps the drive, its serial and the addressing behind advanced info", async () => {
-    renderCard(
-      <RipCard
-        rip={buildRip()}
-        drive={{
-          name: "sr2",
-          mount: "/dev/sr2",
-          current: null,
-          previous: null,
-          maker: "Pioneer",
-          model: "BD-RW BDR-211M",
-          serial_id: "EXAMPLE00007",
-          drive_id: "usb-2-1-1-2-4-4-7",
-          slot: 7,
-          is_quarantined: false,
-          quarantine_reason: null,
-        }}
-        onShowLog={noop}
-        onAction={noop}
-        now={NOW}
-      />,
-    )
-
-    await userEvent.click(screen.getByText(/drive info/))
-
-    expect(
-      screen.getByText("EXAMPLE00007"),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText("Pioneer BDR-211M"),
-    ).toBeInTheDocument()
-    expect(screen.getByText("/dev/sr2")).toBeInTheDocument()
   })
 
   it("does not claim an adopted completed rip has no telemetry", () => {

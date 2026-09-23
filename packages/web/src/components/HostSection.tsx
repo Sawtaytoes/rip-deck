@@ -1,3 +1,5 @@
+import { useState } from "react"
+
 import {
   heldDetailLines,
   isBayHeld,
@@ -20,11 +22,12 @@ import type {
 } from "../types"
 import { BayGrid } from "./BayGrid"
 import { ClearLoadedButton } from "./ClearLoadedButton"
+import { DriveDetailsModal } from "./DriveDetailsModal"
 import { DriveRail } from "./DriveRail"
 import { HeldBayCard } from "./HeldBayCard"
 import { LoadedDiscsBanner } from "./LoadedDiscsBanner"
 import { QuarantinedBayCard } from "./QuarantinedBayCard"
-import { RipCard } from "./RipCard"
+import { RipCard, type RipCardLayout } from "./RipCard"
 import { TowerAlerts } from "./TowerAlerts"
 import { UsbAlertBanner } from "./UsbAlertBanner"
 
@@ -68,6 +71,7 @@ export function HostSection({
   actionFor,
   columns,
   sortMode,
+  cardLayout = "band",
   now,
 }: {
   host: Host
@@ -88,9 +92,17 @@ export function HostSection({
   columns: number
   /** Order within each existing card bucket. */
   sortMode: RipSortMode
+  cardLayout?: RipCardLayout
   /** Injectable so elapsed text is deterministic in tests. */
   now?: number
 }) {
+  const [selectedDriveId, setSelectedDriveId] = useState<
+    string | null
+  >(null)
+  const selectedBay =
+    tower.bays.find(
+      (bay) => bay.drive_id === selectedDriveId,
+    ) ?? null
   const bayByDriveId = new Map<string, BayView>(
     tower.bays.map((bay) => [bay.drive_id, bay]),
   )
@@ -234,26 +246,18 @@ export function HostSection({
       action={actionFor(rip.drive_id)}
       isSharedTrouble={sharedVerdicts.has(rip.verdict)}
       now={now}
+      layout={cardLayout}
     />
   )
 
   return (
     <section className="mb-7">
-      <div className="mb-2.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-border-subtle pb-1.5">
-        <span className="font-semibold text-content-primary">
-          {host.host}
-        </span>
-        <span className="text-base text-content-muted">
-          {tower.drive_count} bays · {tower.active_count}{" "}
-          ripping
-        </span>
-        {!host.ok && (
-          <span className="text-base text-intent-danger-content">
-            collector failed
-            {host.err ? `: ${host.err}` : ""}
-          </span>
-        )}
-      </div>
+      {!host.ok && (
+        <div className="mb-2.5 text-base text-intent-danger-content">
+          collector failed
+          {host.err ? `: ${host.err}` : ""}
+        </div>
+      )}
 
       <UsbAlertBanner alert={tower.usb_alert} />
 
@@ -273,7 +277,12 @@ export function HostSection({
         </div>
       ) : (
         <>
-          <DriveRail bays={tower.bays} />
+          <DriveRail
+            bays={tower.bays}
+            onSelect={(bay) =>
+              setSelectedDriveId(bay.drive_id)
+            }
+          />
 
           <BayGrid columns={columns}>
             {quarantined.map((bay) => (
@@ -347,6 +356,16 @@ export function HostSection({
           )}
         </>
       )}
+      <DriveDetailsModal
+        bay={selectedBay}
+        drive={host.drives?.find(
+          (drive) => drive.drive_id === selectedDriveId,
+        )}
+        rip={current.find(
+          (rip) => rip.drive_id === selectedDriveId,
+        )}
+        onClose={() => setSelectedDriveId(null)}
+      />
     </section>
   )
 }

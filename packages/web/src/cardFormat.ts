@@ -38,7 +38,13 @@ export function jobActionsFor(
   bay: BayView | undefined,
 ): BayAction[] {
   return bayActionsFor(bay).filter(
-    (action) => !TRAY_WORDS.has(action),
+    (action) =>
+      !TRAY_WORDS.has(action) &&
+      action !== "give_up" &&
+      (action !== "keep_trying" ||
+        (bay?.state.verdict !== "unknown" &&
+          bay?.state.verdict !== "ok" &&
+          bay?.alert?.is_keep_trying_sensible === true)),
   )
 }
 

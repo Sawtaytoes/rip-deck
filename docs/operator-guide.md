@@ -40,7 +40,7 @@ audio CD, and its data session is not imaged. The bay card says so.
 
 The dashboard can cancel a running rip. Cancellation waits for that job to stop before it opens only the matching tray.
 
-Attention cards can expose actions such as Keep trying, Give up, and Clear quarantine. Use the action on the affected bay instead of power-cycling the tower during other rips.
+Normal rips show Cancel. Keep trying appears only for a known issue that permits continued reading. Hover over or focus a control for its explanation. Select a slot chip to open its drive details. Use the action on the affected bay instead of power-cycling the tower during other rips.
 
 ## Use tray controls safely
 

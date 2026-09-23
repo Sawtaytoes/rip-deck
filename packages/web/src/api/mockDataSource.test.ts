@@ -247,13 +247,13 @@ describe("suspected vs confirmed", () => {
   // The two-drive rule made visible. A disc verdict from one
   // drive shows and offers a retry; two drives agreeing is what
   // upgrades it, and only the upgrade may announce.
-  it("offers a retry on the suspected bay and none on the confirmed one", () => {
+  it("keeps suspected diagnoses in the UI without inventing retry actions", () => {
     const state = createFixtureState("confidence")
     const suspected = bayOf(state, 2)
     const confirmed = bayOf(state, 8)
 
     expect(suspected.verdict_confidence).toBe("suspected")
-    expect(suspected.actions).toContain(
+    expect(suspected.actions).not.toContain(
       "retry_in_another_drive",
     )
     expect(suspected.is_announceable).toBe(false)
