@@ -231,14 +231,17 @@ const buildBayActions = (bay: BaySnapshot): BayAction[] => {
   if (!job) return actions
 
   const isActive = isJobActive(job.state)
-  const isTroubled = job.verdict.kind !== "ok"
+  const isTroubled =
+    job.verdict.kind !== "ok" &&
+    job.verdict.kind !== "unknown"
 
   if (
     isActive &&
     isTroubled &&
+    job.verdict.isKeepTryingSensible &&
     !job.isKeepTryingRequested
   ) {
-    actions.push("keep_trying", "give_up")
+    actions.push("keep_trying")
   }
 
   if (isActive) actions.push("cancel")
