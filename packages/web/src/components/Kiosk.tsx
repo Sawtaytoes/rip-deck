@@ -5,7 +5,7 @@ import {
   Modal,
   ProgressBar,
 } from "@charcuterie/ui"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useLocation, useParams } from "react-router"
 import { readFixtureName } from "../fixture"
 import { trayActionsFor } from "../format"
@@ -28,7 +28,117 @@ type CancelTarget = {
   title: string
 }
 
-/** All configured slots in physical order, with dedicated full-size controls. */
+const KIOSK_TRANSIENT_BAY_MS = 12_000
+
+const kioskBayChangeKey = (bay: BayView): string =>
+  [
+    bay.state.job_id ?? "empty",
+    bay.state.state,
+    bay.last_tray_command ?? "none",
+    bay.disc_size_sectors ?? "none",
+    bay.is_present ? "present" : "offline",
+  ].join(":")
+
+/**
+ * Keep a bay visible briefly after a tray or job transition.
+ *
+ * The first snapshot deliberately seeds the memory without revealing every
+ * idle bay. The kiosk can therefore open on the active work, while a later
+ * tray move, completion, or failure still gets a short visible acknowledgement.
+ */
+const useFocusedKioskBays = (
+  bays: BayView[],
+): BayView[] => {
+  const previousKeys = useRef<Map<string, string> | null>(
+    null,
+  )
+  const [visibleUntil, setVisibleUntil] = useState<
+    Map<string, number>
+  >(() => new Map())
+
+  useEffect(() => {
+    // The query has no tower on its loading render. Do not mistake the first
+    // real document for nine simultaneous state changes.
+    if (bays.length === 0) {
+      previousKeys.current = null
+      return
+    }
+
+    const nextKeys = new Map(
+      bays.map((bay) => [
+        bay.drive_id,
+        kioskBayChangeKey(bay),
+      ]),
+    )
+    const previous = previousKeys.current
+    previousKeys.current = nextKeys
+
+    if (previous === null) return
+
+    const now = Date.now()
+    setVisibleUntil((current) => {
+      const next = new Map(current)
+      let changed = false
+
+      for (const bay of bays) {
+        const isActive = kioskBaySummary(bay).isActive
+        const didChange =
+          previous.get(bay.drive_id) !==
+          nextKeys.get(bay.drive_id)
+
+        if (isActive && next.delete(bay.drive_id)) {
+          changed = true
+        } else if (!isActive && didChange) {
+          next.set(
+            bay.drive_id,
+            now + KIOSK_TRANSIENT_BAY_MS,
+          )
+          changed = true
+        }
+      }
+
+      for (const driveId of next.keys()) {
+        if (!nextKeys.has(driveId)) {
+          next.delete(driveId)
+          changed = true
+        }
+      }
+
+      return changed ? next : current
+    })
+  }, [bays])
+
+  useEffect(() => {
+    if (visibleUntil.size === 0) return
+
+    const now = Date.now()
+    const nextExpiry = Math.min(...visibleUntil.values())
+    const timeout = window.setTimeout(
+      () => {
+        const expiryTime = Date.now()
+        setVisibleUntil((current) => {
+          const next = new Map(
+            [...current].filter(
+              ([, until]) => until > expiryTime,
+            ),
+          )
+          return next.size === current.size ? current : next
+        })
+      },
+      Math.max(0, nextExpiry - now) + 1,
+    )
+
+    return () => window.clearTimeout(timeout)
+  }, [visibleUntil])
+
+  const now = Date.now()
+  return bays.filter((bay) => {
+    if (kioskBaySummary(bay).isActive) return true
+    return (visibleUntil.get(bay.drive_id) ?? 0) > now
+  })
+}
+
+/** Active slots in physical order, with dedicated full-size controls. */
 export const Kiosk = () => {
   const { driveId } = useParams<{ driveId: string }>()
   const { search } = useLocation()
@@ -44,6 +154,7 @@ export const Kiosk = () => {
     (first, second) =>
       (first.slot ?? 999) - (second.slot ?? 999),
   )
+  const focusedBays = useFocusedKioskBays(bays)
   const selected = bays.find(
     (bay) => bay.drive_id === driveId,
   )
@@ -301,16 +412,34 @@ export const Kiosk = () => {
             its bays.
           </p>
         </section>
+      ) : !driveId && tower && focusedBays.length === 0 ? (
+        <section
+          className="rip-kiosk-idle"
+          aria-label="Rip status"
+        >
+          <h1>No rips running</h1>
+          <p>
+            Active slots will appear here automatically.
+          </p>
+        </section>
       ) : (
         !driveId && (
           <section
             className="rip-kiosk-rows"
-            aria-label="Drive slots"
+            aria-label="Active drive slots"
+            data-visible-count={focusedBays.length}
+            data-row-density={
+              focusedBays.length <= 3
+                ? "focus"
+                : focusedBays.length <= 6
+                  ? "roomy"
+                  : "compact"
+            }
             style={{
-              gridTemplateRows: `repeat(${Math.max(1, bays.length)}, minmax(0, 1fr))`,
+              gridTemplateRows: `repeat(${focusedBays.length}, minmax(0, 1fr))`,
             }}
           >
-            {bays.map((bay) => {
+            {focusedBays.map((bay) => {
               const row = kioskBaySummary(bay)
               return (
                 <ButtonLink

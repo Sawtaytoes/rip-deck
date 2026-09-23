@@ -32,7 +32,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-test("shows nine rows, disc artwork and targeted controls, with a route back", async () => {
+test("shows disc artwork and targeted controls on a direct detail route", async () => {
   const fixture =
     await mockDataSource.fetchState("nine-rips")
   const tower = fixture.ripDeck
@@ -75,34 +75,31 @@ test("shows nine rows, disc artwork and targeted controls, with a route back", a
   const runTrayCommand = vi.fn(async () =>
     buildTrayCommandReport(),
   )
+  const detailRoutes = (
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <Navigate
+            to={`/kiosk/slots/${bay.drive_id}`}
+            replace
+          />
+        }
+      />
+      <Route path="/kiosk" element={<Kiosk />} />
+      <Route
+        path="/kiosk/slots/:driveId"
+        element={<Kiosk />}
+      />
+    </Routes>
+  )
   renderWithProviders(
-    routes,
+    detailRoutes,
     createStubDataSource({
       fetchState: async () => state,
       runTrayCommand,
     }),
   )
-  expect(
-    await screen.findAllByRole("link", {
-      name: /^Slot \d:/,
-    }),
-  ).toHaveLength(9)
-  expect(screen.queryByRole("heading")).toBeNull()
-  // The visible label is the bare number — never the word "Slot" —
-  // and the rip name is the headline of every row.
-  const firstRow = screen.getByRole("link", {
-    name: /^Slot 1:/,
-  })
-  expect(firstRow).toHaveTextContent(/^1/)
-  expect(firstRow).toHaveTextContent(bay.state.title)
-  // The progress bar's accessible name still says "slot"; it is
-  // screen-reader only, so nothing visible may say the word.
-  expect(
-    within(firstRow).queryByText(/Slot/, {
-      ignore: ".sr-only",
-    }),
-  ).toBeNull()
-  await userEvent.click(firstRow)
   const heading = await screen.findByRole("heading", {
     name: new RegExp(`^1\\s*${bay.state.title}$`),
   })
@@ -141,7 +138,165 @@ test("shows nine rows, disc artwork and targeted controls, with a route back", a
     await screen.findAllByRole("link", {
       name: /^Slot \d:/,
     }),
-  ).toHaveLength(9)
+  ).toHaveLength(8)
+})
+
+test("hides idle and finished slots so active rips fill the kiosk", async () => {
+  const fixture =
+    await mockDataSource.fetchState("showcase")
+  renderWithProviders(
+    routes,
+    createStubDataSource({
+      fetchState: async () => fixture,
+    }),
+  )
+
+  const rows = await screen.findAllByRole("link", {
+    name: /^Slot \d:/,
+  })
+  expect(rows).toHaveLength(4)
+  expect(rows[0]).toHaveTextContent(/^1/)
+  expect(
+    within(rows[0]).queryByText(/Slot/, {
+      ignore: ".sr-only",
+    }),
+  ).toBeNull()
+  expect(
+    rows.map((row) => row.getAttribute("aria-label")),
+  ).toEqual([
+    expect.stringMatching(/^Slot 1:/),
+    expect.stringMatching(/^Slot 2:/),
+    expect.stringMatching(/^Slot 3:/),
+    expect.stringMatching(/^Slot 4:/),
+  ])
+  expect(
+    screen.getByRole("region", {
+      name: "Active drive slots",
+    }),
+  ).toHaveAttribute("data-row-density", "roomy")
+})
+
+test("shows a calm idle message instead of nine empty rows", async () => {
+  const fixture = await mockDataSource.fetchState(
+    "held-at-startup",
+  )
+  const tower = fixture.ripDeck
+  if (!tower) throw new Error("Fixture needs a tower")
+
+  renderWithProviders(
+    routes,
+    createStubDataSource({
+      fetchState: async () => ({
+        ...fixture,
+        ripDeck: {
+          ...tower,
+          bays: tower.bays.map((bay) => ({
+            ...bay,
+            state: {
+              ...bay.state,
+              state: "idle" as const,
+              job_id: null,
+              title: null,
+            },
+          })),
+        },
+      }),
+    }),
+  )
+
+  expect(
+    await screen.findByRole("heading", {
+      name: "No rips running",
+    }),
+  ).toBeVisible()
+  expect(screen.queryByRole("link")).toBeNull()
+})
+
+test("briefly includes an inactive slot after its tray changes", async () => {
+  const fixture =
+    await mockDataSource.fetchState("showcase")
+  const initialTower = fixture.ripDeck
+  const target = initialTower?.bays.find(
+    (bay) => bay.slot === 5,
+  )
+  if (!initialTower || !target)
+    throw new Error("Fixture needs a completed slot 5")
+
+  let current = {
+    ...fixture,
+    ripDeck: { ...initialTower, is_fake: false },
+  }
+  const runTrayCommand = vi.fn(async () => {
+    const tower = current.ripDeck
+    current = {
+      ...current,
+      ripDeck: {
+        ...tower,
+        bays: tower.bays.map((bay) =>
+          bay.drive_id === target.drive_id
+            ? {
+                ...bay,
+                last_tray_command: "open_bay" as const,
+              }
+            : bay,
+        ),
+      },
+    }
+    return buildTrayCommandReport({
+      bays: [
+        {
+          drive_id: target.drive_id,
+          slot: target.slot,
+          label: target.label,
+          result: "opened",
+          detail: "Slot 5 opened.",
+        },
+      ],
+    })
+  })
+  const detailRoutes = (
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <Navigate
+            to={`/kiosk/slots/${target.drive_id}`}
+            replace
+          />
+        }
+      />
+      <Route path="/kiosk" element={<Kiosk />} />
+      <Route
+        path="/kiosk/slots/:driveId"
+        element={<Kiosk />}
+      />
+    </Routes>
+  )
+
+  renderWithProviders(
+    detailRoutes,
+    createStubDataSource({
+      fetchState: async () => current,
+      runTrayCommand,
+    }),
+  )
+
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Open" }),
+  )
+  await waitFor(() =>
+    expect(runTrayCommand).toHaveBeenCalledOnce(),
+  )
+  await userEvent.click(
+    screen.getByRole("link", { name: "Back" }),
+  )
+
+  expect(
+    await screen.findByRole("link", { name: /^Slot 5:/ }),
+  ).toBeVisible()
+  expect(
+    screen.getAllByRole("link", { name: /^Slot \d:/ }),
+  ).toHaveLength(5)
 })
 
 test("disables all physical controls for preview data and an active rip", async () => {
