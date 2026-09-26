@@ -334,58 +334,6 @@ describe.each(SCHEMES)("%s scheme", (scheme) => {
     },
   )
 
-  it.each(KIOSK_FIXTURES)("kiosk %s", async (fixture) => {
-    await sizeViewport(KIOSK_PANEL)
-    renderRoute({
-      path: "/kiosk",
-      url: `/kiosk?fake=${fixture}`,
-      element: <Kiosk />,
-    })
-    await shoot({
-      viewport: KIOSK_PANEL,
-      // A fixed panel: nothing lives below its fold.
-      isFullPage: false,
-      name: `kiosk--${fixture}__${scheme}`,
-      isReady: eventually(() => {
-        const main = document.querySelector("main")
-
-        if (
-          main === null ||
-          main.getAttribute("aria-busy")
-        ) {
-          throw new Error("kiosk still loading")
-        }
-
-        return main
-      }),
-    })
-  })
-
-  // The slot's own page: the poster, the disc details and the
-  // full-size tray buttons CastKit hands a tap on a row to.
-  it("kiosk slot detail", async () => {
-    const [bay] =
-      createFixtureState("showcase").ripDeck.bays
-
-    await sizeViewport(KIOSK_PANEL)
-    renderRoute({
-      path: "/kiosk/slots/:driveId",
-      url: `/kiosk/slots/${bay.drive_id}?fake=showcase`,
-      element: <Kiosk />,
-    })
-    await shoot({
-      viewport: KIOSK_PANEL,
-      // A fixed panel: nothing lives below its fold.
-      isFullPage: false,
-      name: `kiosk--showcase--slot-detail__${scheme}`,
-      isReady: eventually(() =>
-        page
-          .getByRole("button", { name: "Open" })
-          .element(),
-      ),
-    })
-  })
-
   it("history, Wide View", async () => {
     await sizeViewport(WIDE_VIEW)
     renderRoute({
@@ -415,8 +363,58 @@ describe.each(SCHEMES)("%s scheme", (scheme) => {
   })
 })
 
-// The loading card pins `data-scheme="dark"` on itself — it is the
-// image CastKit caches for the panel — so it has one shot, not two.
+// The kiosk pins `data-scheme="dark"` on its own `<main>` — the panel
+// is dark whatever the operator's pick — so every kiosk shot is taken
+// once, with no scheme suffix. Shot in both, the two came out
+// byte-identical.
+it.each(KIOSK_FIXTURES)("kiosk %s", async (fixture) => {
+  await sizeViewport(KIOSK_PANEL)
+  renderRoute({
+    path: "/kiosk",
+    url: `/kiosk?fake=${fixture}`,
+    element: <Kiosk />,
+  })
+  await shoot({
+    viewport: KIOSK_PANEL,
+    // A fixed panel: nothing lives below its fold.
+    isFullPage: false,
+    name: `kiosk--${fixture}`,
+    isReady: eventually(() => {
+      const main = document.querySelector("main")
+
+      if (main === null || main.getAttribute("aria-busy")) {
+        throw new Error("kiosk still loading")
+      }
+
+      return main
+    }),
+  })
+})
+
+// The slot's own page: the poster, the disc details and the
+// full-size tray buttons CastKit hands a tap on a row to.
+it("kiosk slot detail", async () => {
+  const [bay] = createFixtureState("showcase").ripDeck.bays
+
+  await sizeViewport(KIOSK_PANEL)
+  renderRoute({
+    path: "/kiosk/slots/:driveId",
+    url: `/kiosk/slots/${bay.drive_id}?fake=showcase`,
+    element: <Kiosk />,
+  })
+  await shoot({
+    viewport: KIOSK_PANEL,
+    // A fixed panel: nothing lives below its fold.
+    isFullPage: false,
+    name: `kiosk--showcase--slot-detail`,
+    isReady: eventually(() =>
+      page.getByRole("button", { name: "Open" }).element(),
+    ),
+  })
+})
+
+// The loading card is the image CastKit caches for the panel, dark
+// for the same reason.
 it("kiosk loading", async () => {
   await sizeViewport(KIOSK_PANEL)
   renderRoute({

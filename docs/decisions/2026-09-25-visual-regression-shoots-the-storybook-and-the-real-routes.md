@@ -18,13 +18,15 @@ shots against the baseline in the repo's own bucket and reports at
    Storybook capture. 14 stories, 28 shots.
 2. **`routes/`** — the real routes, rendered by `yarn vrt:capture`
    (`packages/web/src/vrt/routes.vrt.tsx` on `packages/web/vitest.vrt.config.ts`), a
-   Vitest browser-mode file that writes PNGs instead of asserting. 47 shots:
+   Vitest browser-mode file that writes PNGs instead of asserting. 42 shots:
    - the dashboard on all 12 fixture scenarios in the Wide View (1280 wide), and on 4
      of them in the Narrow View (390 wide), full page height;
    - the kiosk at CastKit's 480x320 panel on 4 scenarios, one slot detail page, and
      the loading card CastKit caches;
    - the history in the Wide View and the Narrow View;
-   - each in dark and light, except the loading card, which pins dark itself.
+   - the dashboard and the history in dark and light. The kiosk pins
+     `data-scheme="dark"` on its own `<main>`, so its six shots are taken once: the
+     first run shot them in both schemes and every pair was byte-identical.
 
 Every shot shows the bundled fixtures (`mockDataSource`, the daemon's scenarios
 transcribed), never a live rack.
@@ -73,7 +75,7 @@ on the tower, and the history, and none of them has a story.
   `agentic/docs/decisions/2026-09-25-every-owned-charcuterie-app-runs-vrt.md`.
 - Determinism, measured locally on 2026-09-25: the full CI sequence (Storybook build,
   shared Storybook capture, `yarn vrt:capture`) ran twice into `.vrt-actual`, and all
-  75 PNGs had identical sha256 sums. A third route capture with the host set to
+  PNGs had identical sha256 sums. A third route capture with the host set to
   `TZ=America/Los_Angeles` was also identical, which shows that the context's time
   zone pin holds.
 - Found by the first capture: in the Narrow View, a history card with the wide UHD
