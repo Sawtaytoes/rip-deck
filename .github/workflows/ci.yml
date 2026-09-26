@@ -96,6 +96,40 @@ jobs:
           npx charcuterie-check-optimize-deps ./optimizeDeps.js
           --cache-dir node_modules/.vite
 
+  # Visual regression, through Charcuterie's shared workflow: the
+  # repo supplies the shots, reg-suit compares them against the
+  # baseline in this repo's bucket and posts a `vrt` status plus one
+  # pull-request comment. The fork guard lives inside the shared
+  # workflow — this repo is public and the runner is on the LAN.
+  #
+  # Two sources, into one directory:
+  #   storybook/  every story, dark and light.
+  #   routes/     the real routes on fixture data — the dashboard in
+  #               the Wide and Narrow Views, the 480x320 kiosk, the
+  #               history — written by `yarn vrt:capture`
+  #               (`packages/web/src/vrt/routes.vrt.tsx`).
+  # The capture brings its own chromium: the repo's Playwright pins a
+  # different revision from the capture tool's.
+  #
+  # Not a required check, by design; a red `vrt` is diagnosed in its
+  # own pull request, never merged past.
+  vrt:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.isDocsOnly != 'true' }}
+    permissions:
+      contents: read
+      statuses: write
+      pull-requests: write
+    uses: Sawtaytoes/charcuterie/.github/workflows/shared-vrt.yml@workflows-v1
+    with:
+      buildCommand: yarn workspace @rip-deck/web build-storybook
+      storybookStaticDirs: storybook=packages/web/storybook-static
+      storybookSchemeGlobal: scheme
+      storybookSchemes: dark,light
+      storybookSchemeAttribute: data-scheme
+      captureCommand: yarn playwright install chromium-headless-shell && yarn vrt:capture
+    secrets: inherit
+
   # Build the runtime image and push it to GHCR; TrueNAS pulls it from
   # there and force-pulls `:latest` on `midclt call app.redeploy rip-deck`
   # (mirrors castkit's docker-deploy). Skipped on pull_request.
