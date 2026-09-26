@@ -17,6 +17,7 @@
     "lint": "yarn lint:biome && yarn lint:eslint",
     "install-playwright-browser": "yarn playwright install chromium --with-deps",
     "test": "vitest",
+    "vrt:capture": "yarn workspace @rip-deck/web vitest run --config vitest.vrt.config.ts",
     "typecheck": "tsc --noEmit && yarn workspaces foreach -Ap run typecheck"
   },
   "dependencies": {

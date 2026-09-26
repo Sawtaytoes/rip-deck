@@ -35,3 +35,9 @@ coverage/
 # separate repos, which is how they were mistaken for exactly that.
 # Matches gallery-downloader and mux-magic.
 .claude/worktrees/
+# Visual regression: the shots a capture writes and reg-suit's working
+# files. The shared `vrt` workflow writes its own `.regconfig.json`;
+# none of the three is ever committed.
+.vrt-actual/
+.reg/
+.regconfig.json
