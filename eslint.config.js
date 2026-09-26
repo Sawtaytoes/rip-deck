@@ -61,6 +61,9 @@ export default tseslint.config(
           // hard parse error rather than a lint result.
           allowDefaultProject: [
             "packages/*/vitest.config.ts",
+            // The visual-regression capture's config, the same class
+            // of file for the same reason.
+            "packages/*/vitest.vrt.config.ts",
             // The declaration beside `optimizeDeps.js`. That list is
             // plain JS so `charcuterie-check-optimize-deps` can read it
             // from a plain Node process; this `.d.ts` is what keeps the
@@ -73,7 +76,13 @@ export default tseslint.config(
     },
   },
   {
-    files: ["**/*.test.ts", "**/*.test.tsx"],
+    // `*.vrt.tsx` is the visual-regression capture: a vitest file
+    // too, just one that writes screenshots instead of asserting.
+    files: [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.vrt.tsx",
+    ],
     extends: [vitest.configs.recommended],
     rules: {
       // A test double standing in for an async dependency has to
@@ -90,6 +99,18 @@ export default tseslint.config(
       // narrows the discriminated union before the assertions
       // that read its variant-specific fields.
       "vitest/no-conditional-expect": "off",
+    },
+  },
+  {
+    // A capture's "assertion" is the screenshot it writes; `shoot`
+    // waits for the route to be ready and fails the run when it never
+    // is, so the rule counts it as one.
+    files: ["**/*.vrt.tsx"],
+    rules: {
+      "vitest/expect-expect": [
+        "error",
+        { assertFunctionNames: ["expect", "shoot"] },
+      ],
     },
   },
 )
