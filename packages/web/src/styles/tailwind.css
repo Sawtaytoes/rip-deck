@@ -185,15 +185,6 @@ body {
   gap: 0;
   pointer-events: none;
 }
-/* Since @charcuterie/ui 4.10 the track sits inside a wrapper div (the
-   slot for its `overlay` prop), which is there even with no overlay.
-   An auto-height wrapper resolves the track's 100% to nothing and the
-   wash disappears, so the wrapper fills the row as well. `> div`
-   matches the track itself on the older shape; the hidden label is a
-   span. */
-.rip-kiosk .rip-kiosk-fill > div {
-  block-size: 100%;
-}
 .rip-kiosk .rip-kiosk-fill [role="progressbar"] {
   block-size: 100%;
   border-radius: 0;
