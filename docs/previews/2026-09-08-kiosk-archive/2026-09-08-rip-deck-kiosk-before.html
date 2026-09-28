@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Rip Deck display test</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101722;color:#f4f6fa;font:16px Arial,sans-serif;width:480px;height:320px;overflow:hidden}header{height:52px;display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#202d40}strong{font-size:18px}small{display:block;font-size:11px;color:#b7c5d9}button{font:inherit;border:1px solid #718bad;border-radius:5px;background:#304766;color:white;height:37px;padding:0 12px;touch-action:manipulation}button:active{background:#87c4ff;color:#101722}#scroll{height:268px;overflow-y:auto;touch-action:pan-y;padding:8px 10px;scrollbar-width:none}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.slot{border:1px solid #49627f;border-radius:5px;padding:8px;height:107px;background:#192638;cursor:pointer;touch-action:pan-y}.slot.selected{background:#2d5072;border-color:#afd6ff}.line{display:flex;justify-content:space-between;align-items:center;font-size:15px}.state{font-size:12px;color:#b7c5d9;margin:8px 0}.track{height:8px;background:#344358;border-radius:2px;overflow:hidden}.bar{height:100%;background:#58b6ff;width:0}.eta{font-size:11px;color:#c1cddd;margin-top:8px}.pass{color:#71e9ad}.fail{color:#ff9e98}footer{padding:12px 0;font-size:13px;color:#b7c5d9}#detail{display:none;position:absolute;inset:52px 0 0;background:#192638;padding:24px}#detail h2{margin:0 0 14px}#detail button{height:50px;margin:5px}#detail p{color:#b7c5d9}#corner{position:absolute;left:1px;top:1px;background:red;width:4px;height:4px}
+</style>
+<header><div><strong>Rip Deck · TEST</strong><small id="transport">Simulated slots · swipe to scroll</small></div><button id="press">Press: 0</button></header>
+<div id="scroll"><div class="grid" id="grid"></div><footer>End of list. Swipe down to return.<br>All actions are simulated.</footer></div>
+<div id="detail"><h2 id="slot-title"></h2><button class="action">Open</button><button class="action">Close</button><button class="action">Taken out</button><p id="result">No action sent to real hardware.</p><button id="back">Back</button></div><div id="corner"></div>
+<script>
+let pressCount=0;let currentSlot=0;let syntheticStep=0;
+const grid=document.querySelector('#grid');
+for(let index=1;index<=12;index++){
+ const slot=document.createElement('div');slot.className='slot';slot.dataset.slot=index;
+ slot.innerHTML=`<div class="line"><b>Slot ${String(index).padStart(2,'0')}</b><span class="percent"></span></div><div class="state"></div><div class="track"><div class="bar"></div></div><div class="eta"></div>`;
+ slot.onclick=()=>{currentSlot=index;document.querySelector('#slot-title').textContent=`Slot ${index} · TEST`;document.querySelector('#detail').style.display='block'};grid.append(slot);
+}
+document.querySelector('#press').onclick=()=>{document.querySelector('#press').textContent=`Press: ${++pressCount}`};
+document.querySelector('#back').onclick=()=>document.querySelector('#detail').style.display='none';
+document.querySelectorAll('.action').forEach(button=>button.onclick=()=>document.querySelector('#result').textContent=`Slot ${currentSlot}: ${button.textContent} acknowledged (test).`);
+window.advance=()=>{syntheticStep++;document.querySelectorAll('.slot').forEach((slot,index)=>{
+ const percent=Math.floor((Date.now()/800+index*13)%100);const done=index===2;const failed=index===5;
+ slot.querySelector('.percent').textContent=done?'100%':failed?'42%':`${percent}%`;
+ slot.querySelector('.state').textContent=done?'Success':failed?'Failed · read error':'Ripping';
+ slot.querySelector('.state').className=`state ${done?'pass':failed?'fail':''}`;
+ slot.querySelector('.bar').style.width=`${done?100:failed?42:percent}%`;
+ slot.querySelector('.bar').style.background=done?'#71e9ad':failed?'#ff9e98':'#58b6ff';
+ slot.querySelector('.eta').textContent=done?'Disc ready to remove':failed?'Touch for details':`About ${100-percent} min left`;
+});};window.advance();
+</script></html>
