@@ -489,7 +489,7 @@ describe("nextTrayCommandFor", () => {
     // means the tray is shut.
     //
     // The tower disagrees. Measured 2026-07-27 against the live
-    // rack: `open_trays` opened slots 7, 8 and 9, and all
+    // rack: `open_trays` opened bays 7, 8 and 9, and all
     // three went on reporting a disc afterwards. Under the old
     // rule the toggle offers `open_bay` forever and can never
     // send its second press — which is the whole feature the
@@ -598,7 +598,7 @@ describe("trayReportToActionResult", () => {
     request_id: null,
     command: "open_bay",
     is_accepted: true,
-    message: "Opened 1 drive: slot 7.",
+    message: "Opened 1 drive: bay 7.",
     started_at: 0,
     finished_at: 1,
     counts: {
@@ -617,7 +617,7 @@ describe("trayReportToActionResult", () => {
     detail: string,
   ) => ({
     drive_id: "usb-2-1-1-2-4-4-7",
-    slot: 7,
+    bay: 7,
     label: "07 - Pioneer BDR-211M",
     result,
     detail,

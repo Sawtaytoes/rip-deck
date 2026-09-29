@@ -68,7 +68,7 @@ import {
  *
  * ## The watcher's own tables are the truth; the events are not
  *
- * `WatcherHandlers` was written for a log: `driveId`, `slot`,
+ * `WatcherHandlers` was written for a log: `driveId`, `bay`,
  * `name`, a `JobProgress` and a `BayOutcome` whose payload is one
  * English sentence. There is no `Job`, no identity, no read-error
  * count and no `createJob` helper anywhere in the repo, so the
@@ -179,7 +179,7 @@ type BayRecord = {
   driveId: string
   /** House name if a handler has told us one; else the id. */
   label: string
-  slot: number | null
+  bay: number | null
   /**
    * The watcher's own `jobUuid` when it could be read, so
    * `job_uuid` in `/json` names the real
@@ -282,12 +282,12 @@ export type TowerFeed = {
  * Measured on the tower 2026-08-27, with all nine trays empty:
  * the `size` attribute under `/sys/block` read the 2097151-sector empty sentinel on
  * every drive and `/json` agreed (`has_disc: false`,
- * `disc_size_sectors: null`) — while slots 1-4 still published
- * `needs_attention` and slots 8-9 still published `completed`,
- * each with its job id, its progress and, on slot 8, a health
+ * `disc_size_sectors: null`) — while bays 1-4 still published
+ * `needs_attention` and bays 8-9 still published `completed`,
+ * each with its job id, its progress and, on bay 8, a health
  * ALERT about a disc that was no longer in the building.
  *
- * The bays that cleared correctly are the tell: slots 5-7 read
+ * The bays that cleared correctly are the tell: bays 5-7 read
  * `idle`, and those are exactly the bays whose last outcome came
  * from startup ADOPTION, which emits a note and deliberately
  * never an outcome. No outcome event, no record to go stale.
@@ -503,7 +503,7 @@ const buildVerdict = (input: {
  *
  * OMDb answering `Troy` for `TROY - BONUS DISC` is a correct
  * match and would still be the wrong headline: three Troy discs
- * sat in slots 7-9 of the real tower, and rewriting all three
+ * sat in bays 7-9 of the real tower, and rewriting all three
  * cards to "Troy" would take away the only thing that told them
  * apart. The disc's own name stays the `title` and the raw
  * label stays the `volumeLabel`; the lookup contributes what
@@ -718,13 +718,13 @@ export const createTowerFeed = ({
   const createRecord = (input: {
     driveId: string
     label?: string
-    slot?: number | null
+    bay?: number | null
   }): BayRecord => ({
     driveId: input.driveId,
     // Until a handler tells us the house name, the stable id is
     // the honest label — never `/dev/srN`, which reshuffles.
     label: input.label ?? input.driveId,
-    slot: input.slot ?? null,
+    bay: input.bay ?? null,
     jobId: "",
     startedAtMs: null,
     finishedAtMs: null,
@@ -764,7 +764,7 @@ export const createTowerFeed = ({
         // very poll; the record's comes from whatever event last
         // spoke, and is the drive id for a bay that never has.
         label: sighting?.label ?? record.label,
-        slot: sighting?.slot ?? record.slot,
+        bay: sighting?.bay ?? record.bay,
         devPath: sighting?.devPath ?? null,
         vendor: sighting?.vendor ?? null,
         model: sighting?.model ?? null,
@@ -814,7 +814,7 @@ export const createTowerFeed = ({
     driveId: string
     /** The bay's house name, which the handlers call `name`. */
     name: string
-    slot: number | null
+    bay: number | null
   }): BayRecord => {
     const existing = records.get(input.driveId)
 
@@ -823,12 +823,12 @@ export const createTowerFeed = ({
         ? createRecord({
             driveId: input.driveId,
             label: input.name,
-            slot: input.slot,
+            bay: input.bay,
           })
         : existing
 
     record.label = input.name
-    record.slot = input.slot
+    record.bay = input.bay
 
     if (record.startedAtMs === null) {
       record.startedAtMs = now()
@@ -854,7 +854,7 @@ export const createTowerFeed = ({
     // bay went on to do published that stale id as `job_uuid`. The
     // dashboard's Logs button then asked `/logs` for a
     // `<uuid>.robot.log` that does not exist and got a 404.
-    // Measured 2026-07-30: slot 9 ripped 84 GB clean and its card
+    // Measured 2026-07-30: bay 9 ripped 84 GB clean and its card
     // pointed at `3387a174…` while the capture was `e7d95e40…`.
     // Not specific to the Rip button — any held bay that later rips
     // hit it.
@@ -921,7 +921,7 @@ export const createTowerFeed = ({
       // outcome so a finished card survives until the next
       // disc, and that is right while the disc is still IN the
       // tray — but a bay whose disc has been taken out has
-      // nothing left to describe. The label and slot carry over
+      // nothing left to describe. The label and bay carry over
       // because they belong to the DRIVE, not to the run.
       const record =
         existing === undefined
@@ -930,7 +930,7 @@ export const createTowerFeed = ({
             ? createRecord({
                 driveId: bay.driveId,
                 label: existing.label,
-                slot: existing.slot,
+                bay: existing.bay,
               })
             : existing
 

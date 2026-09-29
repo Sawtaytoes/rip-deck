@@ -56,7 +56,7 @@ import type { BayOutcome } from "./watcher.ts"
  * being looked at only.
  *
  * What IS here is everything the job files do not know: the
- * disc's name, its type, where the rip landed, which slot it was
+ * disc's name, its type, where the rip landed, which bay it was
  * in, and the one English sentence rip-deck wrote about how it
  * went.
  *
@@ -108,8 +108,8 @@ export type RipHistoryRecord = {
   jobUuid: string
   /** Stable drive identity — the USB port path, never `srN`. */
   driveId: string
-  slot: number | null
-  /** The bay's house label, e.g. "Slot 4". */
+  bay: number | null
+  /** The bay's house label, e.g. "Bay 4". */
   bayName: string | null
   /**
    * The disc's own name, as `identifyDisc` read it.
@@ -251,7 +251,18 @@ export const readRipHistory = async (input: {
       continue
     }
 
-    if (isRipHistoryRecord(parsed)) records.push(parsed)
+    if (isRipHistoryRecord(parsed)) {
+      // History written before the bay terminology change has
+      // `slot` on disk. Keep every old row readable without
+      // rewriting the append-only log.
+      const legacy = parsed as RipHistoryRecord & {
+        slot?: number | null
+      }
+      records.push({
+        ...parsed,
+        bay: parsed.bay ?? legacy.slot ?? null,
+      })
+    }
   }
 
   return records

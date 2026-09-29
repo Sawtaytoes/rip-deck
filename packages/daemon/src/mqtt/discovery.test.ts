@@ -14,12 +14,12 @@ const drives: DiscoveryDrive[] = [
   {
     driveId: "2-1.3.3",
     label: "07 - Pioneer BDR-211M",
-    slot: 7,
+    bay: 7,
   },
   {
     driveId: "2-1.3.2",
     label: "08 - Pioneer BDR-211M",
-    slot: 8,
+    bay: 8,
   },
 ]
 
@@ -118,11 +118,11 @@ describe("buildDiscoveryMessages", () => {
     ).toBe(false)
   })
 
-  it("keys discovery on the slot, not the USB path", () => {
+  it("keys discovery on the bay, not the USB path", () => {
     // Path-keyed unique_ids broke the tablet-dash bay tiles
     // when the tower moved 2-1.1.2 → 2-1.3: HA kept the old
     // entities (pretty names) on the dead topics and minted a
-    // second set on the live path. Slot is stable across re-cables.
+    // second set on the live path. Bay is stable across re-cables.
     const messages = buildDiscoveryMessages({ drives })
     const status = messages.find(
       (message) =>
@@ -140,13 +140,13 @@ describe("buildDiscoveryMessages", () => {
     )
   })
 
-  it("falls back to the path slug when the slot is unknown", () => {
+  it("falls back to the path slug when the bay is unknown", () => {
     const messages = buildDiscoveryMessages({
       drives: [
         {
           driveId: "2-1.3.9",
           label: "2-1.3.9",
-          slot: null,
+          bay: null,
         },
       ],
     })
@@ -162,13 +162,13 @@ describe("buildDiscoveryMessages", () => {
     )
   })
 
-  it("rewrites state_topic when the same slot moves path", () => {
+  it("rewrites state_topic when the same bay moves path", () => {
     const before = buildDiscoveryMessages({
       drives: [
         {
           driveId: "2-1.1.2.3",
           label: "07 - Pioneer BDR-211M",
-          slot: 7,
+          bay: 7,
         },
       ],
     }).find(
@@ -181,7 +181,7 @@ describe("buildDiscoveryMessages", () => {
         {
           driveId: "2-1.3.3",
           label: "07 - Pioneer BDR-211M",
-          slot: 7,
+          bay: 7,
         },
       ],
     }).find(
@@ -238,12 +238,12 @@ describe("buildDiscoveryMessages", () => {
     )
   })
 
-  it("formats slot object ids as zero-padded slot_NN", () => {
+  it("formats bay object ids as zero-padded slot_NN", () => {
     expect(
       bayDiscoveryObjectId({
         driveId: "2-1.3.4.2",
         label: "05 - Pioneer BDR-212U",
-        slot: 5,
+        bay: 5,
       }),
     ).toBe("slot_05")
   })

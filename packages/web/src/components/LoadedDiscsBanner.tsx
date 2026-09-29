@@ -53,7 +53,7 @@ export function LoadedDiscsBanner({
    * A `ReactNode` passed in rather than rendered here so this
    * component stays presentational — it forwards the daemon's words
    * and has no data source of its own. `HostSection` supplies the
-   * smart `ClearLoadedButton`; the tests pass nothing and the slot
+   * smart `ClearLoadedButton`; the tests pass nothing and the bay
    * simply stays empty.
    */
   actions?: ReactNode
@@ -61,15 +61,15 @@ export function LoadedDiscsBanner({
   if (loaded === undefined || loaded.count === 0)
     return null
 
-  // Named discs first: "TROY - BONUS DISC in slot 7" is what he
+  // Named discs first: "TROY - BONUS DISC in bay 7" is what he
   // is actually going to go and pick up. A bay with no name still
-  // earns its slot — dropping it would make the list disagree
+  // earns its bay — dropping it would make the list disagree
   // with the count in the sentence above it.
   const named = loaded.discs.map((disc) => {
     const where =
-      disc.slot === null
+      disc.bay === null
         ? disc.label
-        : `slot ${String(disc.slot)}`
+        : `bay ${String(disc.bay)}`
 
     return disc.title === null
       ? where

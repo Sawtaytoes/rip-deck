@@ -391,22 +391,22 @@ it.each(KIOSK_FIXTURES)("kiosk %s", async (fixture) => {
   })
 })
 
-// The slot's own page: the poster, the disc details and the
+// The bay's own page: the poster, the disc details and the
 // full-size tray buttons CastKit hands a tap on a row to.
-it("kiosk slot detail", async () => {
+it("kiosk bay detail", async () => {
   const [bay] = createFixtureState("showcase").ripDeck.bays
 
   await sizeViewport(KIOSK_PANEL)
   renderRoute({
-    path: "/kiosk/slots/:driveId",
-    url: `/kiosk/slots/${bay.drive_id}?fake=showcase`,
+    path: "/kiosk/bays/:driveId",
+    url: `/kiosk/bays/${bay.drive_id}?fake=showcase`,
     element: <Kiosk />,
   })
   await shoot({
     viewport: KIOSK_PANEL,
     // A fixed panel: nothing lives below its fold.
     isFullPage: false,
-    name: `kiosk--showcase--slot-detail`,
+    name: `kiosk--showcase--bay-detail`,
     isReady: eventually(() =>
       page.getByRole("button", { name: "Open" }).element(),
     ),

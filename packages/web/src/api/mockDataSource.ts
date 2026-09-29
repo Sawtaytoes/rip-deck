@@ -50,7 +50,7 @@ import type {
  * The SCENARIOS are not this file's invention. They are
  * `packages/daemon/src/api/fixtures.ts`, name for name and
  * number for number — same names, bay labels, drive ids, titles,
- * and slots. That file is the source of
+ * and bays. That file is the source of
  * truth; this is its browser-side twin, transcribed rather than
  * imported because `@rip-deck/daemon` must not reach the browser
  * bundle (see `src/types.ts`). `mockDataSource.test.ts` pins the
@@ -205,7 +205,7 @@ const FNV_PRIME = 16777619
  * `armView.toArmJobId`. The viewer types `job_id` as a number
  * (ARM's rowid) and joins a rip to its drive on it, while
  * rip-deck ids are UUIDs — so a stable numeric hash travels in
- * that slot and the real id rides alongside as `job_uuid`.
+ * that bay and the real id rides alongside as `job_uuid`.
  * Reproduced rather than approximated because it is a React key:
  * a value that changed between the mock and the daemon would
  * remount every card the moment the app is pointed at a server.
@@ -225,14 +225,14 @@ const toArmJobId = (jobId: string): number => {
 const driveSlug = (driveId: string): string =>
   driveId.toLowerCase().replace(/[^a-z0-9]+/g, "_")
 
-const bayLabel = (slot: number): string =>
-  `${pad(slot)} - Pioneer BDR-211M`
+const bayLabel = (bay: number): string =>
+  `${pad(bay)} - Pioneer BDR-211M`
 
-const bayDriveId = (slot: number): string =>
-  `usb-2-1-1-2-4-4-${slot}`
+const bayDriveId = (bay: number): string =>
+  `usb-2-1-1-2-4-4-${bay}`
 
-const devPathOf = (slot: number): string =>
-  `/dev/sr${9 - slot}`
+const devPathOf = (bay: number): string =>
+  `/dev/sr${9 - bay}`
 
 /**
  * `armView.toArmKind` — `cd` is ARM's `music`, `cd_rom` is
@@ -309,7 +309,7 @@ const discSectorsOf = (discType: DiscType): number => {
 
 /** One bay's fixture inputs, before projection. */
 type MockBay = {
-  slot: number
+  bay: number
   isQuarantined?: boolean
   quarantineReason?: string | null
   job?: {
@@ -360,9 +360,9 @@ const projectBay = (
   nowMs: number
 } => {
   const nowMs = Date.now()
-  const driveId = bayDriveId(bay.slot)
-  const label = bayLabel(bay.slot)
-  const devPath = devPathOf(bay.slot)
+  const driveId = bayDriveId(bay.bay)
+  const label = bayLabel(bay.bay)
+  const devPath = devPathOf(bay.bay)
 
   const isQuarantined =
     (bay.isQuarantined ?? false) &&
@@ -379,9 +379,9 @@ const projectBay = (
     previous: null,
     maker: "PIONEER",
     model: "BD-RW BDR-211M",
-    serial_id: `FIXTURE00${bay.slot}`,
+    serial_id: `FIXTURE00${bay.bay}`,
     drive_id: driveId,
-    slot: bay.slot,
+    bay: bay.bay,
     is_quarantined: isQuarantined,
     quarantine_reason: quarantineReason,
   }
@@ -389,7 +389,7 @@ const projectBay = (
   const idleBayView: BayView = {
     drive_id: driveId,
     label,
-    slot: bay.slot,
+    bay: bay.bay,
     dev_path: devPath,
     is_present: true,
     // An idle bay has nothing in it. `towerFeed` reads this off
@@ -401,7 +401,7 @@ const projectBay = (
     quarantine_reason: quarantineReason,
     state: {
       drive: label,
-      slot: bay.slot,
+      bay: bay.bay,
       state: "idle",
       job_id: null,
       title: null,
@@ -429,7 +429,7 @@ const projectBay = (
     return { rip: null, drive, bayView: idleBayView, nowMs }
   }
 
-  const jobUuid = `fixture-job-${bay.slot}`
+  const jobUuid = `fixture-job-${bay.bay}`
 
   // The operator's cancel is the one drift that changes a job's
   // STATE rather than its numbers, so it is applied first and
@@ -536,7 +536,7 @@ const projectBay = (
 
     job_uuid: jobUuid,
     drive_id: driveId,
-    slot: bay.slot,
+    bay: bay.bay,
     disctype: isAdopted ? "unknown" : discType,
     disctype_label: isAdopted
       ? null
@@ -571,7 +571,7 @@ const projectBay = (
       ? null
       : {
           drive: label,
-          slot: bay.slot,
+          bay: bay.bay,
           verdict: verdict.kind,
           action: verdict.action,
           message: verdict.message,
@@ -749,8 +749,8 @@ const buildState = (input: {
 }
 
 /** Every bay idle, so a scenario only has to name its outliers. */
-const idleBays = (slots: number[]): MockBay[] =>
-  slots.map((slot) => ({ slot }))
+const idleBays = (bays: number[]): MockBay[] =>
+  bays.map((bay) => ({ bay }))
 
 /**
  * The tower switched off.
@@ -766,15 +766,15 @@ const buildEmpty = (): RipDeckState =>
 const buildNineRips = (): RipDeckState =>
   buildState({
     fixture: "nine-rips",
-    bays: ALL_SLOTS.map((slot) => ({
-      slot,
+    bays: ALL_SLOTS.map((bay) => ({
+      bay,
       job: {
-        title: `Fixture Disc ${slot}`,
-        elapsedMins: slot * 1.5,
+        title: `Fixture Disc ${bay}`,
+        elapsedMins: bay * 1.5,
         // Bay 1 carries the drift so the page visibly moves.
         totalFraction:
-          slot === 1 ? drift.leadPercent / 100 : slot / 10,
-        etaSeconds: 3_600 - slot * 300,
+          bay === 1 ? drift.leadPercent / 100 : bay / 10,
+        etaSeconds: 3_600 - bay * 300,
       },
     })),
   })
@@ -785,7 +785,7 @@ const buildShowcase = (): RipDeckState =>
     fixture: "showcase",
     bays: [
       {
-        slot: 1,
+        bay: 1,
         job: {
           title: "Dune: Part Two",
           discType: "uhd",
@@ -794,7 +794,7 @@ const buildShowcase = (): RipDeckState =>
         },
       },
       {
-        slot: 2,
+        bay: 2,
         job: {
           title: "The Iron Giant",
           discType: "bluray",
@@ -803,7 +803,7 @@ const buildShowcase = (): RipDeckState =>
         },
       },
       {
-        slot: 3,
+        bay: 3,
         job: {
           title: "Schoolhouse Rock!",
           discType: "dvd",
@@ -812,7 +812,7 @@ const buildShowcase = (): RipDeckState =>
         },
       },
       {
-        slot: 4,
+        bay: 4,
         job: {
           state: "stalled",
           title: "Mezzanine",
@@ -824,7 +824,7 @@ const buildShowcase = (): RipDeckState =>
         },
       },
       {
-        slot: 5,
+        bay: 5,
         job: {
           state: "completed",
           title: "Blade Runner 2049",
@@ -833,7 +833,7 @@ const buildShowcase = (): RipDeckState =>
         },
       },
       {
-        slot: 6,
+        bay: 6,
         job: {
           state: "completed",
           title: "Spirited Away",
@@ -842,7 +842,7 @@ const buildShowcase = (): RipDeckState =>
         },
       },
       {
-        slot: 7,
+        bay: 7,
         job: {
           state: "completed",
           title: "The Muppet Movie",
@@ -856,7 +856,7 @@ const buildShowcase = (): RipDeckState =>
         },
       },
       {
-        slot: 8,
+        bay: 8,
         job: {
           state: "failed",
           title: "Kind of Blue",
@@ -873,7 +873,7 @@ const buildShowcase = (): RipDeckState =>
           throughputBytesPerSec: null,
         },
       },
-      { slot: 9 },
+      { bay: 9 },
     ],
   })
 
@@ -894,7 +894,7 @@ const buildVerdicts = (): RipDeckState => {
   return buildState({
     fixture: "verdicts",
     bays: kinds.map((kind, index) => ({
-      slot: index + 1,
+      bay: index + 1,
       job: {
         title: `Fixture ${kind}`,
         verdictKind: kind,
@@ -927,13 +927,13 @@ const buildHubFault = (): RipDeckState => {
 
   return buildState({
     fixture: "hub-fault",
-    bays: ALL_SLOTS.map((slot) =>
-      faultedSlots.includes(slot)
+    bays: ALL_SLOTS.map((bay) =>
+      faultedSlots.includes(bay)
         ? {
-            slot,
+            bay,
             job: {
               state: "stalled" as JobState,
-              title: `Fixture Disc ${slot}`,
+              title: `Fixture Disc ${bay}`,
               verdictKind: "hub_fault" as VerdictKind,
               confidence: "confirmed" as VerdictConfidence,
               evidence: [
@@ -942,10 +942,10 @@ const buildHubFault = (): RipDeckState => {
               ],
               etaSeconds: null,
               etaTrend: null,
-              elapsedMins: slot * 1.5,
+              elapsedMins: bay * 1.5,
             },
           }
-        : { slot },
+        : { bay },
     ),
   })
 }
@@ -964,13 +964,13 @@ const buildUsbFlap = (): RipDeckState => {
 
   return buildState({
     fixture: "usb-flap",
-    bays: ALL_SLOTS.map((slot) =>
-      heldSlots.includes(slot)
+    bays: ALL_SLOTS.map((bay) =>
+      heldSlots.includes(bay)
         ? {
-            slot,
+            bay,
             job: {
               state: "needs_attention" as JobState,
-              title: `Fixture Disc ${slot}`,
+              title: `Fixture Disc ${bay}`,
               verdictKind: "unknown" as VerdictKind,
               confidence: "suspected" as VerdictConfidence,
               evidence: [],
@@ -979,7 +979,7 @@ const buildUsbFlap = (): RipDeckState => {
               elapsedMins: 0,
             },
           }
-        : { slot },
+        : { bay },
     ),
     usbAlert: {
       verdict: "hub_fault",
@@ -1017,7 +1017,7 @@ const buildConfidence = (): RipDeckState =>
     bays: [
       ...idleBays([1]),
       {
-        slot: 2,
+        bay: 2,
         job: {
           title: "Ivanhoe",
           verdictKind: "disc_dirty",
@@ -1028,7 +1028,7 @@ const buildConfidence = (): RipDeckState =>
       },
       ...idleBays([3, 4, 5, 6, 7]),
       {
-        slot: 8,
+        bay: 8,
         job: {
           title: "Ivanhoe",
           verdictKind: "disc_dirty",
@@ -1059,7 +1059,7 @@ const buildRisingEta = (): RipDeckState =>
     bays: [
       ...idleBays([1, 2]),
       {
-        slot: 3,
+        bay: 3,
         job: {
           title: "Ivanhoe",
           totalFraction: 0.11,
@@ -1086,14 +1086,14 @@ const buildQuarantined = (): RipDeckState =>
     bays: [
       ...idleBays([1, 2, 3, 4]),
       {
-        slot: 5,
+        bay: 5,
         isQuarantined: true,
         quarantineReason:
           "Crashed 3 times without staying up. Taken out of " +
           "service — clear it once the drive has been looked " +
           "at.",
       },
-      { slot: 6, job: { title: "Fixture Disc 6" } },
+      { bay: 6, job: { title: "Fixture Disc 6" } },
       ...idleBays([7, 8, 9]),
     ],
   })
@@ -1103,13 +1103,13 @@ const buildQuarantined = (): RipDeckState =>
  *
  * ⚠️ Not a hypothetical: this is the owner's tower on
  * 2026-07-26. `rip-deck:0.4.0` came up with the three Troy discs
- * still in slots 7–9, found no `bays.json`, and took
+ * still in bays 7–9, found no `bays.json`, and took
  * `adoptBayAtStartup`'s fail-closed branch on all three — held,
  * flagged, not ripped. That is the intended outcome and it is
  * what stopped 225 GB of duplicate ripping
  * (`docs/eject-and-durable-bay-state.md` §5).
  *
- * Slot 1 carries a genuinely FAILED rip on purpose. These two
+ * Bay 1 carries a genuinely FAILED rip on purpose. These two
  * states are the pair this dashboard most has to keep apart, and
  * a fixture containing only one of them proves nothing about
  * whether they read differently — "this disc failed to rip"
@@ -1122,11 +1122,11 @@ const buildQuarantined = (): RipDeckState =>
  * a change there will NOT turn this suite red on its own.
  */
 const buildHeldBay = (input: {
-  slot: number
+  bay: number
   title: string
   discType: DiscType
 }): MockBay => ({
-  slot: input.slot,
+  bay: input.bay,
   job: {
     state: "needs_attention",
     title: input.title,
@@ -1156,7 +1156,7 @@ const buildHeldAtStartup = (): RipDeckState =>
     fixture: "held-at-startup",
     bays: [
       {
-        slot: 1,
+        bay: 1,
         job: {
           state: "failed",
           title: "Fixture Scratched Disc",
@@ -1174,17 +1174,17 @@ const buildHeldAtStartup = (): RipDeckState =>
       },
       ...idleBays([2, 3, 4, 5, 6]),
       buildHeldBay({
-        slot: 7,
+        bay: 7,
         title: "TROY - BONUS DISC",
         discType: "bluray",
       }),
       buildHeldBay({
-        slot: 8,
+        bay: 8,
         title: "TROY - DIRECTOR'S CUT",
         discType: "uhd",
       }),
       buildHeldBay({
-        slot: 9,
+        bay: 9,
         title: "TROY - THEATRICAL CUT",
         discType: "uhd",
       }),
@@ -1218,8 +1218,8 @@ const buildHeldAtStartup = (): RipDeckState =>
  * Mirrors `buildUnmeasured` in
  * `packages/daemon/src/api/fixtures.ts`.
  */
-const buildUnmeasuredBay = (slot: number): MockBay => ({
-  slot,
+const buildUnmeasuredBay = (bay: number): MockBay => ({
+  bay,
   job: {
     state: "completed",
     isAdopted: true,
@@ -1264,7 +1264,7 @@ const buildDataDiscs = (): RipDeckState =>
     fixture: "data-disc",
     bays: [
       {
-        slot: 1,
+        bay: 1,
         job: {
           state: "ripping",
           title: "Proteus Sound Library Vol 1",
@@ -1280,7 +1280,7 @@ const buildDataDiscs = (): RipDeckState =>
         },
       },
       {
-        slot: 2,
+        bay: 2,
         job: {
           state: "completed",
           title: "Vintage Keys Sample Disc",
@@ -1298,7 +1298,7 @@ const buildDataDiscs = (): RipDeckState =>
         },
       },
       {
-        slot: 3,
+        bay: 3,
         job: {
           state: "needs_attention",
           title: "Unnamed data disc",
@@ -1612,19 +1612,19 @@ const buildMockLoadedDiscs = (
           LATCHED_MOCK_STATES.has(bay.state.state)),
     )
     .map((bay) => ({
-      slot: bay.slot,
+      bay: bay.bay,
       label: bay.label,
       title: bay.state.title,
       is_ripped: bay.state.state === "completed",
     }))
-    .sort((a, b) => (a.slot ?? 99) - (b.slot ?? 99))
+    .sort((a, b) => (a.bay ?? 99) - (b.bay ?? 99))
 
   const isTowerOn = bays.some((bay) => bay.is_present)
 
   // "1, 7, 8 and 9" — the daemon's `formatBayList`, mirrored. A
   // plain join reads as a CSV rather than as a sentence.
   const names = discs.map((disc) =>
-    disc.slot === null ? disc.label : String(disc.slot),
+    disc.bay === null ? disc.label : String(disc.bay),
   )
 
   const where =
@@ -1636,9 +1636,9 @@ const buildMockLoadedDiscs = (
 
   return {
     count: discs.length,
-    slots: discs
-      .map((disc) => disc.slot)
-      .filter((slot): slot is number => slot !== null),
+    bays: discs
+      .map((disc) => disc.bay)
+      .filter((bay): bay is number => bay !== null),
     discs,
     is_tower_on: isTowerOn,
     message:
@@ -1649,7 +1649,7 @@ const buildMockLoadedDiscs = (
               ? "1 disc is"
               : `${String(discs.length)} discs are`
           } still in the tower — ${
-            discs.length === 1 ? "slot" : "slots"
+            discs.length === 1 ? "bay" : "bays"
           } ${where}. ${
             isTowerOn
               ? `Press Open trays to get ${
@@ -1882,7 +1882,7 @@ export const mockDataSource: RipDeckDataSource = {
               },
               bays: ripping.map((bay) => ({
                 drive_id: bay.drive_id,
-                slot: bay.slot,
+                bay: bay.bay,
                 label: bay.label,
                 result: "refused_ripping" as const,
                 detail:
@@ -2020,7 +2020,7 @@ export const mockDataSource: RipDeckDataSource = {
 
         return {
           drive_id: bay.drive_id,
-          slot: bay.slot,
+          bay: bay.bay,
           label: bay.label,
           result,
           detail,
@@ -2337,7 +2337,7 @@ let mockLeftovers: Leftover[] = [
  *  - a DVD that failed with `empty_output` after 12 minutes;
  *  - a bay flagged `needs_attention`, which is not a success;
  *  - two rebuilt rows from before the history log existed, with
- *    no disc name and no slot, because the tower was re-cabled.
+ *    no disc name and no bay, because the tower was re-cabled.
  *
  * The dates are spread across three weeks so the date filter has
  * something to narrow.
@@ -2351,7 +2351,7 @@ const mockHistory: HistoryRip[] = [
   {
     job_uuid: "a1659124-308c-4f16-be4f-e0be021fee87",
     drive_id: "2-1.1.2.4.2",
-    slot: 5,
+    bay: 5,
     bay_name: "05 - Pioneer BDR-212U",
     disc_name: "THE MUMMY",
     is_named: true,
@@ -2377,7 +2377,7 @@ const mockHistory: HistoryRip[] = [
   {
     job_uuid: "3d27e46a-2ecf-49c5-ba66-0acb4478633c",
     drive_id: "2-1.1.2.4.1",
-    slot: 6,
+    bay: 6,
     bay_name: "06 - Pioneer BDR-211M",
     disc_name: "EYES WIDE SHUT - 4K",
     is_named: true,
@@ -2409,7 +2409,7 @@ const mockHistory: HistoryRip[] = [
   {
     job_uuid: "68fa9004-1da7-4596-a29a-eea75eaa6465",
     drive_id: "2-1.1.2.3",
-    slot: 7,
+    bay: 7,
     bay_name: "07 - Pioneer BDR-211M",
     disc_name: "Teenage_Mutant_Ninja_Turtle_V6",
     is_named: true,
@@ -2436,7 +2436,7 @@ const mockHistory: HistoryRip[] = [
   {
     job_uuid: "947b817e-93b2-4e62-aede-5c8c7ecad073",
     drive_id: "2-1.1.2.2",
-    slot: 8,
+    bay: 8,
     bay_name: "08 - Pioneer BDR-211M",
     disc_name: null,
     is_named: true,
@@ -2462,7 +2462,7 @@ const mockHistory: HistoryRip[] = [
   {
     job_uuid: "021d7450-0e7d-463a-a5bf-4662394e2785",
     drive_id: "2-2.3.4.2",
-    slot: null,
+    bay: null,
     bay_name: "2-2.3.4.2",
     disc_name: null,
     is_named: false,
@@ -2487,7 +2487,7 @@ const mockHistory: HistoryRip[] = [
   {
     job_uuid: "2b2eca98-85f0-4c83-9c24-2cf38f9ba415",
     drive_id: "2-1.3.1",
-    slot: null,
+    bay: null,
     bay_name: "2-1.3.1",
     disc_name: null,
     is_named: false,

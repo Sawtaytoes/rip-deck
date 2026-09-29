@@ -72,12 +72,10 @@ export function TrayControls() {
       (bay) => bay.result === "refused_ripping",
     ) ?? []
 
-  // The slot is the number the owner can walk up to the rack and
+  // The bay is the number the owner can walk up to the rack and
   // count; the full house label nine times over is a wall.
   const refusedNames = refused.map((bay) =>
-    bay.slot === null
-      ? bay.label
-      : `slot ${String(bay.slot)}`,
+    bay.bay === null ? bay.label : `bay ${String(bay.bay)}`,
   )
 
   /**

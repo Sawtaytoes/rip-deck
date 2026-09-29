@@ -36,7 +36,7 @@ describe("parseDriveName", () => {
   })
 
   it("extracts a serial even when the model lies", () => {
-    // Slot 2 is an LG WH14NS40 running OmniDrive firmware that
+    // Bay 2 is an LG WH14NS40 running OmniDrive firmware that
     // makes it report as ASUS. The model string is unusable for
     // identity; the serial is intact and is what we key on.
     const parsed = parseDriveName(
@@ -46,7 +46,7 @@ describe("parseDriveName", () => {
     expect(parsed?.firmwareSerial).toBe("EXAMPLE00002")
   })
 
-  it("returns null for MakeMKV's empty padding slots", () => {
+  it("returns null for MakeMKV's empty padding bays", () => {
     expect(parseDriveName("")).toBeNull()
   })
 
@@ -68,7 +68,7 @@ describe("isAttachedDrive", () => {
     ).toBe(true)
   })
 
-  it("rejects the padding slots MakeMKV always emits", () => {
+  it("rejects the padding bays MakeMKV always emits", () => {
     // MakeMKV pads its drive list to 16 entries; ours are the
     // first nine.
     expect(

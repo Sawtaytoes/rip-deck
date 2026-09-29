@@ -102,20 +102,20 @@ const heldDiscFacts = (
 })
 
 const buildBay = (input: {
-  slot: number
+  bay: number
   job?: Job | null
   isQuarantined?: boolean
   disc?: BayDiscFacts
 }) =>
   createBaySnapshot({
-    driveId: `usb-2-1-1-2-4-4-${input.slot}`,
-    label: `0${input.slot} - Pioneer BDR-211M`,
-    slot: input.slot,
-    devPath: `/dev/sr${9 - input.slot}`,
+    driveId: `usb-2-1-1-2-4-4-${input.bay}`,
+    label: `0${input.bay} - Pioneer BDR-211M`,
+    bay: input.bay,
+    devPath: `/dev/sr${9 - input.bay}`,
     job: input.job ?? null,
     disc: input.disc ?? null,
     supervision: {
-      driveId: `usb-2-1-1-2-4-4-${input.slot}`,
+      driveId: `usb-2-1-1-2-4-4-${input.bay}`,
       restartCount: input.isQuarantined ? 3 : 0,
       startedAt: null,
       isQuarantined: input.isQuarantined ?? false,
@@ -197,11 +197,11 @@ describe("MQTT parity", () => {
       driveId: "usb-2-1-1-2-4-4-2",
       job,
       driveLabel: "02 - Pioneer BDR-211M",
-      slot: 2,
+      bay: 2,
       nowMs: NOW_MS,
     })
 
-    const bay = view({ bays: [buildBay({ slot: 2, job })] })
+    const bay = view({ bays: [buildBay({ bay: 2, job })] })
       .bays[0]
 
     const message = broker.published.find(
@@ -238,13 +238,13 @@ describe("MQTT parity", () => {
       driveId: "usb-2-1-1-2-4-4-2",
       job: null,
       driveLabel: "02 - Pioneer BDR-211M",
-      slot: 2,
+      bay: 2,
       nowMs: NOW_MS,
       disc,
     })
 
     const bay = view({
-      bays: [buildBay({ slot: 2, disc })],
+      bays: [buildBay({ bay: 2, disc })],
     }).bays[0]
 
     expect(bay.state).toMatchObject({
@@ -269,7 +269,7 @@ describe("MQTT parity", () => {
     // behalf of a producer that was never told about the tray —
     // a fixture, say — is the exact false "nothing loaded" the
     // fields exist to correct.
-    const bay = view({ bays: [buildBay({ slot: 2 })] })
+    const bay = view({ bays: [buildBay({ bay: 2 })] })
       .bays[0]
 
     expect("has_disc" in bay.state).toBe(false)
@@ -285,7 +285,7 @@ describe("MQTT parity", () => {
       view({
         bays: [
           buildBay({
-            slot: 2,
+            bay: 2,
             disc: heldDiscFacts({
               lastTrayCommand: "open_bay",
             }),
@@ -295,7 +295,7 @@ describe("MQTT parity", () => {
     ).toBe("open_bay")
 
     expect(
-      view({ bays: [buildBay({ slot: 2 })] }).bays[0]
+      view({ bays: [buildBay({ bay: 2 })] }).bays[0]
         .last_tray_command,
     ).toBeNull()
   })
@@ -321,7 +321,7 @@ describe("MQTT parity", () => {
     })
 
     const towerView = view({
-      bays: [buildBay({ slot: 2, job })],
+      bays: [buildBay({ bay: 2, job })],
       lastRip: {
         job,
         verdict,
@@ -359,10 +359,10 @@ describe("MQTT parity", () => {
       driveId: "usb-2-1-1-2-4-4-2",
       verdict,
       driveLabel: "02 - Pioneer BDR-211M",
-      slot: 2,
+      bay: 2,
     })
 
-    const bay = view({ bays: [buildBay({ slot: 2, job })] })
+    const bay = view({ bays: [buildBay({ bay: 2, job })] })
       .bays[0]
 
     expect(isPublished).toBe(true)
@@ -387,7 +387,7 @@ describe("suspected vs confirmed", () => {
 
     const bay = view({
       bays: [
-        buildBay({ slot: 2, job: buildJob({ verdict }) }),
+        buildBay({ bay: 2, job: buildJob({ verdict }) }),
       ],
     }).bays[0]
 
@@ -408,7 +408,7 @@ describe("suspected vs confirmed", () => {
 
     const bay = view({
       bays: [
-        buildBay({ slot: 8, job: buildJob({ verdict }) }),
+        buildBay({ bay: 8, job: buildJob({ verdict }) }),
       ],
     }).bays[0]
 
@@ -420,7 +420,7 @@ describe("suspected vs confirmed", () => {
 
   it("offers no card at all for the default verdict", () => {
     const bay = view({
-      bays: [buildBay({ slot: 2, job: buildJob() })],
+      bays: [buildBay({ bay: 2, job: buildJob() })],
     }).bays[0]
 
     // `ok` is the default and requires no evidence, so it is
@@ -432,10 +432,10 @@ describe("suspected vs confirmed", () => {
 
 describe("the tower view", () => {
   it("represents nine simultaneously-active bays", () => {
-    const bays = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((slot) =>
+    const bays = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((bay) =>
       buildBay({
-        slot,
-        job: buildJob({ id: `job-${slot}` }),
+        bay,
+        job: buildJob({ id: `job-${bay}` }),
       }),
     )
 
@@ -466,10 +466,10 @@ describe("the tower view", () => {
     ])
 
     const towerView = view({
-      bays: [4, 5, 6, 7].map((slot) =>
+      bays: [4, 5, 6, 7].map((bay) =>
         buildBay({
-          slot,
-          job: buildJob({ id: `job-${slot}`, verdict }),
+          bay,
+          job: buildJob({ id: `job-${bay}`, verdict }),
         }),
       ),
     })
@@ -490,7 +490,7 @@ describe("the tower view", () => {
     const towerView = view({
       bays: kinds.map((kind, index) =>
         buildBay({
-          slot: index + 1,
+          bay: index + 1,
           job: buildJob({
             id: `job-${kind}`,
             verdict: makeVerdict(kind, "confirmed", []),
@@ -514,7 +514,7 @@ describe("the tower view", () => {
     const towerView = view({
       bays: confidences.map((confidence, index) =>
         buildBay({
-          slot: index + 1,
+          bay: index + 1,
           job: buildJob({
             id: `job-${confidence}`,
             verdict: makeVerdict(
@@ -536,7 +536,7 @@ describe("the tower view", () => {
     const bay = view({
       bays: [
         buildBay({
-          slot: 3,
+          bay: 3,
           job: buildJob({
             progress: {
               ...EMPTY_PROGRESS,
@@ -557,7 +557,7 @@ describe("the tower view", () => {
 
   it("offers the clear control on a quarantined drive", () => {
     const bay = view({
-      bays: [buildBay({ slot: 5, isQuarantined: true })],
+      bays: [buildBay({ bay: 5, isQuarantined: true })],
     }).bays[0]
 
     expect(bay.is_quarantined).toBe(true)
@@ -570,7 +570,7 @@ describe("the tower view", () => {
     const bay = view({
       bays: [
         buildBay({
-          slot: 7,
+          bay: 7,
           disc: heldDiscFacts({
             outcome: {
               kind: "failed",
@@ -589,7 +589,7 @@ describe("the tower view", () => {
     const troubled = view({
       bays: [
         buildBay({
-          slot: 2,
+          bay: 2,
           job: buildJob({
             verdict: makeVerdict(
               "disc_marginal_slow",
@@ -602,7 +602,7 @@ describe("the tower view", () => {
     }).bays[0]
 
     const healthy = view({
-      bays: [buildBay({ slot: 2, job: buildJob() })],
+      bays: [buildBay({ bay: 2, job: buildJob() })],
     }).bays[0]
 
     // D4: "keep trying" is an answer to a bad verdict, so it
@@ -644,7 +644,7 @@ describe("the USB-flap banner", () => {
           createBaySnapshot({
             driveId: "2-2.3",
             label: "07 - Pioneer BDR-211M",
-            slot: 7,
+            bay: 7,
           }),
         ],
         usbStability: {

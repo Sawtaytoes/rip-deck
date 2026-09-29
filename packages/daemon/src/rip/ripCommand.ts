@@ -61,7 +61,7 @@ export type RipCommandInput = {
   /**
    * MakeMKV's disc index for the target drive.
    *
-   * NOT the slot and NOT the `srN` number — a third numbering
+   * NOT the bay and NOT the `srN` number — a third numbering
    * again. Resolve it with `enumerateDrives` immediately before
    * the spawn; it is derived from enumeration order and shifts
    * when a drive appears or disappears.
@@ -220,7 +220,7 @@ export const ISOLATED_DISC_INDEX = 0
  *
  * Nine rips run at once and a drive can be re-ripped while its
  * previous container is still being torn down, so anything
- * derived from the slot or from `srN` would collide. `docker run
+ * derived from the bay or from `srN` would collide. `docker run
  * --name` fails outright on a duplicate, which would turn a name
  * collision into a refused rip.
  */

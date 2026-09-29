@@ -4,7 +4,7 @@
 - **Date:** 2026-09-08
 - **Type:** UI naming rule
 - **Supersedes:** —
-- **Superseded by:** —
+- **Superseded by:** [Drive compartments are bays throughout Rip Deck](2026-09-29-drive-compartments-are-bays-throughout-rip-deck.md) for the allowance of “slot” in accessible names and prose
 
 ## Decision
 

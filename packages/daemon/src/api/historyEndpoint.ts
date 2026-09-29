@@ -36,7 +36,7 @@ import { isSafeJobUuid } from "./logCapture.ts"
  * ## The join, and why it is per PAGE
  *
  * A history row (`rip/ripHistory.ts`) holds only what the bay
- * knew: the disc's name and type, where the rip landed, the slot,
+ * knew: the disc's name and type, where the rip landed, the bay,
  * and the outcome sentence. Everything measured — bytes,
  * duration, read errors, the health verdict — is already written
  * per job by `health/sampleStore.ts` and is joined back in HERE,
@@ -89,7 +89,7 @@ export type HistoryOutcomeFilter =
 export type HistoryRipView = {
   job_uuid: string
   drive_id: string
-  slot: number | null
+  bay: number | null
   /** The bay's house label, or the raw drive id when unmapped. */
   bay_name: string
   disc_name: string | null
@@ -560,7 +560,7 @@ const buildRipView = (input: {
   return {
     job_uuid: record.jobUuid,
     drive_id: record.driveId,
-    slot: record.slot,
+    bay: record.bay,
     bay_name: record.bayName ?? record.driveId,
     disc_name: record.discName,
     // A backfilled row can never be named — nothing wrote one

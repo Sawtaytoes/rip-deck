@@ -93,7 +93,7 @@ describe("proving a directory is abandoned, not merely incomplete", () => {
     // a mess to tidy.
     const liveJobUuids = Array.from(
       { length: 9 },
-      (_unused, index) => `slot-${index + 1}`,
+      (_unused, index) => `bay-${index + 1}`,
     )
 
     for (const jobUuid of liveJobUuids) {

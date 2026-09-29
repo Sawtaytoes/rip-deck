@@ -117,7 +117,7 @@ const fakeSightings = (
   input.map((sighting) => ({
     driveId: DRIVE_ID,
     isDrivePresent: true,
-    slot: 2,
+    bay: 2,
     label: "02 - Pioneer BDR-211M",
     devPath: "/dev/sr3",
     vendor: "Pioneer",
@@ -188,7 +188,7 @@ const createHarness = (
 
 const bayEvent = {
   driveId: DRIVE_ID,
-  slot: 2,
+  bay: 2,
   name: "02 - Pioneer BDR-211M",
 }
 
@@ -304,7 +304,7 @@ describe("the feed", () => {
     const bay = harness.readBay()
 
     expect(bay?.label).toBe("02 - Pioneer BDR-211M")
-    expect(bay?.slot).toBe(2)
+    expect(bay?.bay).toBe(2)
     expect(bay?.job?.state).toBe("settling")
     expect(bay?.job?.startedAt).toBe(NOW_MS)
     expect(bay?.job?.finishedAt).toBeNull()
@@ -390,7 +390,7 @@ describe("the feed", () => {
     // just happen, on every restart). So the note created the
     // record and stamped the uuid the LEDGER was carrying — the
     // PREVIOUS daemon's job. `outcome` stayed null, nothing
-    // recreated the record, and the id was read only once. Slot 9
+    // recreated the record, and the id was read only once. Bay 9
     // then ripped 84 GB clean while its card pointed at a
     // `<uuid>.robot.log` that does not exist, so Logs answered 404.
     const STALE = "3387a174-b316-414e-bd78-05e65e528fd5"
@@ -671,8 +671,8 @@ describe("the feed", () => {
     // not be confused with this one.
     const harness = createHarness({
       bays: fakeBays(
-        [1, 2, 3, 4, 5, 6, 7, 8, 9].map((slot) => ({
-          driveId: `usb-2-1-1-2-4-4-${String(slot)}`,
+        [1, 2, 3, 4, 5, 6, 7, 8, 9].map((bay) => ({
+          driveId: `usb-2-1-1-2-4-4-${String(bay)}`,
           phase: "idle" as const,
           jobUuid: null,
         })),
@@ -706,8 +706,8 @@ describe("the feed", () => {
 
     harness.setBays(
       fakeBays(
-        [1, 2, 3, 4, 5, 6, 7, 8, 9].map((slot) => ({
-          driveId: `usb-2-1-1-2-4-4-${String(slot)}`,
+        [1, 2, 3, 4, 5, 6, 7, 8, 9].map((bay) => ({
+          driveId: `usb-2-1-1-2-4-4-${String(bay)}`,
           phase: "idle" as const,
           jobUuid: null,
         })),
@@ -1013,7 +1013,7 @@ describe("the feed", () => {
     // provider never ran.
     expect(identity?.source).toBe("omdb")
     // And the disc keeps its own name: three Troy discs sat in
-    // slots 7-9 of the real tower, and rewriting all three
+    // bays 7-9 of the real tower, and rewriting all three
     // cards to "Troy" would take away the only thing that told
     // them apart.
     expect(identity?.title).toBe("TROY - BONUS DISC")
@@ -1139,7 +1139,7 @@ describe("the feed", () => {
       bays: fakeBays([{ phase: "idle", jobUuid: null }]),
       sightings: fakeSightings([
         {
-          slot: 3,
+          bay: 3,
           label: "03 - LG WH14NS40",
           devPath: "/dev/sr5",
           // The registry's TRUE maker and model: this bay is an
@@ -1156,7 +1156,7 @@ describe("the feed", () => {
     const bay = harness.readBay()
 
     expect(bay?.label).toBe("03 - LG WH14NS40")
-    expect(bay?.slot).toBe(3)
+    expect(bay?.bay).toBe(3)
     expect(bay?.devPath).toBe("/dev/sr5")
     expect(bay?.vendor).toBe("LG")
     expect(bay?.model).toBe("WH14NS40")
@@ -1257,7 +1257,7 @@ describe("the feed", () => {
 /**
  * Tonight's tower, as the daemon actually found it.
  *
- * Nine drives on the bus, discs in slots 7-9, and a ledger that
+ * Nine drives on the bus, discs in bays 7-9, and a ledger that
  * latched those three as finished by the daemon that ran before
  * this one. The live 0.4.0 answer to this exact state was
  * `drive_count: 3` with all three reading `idle`/`ok`, which no
@@ -1269,8 +1269,8 @@ const BLURAY_SECTORS = 23_000_000
 const nineBayTower = (input: { isPoweredOn: boolean }) =>
   input.isPoweredOn
     ? Array.from({ length: 9 }, (_unused, index) => {
-        const slot = index + 1
-        const isLoaded = slot >= 7
+        const bay = index + 1
+        const isLoaded = bay >= 7
 
         return {
           address: {
@@ -1280,12 +1280,12 @@ const nineBayTower = (input: { isPoweredOn: boolean }) =>
             scsiAddress: "29:0:0:0",
           },
           identity: {
-            usbPortPath: `2-1.1.2.${String(slot)}`,
+            usbPortPath: `2-1.1.2.${String(bay)}`,
             bridgeSerial: null,
             hubPath: "2-1.1.2",
             hubChain: [],
             // What the drive says about ITSELF, which the
-            // registry overrules — slots 2-4 are the reflashed
+            // registry overrules — bays 2-4 are the reflashed
             // LGs.
             vendor: "ASUS",
             model: "BW-16D1HT",
@@ -1309,16 +1309,16 @@ const nineBayTower = (input: { isPoweredOn: boolean }) =>
 const towerRegistry = {
   towerRootPortPath: "2-1.1.2",
   entries: Array.from({ length: 9 }, (_unused, index) => {
-    const slot = index + 1
+    const bay = index + 1
 
     return {
-      slot,
+      bay,
       // Prefixed, exactly as `config/drives.json` writes it.
-      name: `0${String(slot)} - Pioneer BDR-211M`,
-      firmwareSerial: `EXAMPLE97${String(slot)}WL`,
+      name: `0${String(bay)} - Pioneer BDR-211M`,
+      firmwareSerial: `EXAMPLE97${String(bay)}WL`,
       trueModel: "Pioneer BDR-211M",
       reportedModel: "BW-16D1HT",
-      usbPortPath: `2-1.1.2.${String(slot)}`,
+      usbPortPath: `2-1.1.2.${String(bay)}`,
       bridgeSerial: "",
       isUhdCapable: true,
       // Nobody has measured an offset on this tower yet.
@@ -1327,25 +1327,25 @@ const towerRegistry = {
   }),
 }
 
-/** Slots 7-9, held by the daemon that ran before this one. */
+/** Bays 7-9, held by the daemon that ran before this one. */
 const heldLedger = {
   version: BAY_LEDGER_VERSION,
-  records: [7, 8, 9].map((slot) => ({
-    driveId: `2-1.1.2.${String(slot)}`,
+  records: [7, 8, 9].map((bay) => ({
+    driveId: `2-1.1.2.${String(bay)}`,
     phase: "done" as const,
     sizeSectors: BLURAY_SECTORS,
     // v2 fields. The previous daemon read this name off the
     // disc and published the rip to this path, and the ledger
     // is the only thing that still knows either.
-    discName: `TROY ${String(slot)}`,
+    discName: `TROY ${String(bay)}`,
     discType: "bluray" as const,
-    destinationPath: `/media/Disc-Rips/[BACKUP] TROY ${String(slot)}`,
+    destinationPath: `/media/Disc-Rips/[BACKUP] TROY ${String(bay)}`,
     // The capture id of the rip the PREVIOUS daemon ran. It is
     // what keeps the held card's log button after a restart.
-    jobUuid: `0b1e5c7a-4d3f-42a8-9e6b-00000000000${String(slot)}`,
+    jobUuid: `0b1e5c7a-4d3f-42a8-9e6b-00000000000${String(bay)}`,
     outcome: {
       kind: "completed" as const,
-      detail: `/media/Disc-Rips/[BACKUP] TROY ${String(slot)}`,
+      detail: `/media/Disc-Rips/[BACKUP] TROY ${String(bay)}`,
     },
     isLoadedDismissed: false,
     updatedAtMs: NOW_MS - 7_200_000,
@@ -1585,7 +1585,7 @@ describe("the watcher, feeding the store", () => {
     const snapshot = store.readSnapshot()
 
     expect(snapshot.bays).toHaveLength(9)
-    expect(snapshot.bays.map((bay) => bay.slot)).toEqual([
+    expect(snapshot.bays.map((bay) => bay.bay)).toEqual([
       1, 2, 3, 4, 5, 6, 7, 8, 9,
     ])
 
@@ -1980,13 +1980,13 @@ describe("an empty tray retires the finished card", () => {
    *
    * the `size` attribute under `/sys/block` read the 2097151-sector empty
    * sentinel on all nine drives, and `/json` agreed —
-   * `has_disc: false`, `disc_size_sectors: null`. Slots 1-4
-   * still published `needs_attention` and slots 8-9 still
+   * `has_disc: false`, `disc_size_sectors: null`. Bays 1-4
+   * still published `needs_attention` and bays 8-9 still
    * published `completed`, each with its job id, its progress,
-   * and on slot 8 a health ALERT about a disc that had been
+   * and on bay 8 a health ALERT about a disc that had been
    * taken out of the building.
    *
-   * The bays that behaved are the tell: slots 5-7 read `idle`,
+   * The bays that behaved are the tell: bays 5-7 read `idle`,
    * and those are exactly the bays whose last outcome came from
    * startup ADOPTION, which emits a note and never an outcome.
    * No outcome event, no record left to go stale.

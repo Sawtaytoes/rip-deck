@@ -20,7 +20,7 @@ const NOW = new Date("2026-07-26 12:12:00").getTime()
  * synchronously and needs no fetch, so the enlarged 2:3 thumbnail
  * is deterministic in CI. `poster` is `null` on every live bay
  * today (the fetcher is still being built), so a story is the only
- * place the poster slot is exercised at all.
+ * place the poster bay is exercised at all.
  */
 const POSTER = `data:image/svg+xml;utf8,${encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300"><rect width="200" height="300" fill="#1B1B2F"/><rect x="14" y="14" width="172" height="272" fill="none" stroke="#C9A227" stroke-width="2"/><text x="100" y="150" fill="#C9A227" font-family="Georgia, serif" font-size="26" letter-spacing="2" text-anchor="middle">THE</text><text x="100" y="184" fill="#F5F3E7" font-family="Georgia, serif" font-size="24" letter-spacing="2" text-anchor="middle">OUTFIT</text></svg>`,
@@ -45,7 +45,7 @@ const buildRip = (overrides: Partial<Rip> = {}): Rip => ({
   stop: null,
   job_uuid: "ace3f66f-a4a6-4847-be91-c5369e3119f3",
   drive_id: "2-1.3.3",
-  slot: 7,
+  bay: 7,
   disctype: "bluray",
   disctype_label: "Blu-ray",
   volume_label: "THE_OUTFIT",
@@ -279,7 +279,7 @@ export const EveryDiscKind: Story = {
             kind,
             label: title,
             path: `/data/Film/Disc-Rips/${title}`,
-            slot: index + 1,
+            bay: index + 1,
           })}
         />
       ))}

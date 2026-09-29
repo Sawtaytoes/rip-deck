@@ -16,16 +16,16 @@ const loaded = (
   overrides: Partial<LoadedDiscsView> = {},
 ): LoadedDiscsView => ({
   count: 2,
-  slots: [7, 9],
+  bays: [7, 9],
   discs: [
     {
-      slot: 7,
+      bay: 7,
       label: "07 - Pioneer BDR-211M",
       title: "TROY - BONUS DISC",
       is_ripped: true,
     },
     {
-      slot: 9,
+      bay: 9,
       label: "09 - Pioneer BDR-211M",
       title: null,
       is_ripped: false,
@@ -33,7 +33,7 @@ const loaded = (
   ],
   is_tower_on: false,
   message:
-    "2 discs are still in the tower — slots 7 and 9. The " +
+    "2 discs are still in the tower — bays 7 and 9. The " +
     "tower is off, so the trays cannot open until it is " +
     "powered back on.",
   spoken_message:
@@ -59,12 +59,12 @@ describe("LoadedDiscsBanner", () => {
     render(<LoadedDiscsBanner loaded={loaded()} />)
 
     expect(
-      screen.getByText("TROY - BONUS DISC · slot 7"),
+      screen.getByText("TROY - BONUS DISC · bay 7"),
     ).toBeInTheDocument()
 
-    // A bay whose disc was never named still earns its slot —
+    // A bay whose disc was never named still earns its bay —
     // dropping it would make the list disagree with the count.
-    expect(screen.getByText("slot 9")).toBeInTheDocument()
+    expect(screen.getByText("bay 9")).toBeInTheDocument()
   })
 
   it("says nothing when the trays are empty", () => {

@@ -149,7 +149,7 @@ describe("the fixture set", () => {
    *
    * Three Troy discs still loaded, no `bays.json` yet, so
    * `adoptBayAtStartup` took its fail-closed branch on all
-   * three — held, flagged, not ripped. Slot 1 is a genuinely
+   * three — held, flagged, not ripped. Bay 1 is a genuinely
    * failed rip in the same document, because "this disc failed"
    * and "rip-deck does not know whether this was ripped, so it
    * did not" call for opposite actions and a fixture with only
@@ -254,7 +254,7 @@ describe("the fixture set", () => {
     )
 
     expect(warned).toHaveLength(1)
-    expect(warned[0].slot).toBe(5)
+    expect(warned[0].bay).toBe(5)
     // The clean one must NOT be flagged, or the fixture proves
     // nothing about telling them apart.
     expect(

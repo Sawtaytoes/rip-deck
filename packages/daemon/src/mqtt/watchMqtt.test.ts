@@ -49,7 +49,7 @@ const bay = (input: Partial<BayState>): BayState => ({
 })
 
 /**
- * A held disc, exactly as slots 7-9 held one for days.
+ * A held disc, exactly as bays 7-9 held one for days.
  *
  * Latched `completed` by a daemon that is no longer running,
  * adopted from the ledger at startup, and still physically in
@@ -167,7 +167,7 @@ const createFakeMqtt = (
 /**
  * The registry as `config/drives.json` really writes it.
  *
- * `name` carries the slot prefix — `07 - Pioneer BDR-211M` —
+ * `name` carries the bay prefix — `07 - Pioneer BDR-211M` —
  * because that is the label the owner reads off the rack. This
  * fixture used to write the bare model, which is why a green
  * suite let `"07 - 07 - Pioneer BDR-211M"` reach the house
@@ -177,7 +177,7 @@ const registry: DriveRegistry = {
   towerRootPortPath: "usb-2-1.1",
   entries: [
     {
-      slot: 7,
+      bay: 7,
       name: "07 - Pioneer BDR-211M",
       firmwareSerial: "SERIAL7",
       trueModel: "BDR-211M",
@@ -198,7 +198,7 @@ const sighting = (
 ): BaySighting => ({
   driveId,
   isDrivePresent,
-  slot: null,
+  bay: null,
   label: driveId,
   devPath: null,
   vendor: null,
@@ -263,7 +263,7 @@ describe("jobStateForBay", () => {
 
 describe("buildBayJob", () => {
   const view = {
-    slot: 7,
+    bay: 7,
     name: "07 - Pioneer BDR-211M",
     identity: {
       title: "TROY",
@@ -456,7 +456,7 @@ describe("createWatchMqtt", () => {
 
     wrapped.handlers?.onBayOutcome?.({
       driveId: "usb-2-1.1.2.4.4.2",
-      slot: 7,
+      bay: 7,
       name: "07 - Pioneer BDR-211M",
       outcome: {
         kind: "completed",
@@ -483,14 +483,14 @@ describe("createWatchMqtt", () => {
 
     wrapped.handlers?.onBayIdentified?.({
       driveId: "usb-2-1.1.2.4.4.2",
-      slot: 7,
+      bay: 7,
       name: "07 - Pioneer BDR-211M",
       identity: { title: "Ivanhoe", discType: "bluray" },
     })
 
     wrapped.handlers?.onBayOutcome?.({
       driveId: "usb-2-1.1.2.4.4.2",
-      slot: 7,
+      bay: 7,
       name: "07 - Pioneer BDR-211M",
       outcome: {
         kind: "completed",
@@ -532,7 +532,7 @@ describe("createWatchMqtt", () => {
 
     wrapped.handlers?.onBayOutcome?.({
       driveId: "usb-2-1.1.2.4.4.2",
-      slot: 7,
+      bay: 7,
       name: "07 - Pioneer BDR-211M",
       outcome: {
         kind: "no_media",
@@ -563,7 +563,7 @@ describe("createWatchMqtt", () => {
     expect(() =>
       wrapped.handlers?.onBayOutcome?.({
         driveId: "usb-2-1.1.2.4.4.2",
-        slot: 7,
+        bay: 7,
         name: "Pioneer BDR-211M",
         outcome: { kind: "failed", detail: "read_errors" },
       }),
@@ -594,13 +594,13 @@ describe("createWatchMqtt", () => {
         {
           driveId: "usb-2-1.1.2.4.4.2",
           label: "07 - Pioneer BDR-211M",
-          slot: 7,
+          bay: 7,
         },
       ],
     })
   })
 
-  it("never prefixes a label that already has its slot", async () => {
+  it("never prefixes a label that already has its bay", async () => {
     // `"06 - 06 - Pioneer BDR-211M"`, live on fifteen retained
     // topics in 0.4.0. The registry's `name` IS the label, so
     // every path out of this module carries it verbatim — and
@@ -620,7 +620,7 @@ describe("createWatchMqtt", () => {
 
     wrapped.handlers?.onBayOutcome?.({
       driveId: "usb-2-1.1.2.4.4.2",
-      slot: 7,
+      bay: 7,
       name: "07 - Pioneer BDR-211M",
       outcome: { kind: "completed", detail: "/dest/Troy" },
     })
@@ -733,8 +733,8 @@ describe("createWatchMqtt", () => {
 
   it("tells a held disc apart from an empty bay", async () => {
     // THE defect: all nine bays published `idle` while three
-    // Troy discs sat latched `completed` in slots 7-9, so Home
-    // Assistant's list of loaded slots rendered `[]` and the
+    // Troy discs sat latched `completed` in bays 7-9, so Home
+    // Assistant's list of loaded bays rendered `[]` and the
     // trapped-disc warning could never fire.
     const fake = createFakeMqtt()
 
@@ -936,7 +936,7 @@ describe("createWatchMqtt tray commands", () => {
           request_id: null,
           command: "open_trays",
           is_accepted: true,
-          message: "Opened 1 drive: slot 7.",
+          message: "Opened 1 drive: bay 7.",
           spoken_message: "Opened 1 tray.",
           started_at: NOW_MS,
           finished_at: NOW_MS,
@@ -966,7 +966,7 @@ describe("createWatchMqtt tray commands", () => {
     expect(fake.recorded.commandResponses[0]).toMatchObject(
       {
         is_accepted: true,
-        message: "Opened 1 drive: slot 7.",
+        message: "Opened 1 drive: bay 7.",
         spoken_message: "Opened 1 tray.",
       },
     )

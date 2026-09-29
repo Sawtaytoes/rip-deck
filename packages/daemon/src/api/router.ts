@@ -311,7 +311,8 @@ const isClientRoutePathname = (
   if (isServerRoutePathname(pathname)) return false
 
   // Drive IDs contain dots. This explicit client route carries an ID, not a file.
-  if (/^\/kiosk\/slots\/[^/]+$/.test(pathname)) return true
+  if (/^\/kiosk\/(?:bays|slots)\/[^/]+$/.test(pathname))
+    return true
 
   const lastSegment = pathname.slice(
     pathname.lastIndexOf("/") + 1,
@@ -338,13 +339,38 @@ const DASHBOARD_NOT_BUILT_BODY = (root: string): string =>
   "The JSON API is unaffected — /json, /fixtures and /health\n" +
   "all still answer.\n"
 
+/** Keep the old numeric wire field for clients that have not yet
+ * updated. The daemon and dashboard use `bay` internally. */
+const withLegacySlotAlias = (value: unknown): unknown => {
+  if (Array.isArray(value))
+    return value.map(withLegacySlotAlias)
+  if (typeof value !== "object" || value === null)
+    return value
+  const object = value as Record<string, unknown>
+  const result = Object.fromEntries(
+    Object.entries(object).map(([key, entry]) => [
+      key,
+      withLegacySlotAlias(entry),
+    ]),
+  )
+  if (
+    Object.hasOwn(object, "bay") &&
+    (typeof object.bay === "number" ||
+      object.bay === null) &&
+    !Object.hasOwn(object, "slot")
+  ) {
+    result.slot = object.bay
+  }
+  return result
+}
+
 const jsonResponse = (input: {
   status: number
   payload: unknown
 }): ApiResponse => ({
   status: input.status,
   contentType: "application/json; charset=utf-8",
-  body: JSON.stringify(input.payload),
+  body: JSON.stringify(withLegacySlotAlias(input.payload)),
   cachePolicy: "no-store",
 })
 

@@ -14,7 +14,7 @@
  *
  * What it *does* now have, as of 2026-07-27, is the binary. The
  * image carries cyanrip 0.9.3 (Debian trixie), and on this rig
- * it opened slot 1's real drive and identified it through
+ * it opened bay 1's real drive and identified it through
  * libcdio. So the flags below are checked against the real
  * `cyanrip -h` rather than against documentation, and the two
  * agreed on every one. Two measured behaviours:
@@ -123,7 +123,7 @@ export type CyanripCommandInput = {
    * configuration one.
    *
    * Offsets are per drive MODEL, and this tower is not uniform:
-   * slots 2-4 are LG units whose OmniDrive firmware reports them
+   * bays 2-4 are LG units whose OmniDrive firmware reports them
    * as ASUS, so the model string cannot be used to look one up.
    * Omitted until a real value exists per serial — cyanrip's
    * `-f` finds it from a disc with an AccurateRip entry.

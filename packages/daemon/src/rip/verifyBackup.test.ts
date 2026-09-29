@@ -132,7 +132,7 @@ describe("proving a backup produced a disc", () => {
  *
  * `makemkvcon backup` produces a DIRECTORY for a Blu-ray and a
  * single decrypted ISO FILE for a DVD, and says nothing about
- * which. Slot 6 rode to `MSG:5070 "Backup done"` and left an
+ * which. Bay 6 rode to `MSG:5070 "Backup done"` and left an
  * 8,203,894,784-byte file that loop-mounts with an intact
  * `VIDEO_TS` — and this function reported `empty_output`,
  * because it looked for a directory inside something that was

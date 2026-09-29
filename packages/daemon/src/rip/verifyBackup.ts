@@ -94,7 +94,7 @@ const measureTree = async (
  *  - **DVD** — a single decrypted **ISO image file** at that
  *    exact path, with no extension and no directory anywhere.
  *
- * Measured on the live tower 2026-08-26. Slot 6 rode to
+ * Measured on the live tower 2026-08-26. Bay 6 rode to
  * `MSG:5070 "Backup done"` and left
  * `.rip-deck-incomplete-68fa9004-…` as an 8,203,894,784-byte
  * regular file which `file(1)` reads as
