@@ -52,7 +52,7 @@ export type DiscoveryDrive = {
   driveId: string
   /** Display label, e.g. "07 - Pioneer BDR-211M". */
   label: string
-  slot: number | null
+  bay: number | null
 }
 
 /**
@@ -66,21 +66,21 @@ export type DiscoveryDrive = {
  * stayed wired to the first set, so the dashboard showed idle empty
  * bays while a disc was mid-rip on the live path.
  *
- * Slot is the number on the front of the rack and is what
+ * Bay is the number on the front of the rack and is what
  * `config/drives.json` already treats as the human identity. State
  * topics still use the runtime path slug (that is where the
  * retained bay payload is published); only the discovery object id
- * / unique_id are slot-stable so HA updates `state_topic` in place
+ * / unique_id are bay-stable so HA updates `state_topic` in place
  * when the path changes.
  *
- * Unregistered bays (slot null) fall back to the path slug — same
+ * Unregistered bays (bay null) fall back to the path slug — same
  * as before — because there is nothing stabler to key on yet.
  */
 export const bayDiscoveryObjectId = (
   drive: DiscoveryDrive,
 ): string => {
-  if (drive.slot != null && drive.slot > 0) {
-    return `slot_${String(drive.slot).padStart(2, "0")}`
+  if (drive.bay != null && drive.bay > 0) {
+    return `slot_${String(drive.bay).padStart(2, "0")}`
   }
   return driveSlug(drive.driveId)
 }
@@ -236,9 +236,9 @@ export const buildDiscoveryMessages = ({
       // The take-the-discs-out chore, as an entity a reminder
       // automation can trigger on. A COUNT, like `active_rips`,
       // so `above: 0` is the whole trigger and the number is
-      // legible on a dashboard; the slots, titles and the
+      // legible on a dashboard; the bays, titles and the
       // ready-made sentences ride the attributes, because
-      // composing an English list out of a slot array in Jinja is
+      // composing an English list out of a bay array in Jinja is
       // the job rip-deck already did.
       //
       // Its topic is the one retained payload built to outlive a

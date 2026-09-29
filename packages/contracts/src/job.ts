@@ -15,7 +15,7 @@ export type JobState =
   | "settling"
   /** Working out what the disc is. */
   | "identifying"
-  /** Identified, waiting for a slot / operator decision. */
+  /** Identified, waiting for a bay / operator decision. */
   | "queued"
   /** `makemkvcon backup --decrypt` is running. */
   | "ripping"

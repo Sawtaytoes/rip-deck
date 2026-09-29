@@ -58,7 +58,7 @@ describe("buildDriveStatePayload", () => {
     const payload = buildDriveStatePayload({
       job: null,
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
       nowMs: 1_000,
     })
 
@@ -73,7 +73,7 @@ describe("buildDriveStatePayload", () => {
     const payload = buildDriveStatePayload({
       job: job(),
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
       nowMs: 1_000,
     })
 
@@ -92,7 +92,7 @@ describe("buildDriveStatePayload", () => {
         },
       }),
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
       nowMs: 1_000,
     })
 
@@ -103,7 +103,7 @@ describe("buildDriveStatePayload", () => {
     const payload = buildDriveStatePayload({
       job: job({ readErrorCount: 3 }),
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
       nowMs: 1_000,
     })
 
@@ -114,7 +114,7 @@ describe("buildDriveStatePayload", () => {
     const payload = buildDriveStatePayload({
       job: job({ identity: null }),
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
       nowMs: 1_000,
     })
 
@@ -126,7 +126,7 @@ describe("buildDriveStatePayload", () => {
     const payload = buildDriveStatePayload({
       job: job(),
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
       nowMs: 1_753_000_000_000,
     })
 
@@ -148,7 +148,7 @@ describe("buildDriveStatePayload — the tray", () => {
     buildDriveStatePayload({
       job: null,
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
       nowMs: NOW_MS,
       disc: {
         bay: input.bay,
@@ -249,7 +249,7 @@ describe("buildDriveStatePayload — the tray", () => {
         warnings: ["4 read errors at 3.20 GB."],
       }),
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
       nowMs: NOW_MS,
     })
 
@@ -261,7 +261,7 @@ describe("buildDriveStatePayload — the tray", () => {
     const payload = buildDriveStatePayload({
       job: job({ state: "completed" }),
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
       nowMs: NOW_MS,
     })
 
@@ -275,7 +275,7 @@ describe("buildDriveStatePayload — the tray", () => {
     const payload = buildDriveStatePayload({
       job: null,
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
       nowMs: NOW_MS,
     })
 

@@ -137,9 +137,9 @@ export type WatchMqtt = {
 
 /** What we have learned about one bay from the event stream. */
 type BayView = {
-  slot: number | null
+  bay: number | null
   /**
-   * The bay's house label, ALREADY slot-prefixed —
+   * The bay's house label, ALREADY bay-prefixed —
    * `07 - Pioneer BDR-211M`.
    *
    * It arrives that way from the registry, which is where every
@@ -159,10 +159,10 @@ type BayView = {
 }
 
 const createBayView = (input: {
-  slot: number | null
+  bay: number | null
   name: string
 }): BayView => ({
-  slot: input.slot,
+  bay: input.bay,
   name: input.name,
   identity: null,
   progress: null,
@@ -368,7 +368,7 @@ export const createWatchMqtt = (
 
   const viewFor = (event: {
     driveId: string
-    slot: number | null
+    bay: number | null
     name: string
   }): BayView => {
     const existing = views.get(event.driveId)
@@ -376,7 +376,7 @@ export const createWatchMqtt = (
     if (existing !== undefined) {
       // Placement can only improve: the registry may have been
       // missing on the first tick and present later.
-      existing.slot = event.slot
+      existing.bay = event.bay
       existing.name = event.name
       return existing
     }
@@ -397,17 +397,17 @@ export const createWatchMqtt = (
       .map(([driveId, view]) => ({
         driveId,
         label: view.name,
-        slot: view.slot,
+        bay: view.bay,
       }))
       .sort((a, b) => a.driveId.localeCompare(b.driveId))
 
     // driveId is in the signature on purpose: when the USB path
     // moves, state_topic must be rewritten even though the stable
-    // slot-based unique_id stays the same.
+    // bay-based unique_id stays the same.
     const signature = drives
       .map(
         (drive) =>
-          `${drive.driveId}:${drive.slot ?? ""}:${drive.label}`,
+          `${drive.driveId}:${drive.bay ?? ""}:${drive.label}`,
       )
       .join("|")
 
@@ -440,7 +440,7 @@ export const createWatchMqtt = (
     const view =
       views.get(input.bay.driveId) ??
       createBayView({
-        slot: null,
+        bay: null,
         name: input.bay.driveId,
       })
 
@@ -484,7 +484,7 @@ export const createWatchMqtt = (
         driveId: input.bay.driveId,
         job,
         driveLabel: view.name,
-        slot: view.slot,
+        bay: view.bay,
         nowMs: input.nowMs,
         disc,
       })
@@ -600,7 +600,7 @@ export const createWatchMqtt = (
    */
   const publishOutcome = (event: {
     driveId: string
-    slot: number | null
+    bay: number | null
     name: string
     outcome: BayOutcome
     jobUuid?: string
@@ -682,7 +682,7 @@ export const createWatchMqtt = (
         driveLabel: view.name,
         // The number on the front of the tower, and the only bay
         // name worth speaking — `view.name` is a drive model.
-        slot: view.slot,
+        bay: view.bay,
       })
     })
   }
@@ -830,7 +830,7 @@ export const createWatchMqtt = (
 
       if (!mqtt.isEnabled) return
 
-      // Registry first, so the nine bays get their slot numbers
+      // Registry first, so the nine bays get their bay numbers
       // and human names into discovery before any of them has
       // ever emitted an event.
       const registry =
@@ -844,7 +844,7 @@ export const createWatchMqtt = (
         views.set(
           entry.usbPortPath,
           createBayView({
-            slot: entry.slot,
+            bay: entry.bay,
             name: entry.name,
           }),
         )

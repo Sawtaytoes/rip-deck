@@ -80,16 +80,16 @@ describe("nine concurrent rips", () => {
       await screen.findByText(/9 bays · 9 ripping/),
     ).toBeInTheDocument()
 
-    // §3 + §12: the slot is its own field and the disc is the
+    // §3 + §12: the bay is its own field and the disc is the
     // headline. The card used to lead with
-    // "0N - Pioneer BDR-211M", which said the slot twice and put
+    // "0N - Pioneer BDR-211M", which said the bay twice and put
     // the drive above the disc.
-    for (const slot of [1, 5, 9]) {
+    for (const bay of [1, 5, 9]) {
       expect(
-        screen.getAllByText(String(slot)).length,
+        screen.getAllByText(String(bay)).length,
       ).toBeGreaterThan(0)
       expect(
-        screen.getByText(`Fixture Disc ${slot}`),
+        screen.getByText(`Fixture Disc ${bay}`),
       ).toBeInTheDocument()
     }
   })
@@ -291,9 +291,9 @@ describe("discs held at startup", () => {
       ),
     ).toBeInTheDocument()
 
-    for (const slot of [7, 8, 9]) {
+    for (const bay of [7, 8, 9]) {
       expect(
-        screen.getByText(String(slot)),
+        screen.getByText(String(bay)),
       ).toBeInTheDocument()
     }
 
@@ -305,7 +305,7 @@ describe("discs held at startup", () => {
     // said ONCE. The startup hold fires on every loaded bay at
     // once, so all three carry the identical paragraph, and
     // three copies of it bury the only thing that differs
-    // between the cards: which disc is in which slot. The other
+    // between the cards: which disc is in which bay. The other
     // two point at it, the way `VerdictBadge` already points at
     // a hub fault.
     expect(
@@ -785,7 +785,7 @@ describe("the rip card order", () => {
       .getAllByText(/^Fixture Disc \d+$/)
       .map((element) => element.textContent ?? "")
 
-  it("defaults to ascending slot number", async () => {
+  it("defaults to ascending bay number", async () => {
     showFixture("nine-rips")
 
     await screen.findByText(/9 bays · 9 ripping/)
@@ -808,8 +808,8 @@ describe("the rip card order", () => {
       }),
     )
 
-    // This fixture's ETA falls as its slot rises: slot 9 has the
-    // smallest measured ETA and slot 1 has the largest.
+    // This fixture's ETA falls as its bay rises: bay 9 has the
+    // smallest measured ETA and bay 1 has the largest.
     expect(displayedDiscOrder()).toEqual(
       Array.from(
         { length: 9 },

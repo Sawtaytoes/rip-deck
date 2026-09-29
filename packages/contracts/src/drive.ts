@@ -58,12 +58,12 @@ export type DriveIdentity = {
 }
 
 /**
- * Physical placement, from the operator-maintained slot map.
+ * Physical placement, from the operator-maintained bay map.
  * Absent for a drive we have never seen before.
  */
 export type DrivePlacement = {
   /** 1-based, tower order: top = 1 … bottom = 9. */
-  slot: number
+  bay: number
   /** Display name, house scheme: "03 - BD-RW BDR-211M". */
   name: string
 }
@@ -115,7 +115,7 @@ export const isValidReadOffsetSamples = (
   Math.abs(value) <= MAX_READ_OFFSET_SAMPLES
 
 /**
- * Read one `readOffsetSamples` out of the operator's slot map.
+ * Read one `readOffsetSamples` out of the operator's bay map.
  *
  * Absent, null and implausible all collapse to null, and null
  * is a SUPPORTED state rather than an error — the same shape as

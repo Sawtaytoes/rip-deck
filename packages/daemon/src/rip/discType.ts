@@ -20,8 +20,8 @@ import {
  *
  * The hard part is not the fork, it is deciding which side of it
  * a disc is on WITHOUT guessing — because the two mistakes are
- * not symmetric. Handing a Blu-ray to cyanrip wastes a slot;
- * handing an audio CD to `makemkvcon backup` wastes a slot and
+ * not symmetric. Handing a Blu-ray to cyanrip wastes a bay;
+ * handing an audio CD to `makemkvcon backup` wastes a bay and
  * teaches the owner that the new tool is unreliable. So this
  * module is built to refuse rather than to guess (B3), and the
  * refusal NEVER ejects — auto-eject is the root cause of the
@@ -433,7 +433,7 @@ export const decideDiscType = (input: {
 
     // sysfs is showing a real capacity, so something IS in the
     // bay. Two different states hide behind "udev did not say
-    // there is media", and collapsing them is what held slots
+    // there is media", and collapsing them is what held bays
     // 1-4 on 2026-08-27:
     //
     //  - `cdrom_id` recorded media facts and they say the tray

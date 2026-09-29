@@ -56,7 +56,7 @@ const isRevision = (token: string): boolean =>
  *
  * Returns null rather than throwing for anything that does not
  * match, including the empty name MakeMKV emits for its 16
- * always-present but unattached slots.
+ * always-present but unattached bays.
  */
 export const parseDriveName = (
   driveName: string,
@@ -86,7 +86,7 @@ export const parseDriveName = (
 }
 
 /**
- * MakeMKV pads its drive list to 16 slots; the unused ones come
+ * MakeMKV pads its drive list to 16 bays; the unused ones come
  * back with `visible === 256` (NOT_ATTACHED) and three empty
  * strings. Filtering on the empty device path is the reliable
  * test — `visible` also takes other values on real drives.

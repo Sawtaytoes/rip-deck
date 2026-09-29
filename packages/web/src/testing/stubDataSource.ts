@@ -48,10 +48,10 @@ export const buildTrayBayReport = (
   overrides: Partial<TrayBayReport> = {},
 ): TrayBayReport => ({
   drive_id: "usb-2-1-1-2-4-4-7",
-  slot: 7,
+  bay: 7,
   label: "07 - Pioneer BDR-211M",
   result: "opened",
-  detail: "Slot 7 opened.",
+  detail: "Bay 7 opened.",
   ...overrides,
 })
 

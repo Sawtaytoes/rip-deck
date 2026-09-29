@@ -39,9 +39,11 @@ export type RipEventPayload = {
    *
    * Additive, and it exists for `spoken_message` below: `drive` is
    * `"09 - Pioneer BDR-211M"`, which a house speaker reads out as
-   * a part number. The slot is the identifier the owner uses when
+   * a part number. The bay is the identifier the owner uses when
    * he walks over to the tower.
    */
+  bay: number | null
+  /** Old MQTT attribute retained for existing automations. */
   slot: number | null
   /**
    * The whole announcement, written to be HEARD. Additive.
@@ -120,15 +122,15 @@ export const toLegacyHealth = (
 /**
  * How a bay is named ALOUD.
  *
- * The slot when there is one, because that is the number written
+ * The bay when there is one, because that is the number written
  * on the tower. Never the drive label: `"09 - Pioneer BDR-211M"`
  * is read out as "zero nine dash Pioneer B D R two one one M".
- * A bay with no slot — a drive not in `config/drives.json` — gets
+ * A drive with no known bay — one absent from `config/drives.json` — gets
  * no name rather than a model number, and the sentences below are
  * written so that reads naturally.
  */
-const spokenBay = (slot: number | null): string | null =>
-  slot === null ? null : `slot ${String(slot)}`
+const spokenBay = (bay: number | null): string | null =>
+  bay === null ? null : `bay ${String(bay)}`
 
 /**
  * The one line Home Assistant reads out for a finished rip.
@@ -151,7 +153,7 @@ const spokenBay = (slot: number | null): string | null =>
 export const buildRipSpokenMessage = (input: {
   job: Job
   verdict: Verdict
-  slot: number | null
+  bay: number | null
 }): string => {
   const { job, verdict } = input
 
@@ -159,7 +161,7 @@ export const buildRipSpokenMessage = (input: {
   // is defaulted to "Unknown disc", and "Unknown disc finished
   // ripping" is a sentence no listener can act on.
   const title = job.identity?.title ?? null
-  const bay = spokenBay(input.slot)
+  const bay = spokenBay(input.bay)
 
   if (job.state === "needs_attention") {
     return bay === null
@@ -198,13 +200,13 @@ export const buildRipEventPayload = (input: {
   verdict: Verdict
   /** Display label for the bay, e.g. "07 - Pioneer BDR-211M". */
   driveLabel: string
-  /** The bay's slot, for the spoken line. Null when unknown. */
-  slot?: number | null
+  /** The bay number, for the spoken line. Null when unknown. */
+  bay?: number | null
 }): RipEventPayload => {
   const { job, verdict, driveLabel } = input
 
   const isSuccess = job.state === "completed"
-  const slot = input.slot ?? null
+  const bay = input.bay ?? null
 
   return {
     job_id: job.id,
@@ -217,11 +219,12 @@ export const buildRipEventPayload = (input: {
     verdict: verdict.kind,
     verdict_message: verdict.message,
     verdict_action: verdict.action,
-    slot,
+    bay,
+    slot: bay,
     spoken_message: buildRipSpokenMessage({
       job,
       verdict,
-      slot,
+      bay,
     }),
   }
 }
@@ -235,7 +238,7 @@ export const buildRipEventPayload = (input: {
  */
 export type DriveAlertPayload = {
   drive: string
-  slot: number | null
+  bay: number | null
   verdict: VerdictKind
   action: string
   message: string
@@ -247,10 +250,10 @@ export type DriveAlertPayload = {
 export const buildDriveAlertPayload = (input: {
   verdict: Verdict
   driveLabel: string
-  slot: number | null
+  bay: number | null
 }): DriveAlertPayload => ({
   drive: input.driveLabel,
-  slot: input.slot,
+  bay: input.bay,
   verdict: input.verdict.kind,
   action: input.verdict.action,
   message: input.verdict.message,

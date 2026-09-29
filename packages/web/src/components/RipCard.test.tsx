@@ -28,8 +28,8 @@ const renderCard = (
 ) => renderWithProviders(ui, dataSource)
 
 describe("RipCard", () => {
-  it("leads with the slot and the disc, not the drive", () => {
-    // §12's ranked list: slot, disc, thumbnail — and the drive
+  it("leads with the bay and the disc, not the drive", () => {
+    // §12's ranked list: bay, disc, thumbnail — and the drive
     // name tenth, behind the advanced-info disclosure. It was
     // the headline before.
     renderCard(
@@ -57,9 +57,9 @@ describe("RipCard", () => {
     ).toBeInTheDocument()
   })
 
-  // §3: "the drives are prefixed with their slot number. Do we
-  // need that if we're going to say 'slot 9' anyway?"
-  it("says the slot once, and never with the drive's prefix", () => {
+  // §3: "the drives are prefixed with their bay number. Do we
+  // need that if we're going to say 'bay 9' anyway?"
+  it("says the bay once, and never with the drive's prefix", () => {
     renderCard(
       <RipCard
         rip={buildRip({ label: null, volume_label: null })}
@@ -70,7 +70,7 @@ describe("RipCard", () => {
     )
 
     // With no disc name the drive IS the title — bare, because
-    // the slot is already its own field beside it. Twice: the
+    // the bay is already its own field beside it. Twice: the
     // headline, and again inside the advanced panel where the
     // drive properly belongs.
     expect(
@@ -82,7 +82,7 @@ describe("RipCard", () => {
   })
 
   // §5: "It'd be nice to see that 'where did it rip' directory
-  // somewhere in the same area the 'slot 8 · completed' is
+  // somewhere in the same area the 'bay 8 · completed' is
   // located […] It doesn't make sense to show it in weird
   // information box underneath right?"
   it("puts the destination on the metadata row, not in the evidence box", () => {
@@ -475,7 +475,7 @@ describe("RipCard", () => {
                 buildTrayBayReport({
                   result: "refused_ripping",
                   detail:
-                    "Slot 7 is ripping — nothing was touched.",
+                    "Bay 7 is ripping — nothing was touched.",
                 }),
               ],
             }),
@@ -491,7 +491,7 @@ describe("RipCard", () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          "Slot 7 is ripping — nothing was touched.",
+          "Bay 7 is ripping — nothing was touched.",
         ),
       ).toBeInTheDocument()
     })
@@ -544,7 +544,7 @@ describe("RipCard", () => {
     )
     await userEvent.click(
       screen.getByRole("button", {
-        name: "Show the log for slot 7",
+        name: "Show the log for bay 7",
       }),
     )
 
@@ -587,7 +587,7 @@ describe("RipCard", () => {
           model: "BD-RW BDR-211M",
           serial_id: "EXAMPLE00007",
           drive_id: "usb-2-1-1-2-4-4-7",
-          slot: 7,
+          bay: 7,
           is_quarantined: false,
           quarantine_reason: null,
         }}
@@ -660,7 +660,7 @@ describe("RipCard", () => {
     )
   })
 
-  it("puts the slot above the thumbnail when artwork exists", () => {
+  it("puts the bay above the thumbnail when artwork exists", () => {
     const { container } = renderCard(
       <RipCard
         rip={buildRip({ poster: "/posters/ivanhoe.jpg" })}
@@ -670,19 +670,19 @@ describe("RipCard", () => {
       />,
     )
 
-    const slot = screen.getByText("7")
+    const bay = screen.getByText("7")
     const poster = container.querySelector("img")
     const title = container.querySelector(
       "span.break-words.font-semibold",
     )
 
     expect(poster).not.toBeNull()
-    expect(slot.parentElement).toHaveClass("flex-col")
-    expect(slot.parentElement).toContainElement(poster)
-    expect(title?.parentElement).not.toContainElement(slot)
+    expect(bay.parentElement).toHaveClass("flex-col")
+    expect(bay.parentElement).toContainElement(poster)
+    expect(title?.parentElement).not.toContainElement(bay)
   })
 
-  it("keeps the slot beside the title when there is no artwork", () => {
+  it("keeps the bay beside the title when there is no artwork", () => {
     const { container } = renderCard(
       <RipCard
         rip={buildRip({ poster: null })}
@@ -692,12 +692,12 @@ describe("RipCard", () => {
       />,
     )
 
-    const slot = screen.getByText("7")
+    const bay = screen.getByText("7")
     const title = container.querySelector(
       "span.break-words.font-semibold",
     )
 
-    expect(title?.parentElement).toContainElement(slot)
+    expect(title?.parentElement).toContainElement(bay)
   })
 
   // The owner on a phone: the poster and the title must stay

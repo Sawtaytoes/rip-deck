@@ -62,17 +62,17 @@ const buildJob = (overrides: Partial<Job> = {}): Job => ({
 })
 
 const buildBay = (input: {
-  slot: number
+  bay: number
   job?: Job | null
 }) =>
   createBaySnapshot({
-    driveId: `usb-2-1-1-2-4-4-${input.slot}`,
-    label: `0${input.slot} - Pioneer BDR-211M`,
-    slot: input.slot,
-    devPath: `/dev/sr${9 - input.slot}`,
+    driveId: `usb-2-1-1-2-4-4-${input.bay}`,
+    label: `0${input.bay} - Pioneer BDR-211M`,
+    bay: input.bay,
+    devPath: `/dev/sr${9 - input.bay}`,
     vendor: "PIONEER",
     model: "BD-RW BDR-211M",
-    serial: `SERIAL00${input.slot}`,
+    serial: `SERIAL00${input.bay}`,
     job: input.job ?? null,
   })
 
@@ -84,7 +84,7 @@ const armState = (bays: ReturnType<typeof buildBay>[]) =>
 describe("the ARM-viewer projection", () => {
   it("emits one host with the fields the viewer reads", () => {
     const state = armState([
-      buildBay({ slot: 2, job: buildJob() }),
+      buildBay({ bay: 2, job: buildJob() }),
     ])
 
     expect(state.hosts).toHaveLength(1)
@@ -107,7 +107,7 @@ describe("the ARM-viewer projection", () => {
 
   it("carries the real id beside the numeric surrogate", () => {
     const job = buildJob()
-    const rip = armState([buildBay({ slot: 2, job })])
+    const rip = armState([buildBay({ bay: 2, job })])
       .hosts[0].rips[0]
 
     // The viewer types job_id as a number and joins on it, so a
@@ -128,7 +128,7 @@ describe("the ARM-viewer projection", () => {
 
   it("joins a drive to its rip through that surrogate", () => {
     const state = armState([
-      buildBay({ slot: 2, job: buildJob() }),
+      buildBay({ bay: 2, job: buildJob() }),
     ])
 
     expect(state.hosts[0].drives[0].current).toBe(
@@ -143,7 +143,7 @@ describe("the ARM-viewer projection", () => {
   it("moves a finished job from current to previous", () => {
     const state = armState([
       buildBay({
-        slot: 2,
+        bay: 2,
         job: buildJob({
           state: "completed",
           finishedAt: NOW_MS,
@@ -182,14 +182,14 @@ describe("the ARM-viewer projection", () => {
   it("orders rips newest first", () => {
     const state = armState([
       buildBay({
-        slot: 1,
+        bay: 1,
         job: buildJob({
           id: "older",
           startedAt: NOW_MS - 3_600_000,
         }),
       }),
       buildBay({
-        slot: 2,
+        bay: 2,
         job: buildJob({
           id: "newer",
           startedAt: NOW_MS - 60_000,
@@ -204,7 +204,7 @@ describe("the ARM-viewer projection", () => {
 
   it("never eject-loops, and never pokes the tray", () => {
     const rip = armState([
-      buildBay({ slot: 2, job: buildJob() }),
+      buildBay({ bay: 2, job: buildJob() }),
     ]).hosts[0].rips[0]
 
     // A disc we cannot identify stays in the drive; the eject
@@ -223,7 +223,7 @@ describe("the log capture", () => {
     // A button during this phase can only lead to a 404.
     const rip = armState([
       buildBay({
-        slot: 2,
+        bay: 2,
         job: buildJob({ state: "settling" }),
       }),
     ]).hosts[0].rips[0]
@@ -235,7 +235,7 @@ describe("the log capture", () => {
     // `runBayRip` creates the log before the state becomes
     // `ripping`, so the button has something to open now.
     const rip = armState([
-      buildBay({ slot: 2, job: buildJob() }),
+      buildBay({ bay: 2, job: buildJob() }),
     ]).hosts[0].rips[0]
 
     expect(rip.logfile).toBe(
@@ -254,7 +254,7 @@ describe("the log capture", () => {
     // worse than no button.
     const rip = armState([
       buildBay({
-        slot: 2,
+        bay: 2,
         job: buildJob({
           id: "usb-2-1-1-2-4-4-2@1800000000000",
         }),
@@ -338,7 +338,7 @@ describe("media kind", () => {
   it("carries the house label for a rip-deck-aware UI", () => {
     const rip = armState([
       buildBay({
-        slot: 2,
+        bay: 2,
         job: buildJob({
           identity: {
             title: "Dune",

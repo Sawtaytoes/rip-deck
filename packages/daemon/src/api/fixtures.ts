@@ -47,14 +47,14 @@ import {
  *    the pair the dashboard most has to keep apart.
  */
 
-const bayLabel = (slot: number): string =>
-  `${String(slot).padStart(2, "0")} - Pioneer BDR-211M`
+const bayLabel = (bay: number): string =>
+  `${String(bay).padStart(2, "0")} - Pioneer BDR-211M`
 
-const bayDriveId = (slot: number): string =>
-  `usb-2-1-1-2-4-4-${slot}`
+const bayDriveId = (bay: number): string =>
+  `usb-2-1-1-2-4-4-${bay}`
 
 const buildFixtureJob = (input: {
-  slot: number
+  bay: number
   nowMs: number
   state?: JobState
   title?: string
@@ -91,7 +91,7 @@ const buildFixtureJob = (input: {
   destinationPath?: string
 }): Job => {
   const {
-    slot,
+    bay,
     nowMs,
     state = "ripping",
     title = "Ivanhoe",
@@ -108,8 +108,8 @@ const buildFixtureJob = (input: {
   } = input
 
   return {
-    id: `fixture-job-${slot}`,
-    driveId: bayDriveId(slot),
+    id: `fixture-job-${bay}`,
+    driveId: bayDriveId(bay),
     state,
     startedAt: nowMs - elapsedMs,
     finishedAt:
@@ -174,23 +174,23 @@ const buildFixtureJob = (input: {
 }
 
 const buildFixtureBay = (input: {
-  slot: number
+  bay: number
   job?: Job | null
   isQuarantined?: boolean
   quarantineReason?: string | null
 }): BaySnapshot => {
   const supervision = createSupervisionState(
-    bayDriveId(input.slot),
+    bayDriveId(input.bay),
   )
 
   return createBaySnapshot({
-    driveId: bayDriveId(input.slot),
-    label: bayLabel(input.slot),
-    slot: input.slot,
-    devPath: `/dev/sr${9 - input.slot}`,
+    driveId: bayDriveId(input.bay),
+    label: bayLabel(input.bay),
+    bay: input.bay,
+    devPath: `/dev/sr${9 - input.bay}`,
     vendor: "PIONEER",
     model: "BD-RW BDR-211M",
-    serial: `FIXTURE00${input.slot}`,
+    serial: `FIXTURE00${input.bay}`,
     job: input.job ?? null,
     supervision: input.isQuarantined
       ? {
@@ -206,8 +206,8 @@ const buildFixtureBay = (input: {
 }
 
 /** Every bay idle, so a scenario only has to name its outliers. */
-const buildIdleBays = (slots: number[]): BaySnapshot[] =>
-  slots.map((slot) => buildFixtureBay({ slot }))
+const buildIdleBays = (bays: number[]): BaySnapshot[] =>
+  bays.map((bay) => buildFixtureBay({ bay }))
 
 const ALL_SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
@@ -219,17 +219,17 @@ const buildEmptyTower = (): TowerSnapshot =>
 const buildNineRips = (nowMs: number): TowerSnapshot =>
   createTowerSnapshot({
     isMqttEnabled: true,
-    bays: ALL_SLOTS.map((slot) =>
+    bays: ALL_SLOTS.map((bay) =>
       buildFixtureBay({
-        slot,
+        bay,
         job: buildFixtureJob({
-          slot,
+          bay,
           nowMs,
-          title: `Fixture Disc ${slot}`,
-          elapsedMs: slot * 90_000,
+          title: `Fixture Disc ${bay}`,
+          elapsedMs: bay * 90_000,
           progress: {
-            totalFraction: slot / 10,
-            etaSeconds: 3_600 - slot * 300,
+            totalFraction: bay / 10,
+            etaSeconds: 3_600 - bay * 300,
           },
         }),
       }),
@@ -255,9 +255,9 @@ const buildVerdicts = (nowMs: number): TowerSnapshot => {
     isMqttEnabled: true,
     bays: kinds.map((kind, index) =>
       buildFixtureBay({
-        slot: index + 1,
+        bay: index + 1,
         job: buildFixtureJob({
-          slot: index + 1,
+          bay: index + 1,
           nowMs,
           title: `Fixture ${kind}`,
           verdictKind: kind,
@@ -294,15 +294,15 @@ const buildHubFault = (nowMs: number): TowerSnapshot => {
 
   return createTowerSnapshot({
     isMqttEnabled: true,
-    bays: ALL_SLOTS.map((slot) =>
-      faultedSlots.includes(slot)
+    bays: ALL_SLOTS.map((bay) =>
+      faultedSlots.includes(bay)
         ? buildFixtureBay({
-            slot,
+            bay,
             job: buildFixtureJob({
-              slot,
+              bay,
               nowMs,
               state: "stalled",
-              title: `Fixture Disc ${slot}`,
+              title: `Fixture Disc ${bay}`,
               verdictKind: "hub_fault",
               confidence: "confirmed",
               evidence: [
@@ -315,7 +315,7 @@ const buildHubFault = (nowMs: number): TowerSnapshot => {
               },
             }),
           })
-        : buildFixtureBay({ slot }),
+        : buildFixtureBay({ bay }),
     ),
   })
 }
@@ -334,9 +334,9 @@ const buildConfidence = (nowMs: number): TowerSnapshot =>
     bays: [
       ...buildIdleBays([1]),
       buildFixtureBay({
-        slot: 2,
+        bay: 2,
         job: buildFixtureJob({
-          slot: 2,
+          bay: 2,
           nowMs,
           title: "Ivanhoe",
           verdictKind: "disc_dirty",
@@ -347,9 +347,9 @@ const buildConfidence = (nowMs: number): TowerSnapshot =>
       }),
       ...buildIdleBays([3, 4, 5, 6, 7]),
       buildFixtureBay({
-        slot: 8,
+        bay: 8,
         job: buildFixtureJob({
-          slot: 8,
+          bay: 8,
           nowMs,
           title: "Ivanhoe",
           verdictKind: "disc_dirty",
@@ -380,9 +380,9 @@ const buildRisingEta = (nowMs: number): TowerSnapshot =>
     bays: [
       ...buildIdleBays([1, 2]),
       buildFixtureBay({
-        slot: 3,
+        bay: 3,
         job: buildFixtureJob({
-          slot: 3,
+          bay: 3,
           nowMs,
           title: "Ivanhoe",
           progress: {
@@ -411,7 +411,7 @@ const buildQuarantined = (nowMs: number): TowerSnapshot =>
     bays: [
       ...buildIdleBays([1, 2, 3, 4]),
       buildFixtureBay({
-        slot: 5,
+        bay: 5,
         isQuarantined: true,
         quarantineReason:
           "Crashed 3 times without staying up. Taken out of " +
@@ -419,9 +419,9 @@ const buildQuarantined = (nowMs: number): TowerSnapshot =>
           "at.",
       }),
       buildFixtureBay({
-        slot: 6,
+        bay: 6,
         job: buildFixtureJob({
-          slot: 6,
+          bay: 6,
           nowMs,
           title: "Fixture Disc 6",
         }),
@@ -435,14 +435,14 @@ const buildQuarantined = (nowMs: number): TowerSnapshot =>
  *
  * ⚠️ This is not a hypothetical. It is the exact state of the
  * owner's tower on 2026-07-26: `rip-deck:0.4.0` came up with the
- * three Troy discs still in slots 7–9, found no `bays.json`, and
+ * three Troy discs still in bays 7–9, found no `bays.json`, and
  * took `adoptBayAtStartup`'s fail-closed branch on all three —
  * `phase: "done"`, `outcome.kind: "needs_attention"`, carrying
  * `UNKNOWN_AT_STARTUP_DETAIL`. That is the intended outcome; it
  * is what stopped 225 GB of duplicate ripping
  * (`docs/eject-and-durable-bay-state.md` §5).
  *
- * Slot 1 carries a genuinely FAILED rip on purpose. The two
+ * Bay 1 carries a genuinely FAILED rip on purpose. The two
  * states are the pair the dashboard most has to keep apart, and
  * a fixture that only contains one of them proves nothing about
  * whether they read differently: "this disc failed to rip" wants
@@ -460,22 +460,22 @@ const buildHeldAtStartup = (
   nowMs: number,
 ): TowerSnapshot => {
   const heldDiscs: {
-    slot: number
+    bay: number
     title: string
     discType: DiscType
   }[] = [
     {
-      slot: 7,
+      bay: 7,
       title: "TROY - BONUS DISC",
       discType: "bluray",
     },
     {
-      slot: 8,
+      bay: 8,
       title: "TROY - DIRECTOR'S CUT",
       discType: "uhd",
     },
     {
-      slot: 9,
+      bay: 9,
       title: "TROY - THEATRICAL CUT",
       discType: "uhd",
     },
@@ -485,9 +485,9 @@ const buildHeldAtStartup = (
     isMqttEnabled: true,
     bays: [
       buildFixtureBay({
-        slot: 1,
+        bay: 1,
         job: buildFixtureJob({
-          slot: 1,
+          bay: 1,
           nowMs,
           state: "failed",
           title: "Fixture Scratched Disc",
@@ -506,11 +506,11 @@ const buildHeldAtStartup = (
         }),
       }),
       ...buildIdleBays([2, 3, 4, 5, 6]),
-      ...heldDiscs.map(({ slot, title, discType }) =>
+      ...heldDiscs.map(({ bay, title, discType }) =>
         buildFixtureBay({
-          slot,
+          bay,
           job: buildFixtureJob({
-            slot,
+            bay,
             nowMs,
             state: "needs_attention",
             title,
@@ -570,20 +570,20 @@ const buildHeldAtStartup = (
  */
 const buildUnmeasured = (nowMs: number): TowerSnapshot => {
   const adoptedDiscs = [
-    { slot: 7, title: "TROY - BONUS DISC" },
-    { slot: 8, title: "TROY - DIRECTOR'S CUT" },
-    { slot: 9, title: "TROY - THEATRICAL CUT" },
+    { bay: 7, title: "TROY - BONUS DISC" },
+    { bay: 8, title: "TROY - DIRECTOR'S CUT" },
+    { bay: 9, title: "TROY - THEATRICAL CUT" },
   ]
 
   return createTowerSnapshot({
     isMqttEnabled: true,
     bays: [
       ...buildIdleBays([1, 2, 3, 4, 5, 6]),
-      ...adoptedDiscs.map(({ slot, title }) =>
+      ...adoptedDiscs.map(({ bay, title }) =>
         buildFixtureBay({
-          slot,
+          bay,
           job: buildFixtureJob({
-            slot,
+            bay,
             nowMs,
             state: "completed",
             title,
@@ -642,14 +642,14 @@ const buildUsbFlap = (nowMs: number): TowerSnapshot => {
     },
     bays: [
       ...buildIdleBays([1, 2, 3, 4, 5, 6, 9]),
-      ...heldSlots.map((slot) =>
+      ...heldSlots.map((bay) =>
         buildFixtureBay({
-          slot,
+          bay,
           job: buildFixtureJob({
-            slot,
+            bay,
             nowMs,
             state: "needs_attention",
-            title: `Fixture Held Disc ${slot}`,
+            title: `Fixture Held Disc ${bay}`,
             verdictKind: "unknown",
             confidence: "suspected",
             evidence: [
@@ -677,9 +677,9 @@ const buildShowcase = (nowMs: number): TowerSnapshot =>
     isMqttEnabled: true,
     bays: [
       buildFixtureBay({
-        slot: 1,
+        bay: 1,
         job: buildFixtureJob({
-          slot: 1,
+          bay: 1,
           nowMs,
           title: "Dune: Part Two",
           discType: "uhd",
@@ -690,9 +690,9 @@ const buildShowcase = (nowMs: number): TowerSnapshot =>
         }),
       }),
       buildFixtureBay({
-        slot: 2,
+        bay: 2,
         job: buildFixtureJob({
-          slot: 2,
+          bay: 2,
           nowMs,
           title: "The Iron Giant",
           discType: "bluray",
@@ -703,9 +703,9 @@ const buildShowcase = (nowMs: number): TowerSnapshot =>
         }),
       }),
       buildFixtureBay({
-        slot: 3,
+        bay: 3,
         job: buildFixtureJob({
-          slot: 3,
+          bay: 3,
           nowMs,
           title: "Schoolhouse Rock!",
           discType: "dvd",
@@ -716,9 +716,9 @@ const buildShowcase = (nowMs: number): TowerSnapshot =>
         }),
       }),
       buildFixtureBay({
-        slot: 4,
+        bay: 4,
         job: buildFixtureJob({
-          slot: 4,
+          bay: 4,
           nowMs,
           state: "stalled",
           title: "Mezzanine",
@@ -732,9 +732,9 @@ const buildShowcase = (nowMs: number): TowerSnapshot =>
         }),
       }),
       buildFixtureBay({
-        slot: 5,
+        bay: 5,
         job: buildFixtureJob({
-          slot: 5,
+          bay: 5,
           nowMs,
           state: "completed",
           title: "Blade Runner 2049",
@@ -743,9 +743,9 @@ const buildShowcase = (nowMs: number): TowerSnapshot =>
         }),
       }),
       buildFixtureBay({
-        slot: 6,
+        bay: 6,
         job: buildFixtureJob({
-          slot: 6,
+          bay: 6,
           nowMs,
           state: "completed",
           title: "Spirited Away",
@@ -754,9 +754,9 @@ const buildShowcase = (nowMs: number): TowerSnapshot =>
         }),
       }),
       buildFixtureBay({
-        slot: 7,
+        bay: 7,
         job: buildFixtureJob({
-          slot: 7,
+          bay: 7,
           nowMs,
           state: "completed",
           title: "The Muppet Movie",
@@ -770,9 +770,9 @@ const buildShowcase = (nowMs: number): TowerSnapshot =>
         }),
       }),
       buildFixtureBay({
-        slot: 8,
+        bay: 8,
         job: buildFixtureJob({
-          slot: 8,
+          bay: 8,
           nowMs,
           state: "failed",
           title: "Kind of Blue",
@@ -791,7 +791,7 @@ const buildShowcase = (nowMs: number): TowerSnapshot =>
           },
         }),
       }),
-      buildFixtureBay({ slot: 9 }),
+      buildFixtureBay({ bay: 9 }),
     ],
   })
 
@@ -803,9 +803,9 @@ const buildShowcase = (nowMs: number): TowerSnapshot =>
  * has is not "is amber legible" but "can I tell these three
  * apart at a glance from the doorway".
  *
- * Slot 5 is the rip this fixture was written for. A CSS DVD that
+ * Bay 5 is the rip this fixture was written for. A CSS DVD that
  * rode to `Backup done`, left an 8 GB ISO, and hit one bad
- * sector on the way. Before 2026-08-27 it wore slot 8's colours
+ * sector on the way. Before 2026-08-27 it wore bay 8's colours
  * — a `fail` badge saying there was no backup, over a backup
  * ([decision](../../../../docs/decisions/2026-08-27-a-read-error-on-a-verified-backup-is-a-warning-not-a-failure.md)).
  */
@@ -814,9 +814,9 @@ const buildThreeOutcomes = (nowMs: number): TowerSnapshot =>
     isMqttEnabled: true,
     bays: [
       buildFixtureBay({
-        slot: 1,
+        bay: 1,
         job: buildFixtureJob({
-          slot: 1,
+          bay: 1,
           nowMs,
           state: "completed",
           title: "Fixture Disc 1",
@@ -825,9 +825,9 @@ const buildThreeOutcomes = (nowMs: number): TowerSnapshot =>
       }),
       ...buildIdleBays([2, 3, 4]),
       buildFixtureBay({
-        slot: 5,
+        bay: 5,
         job: buildFixtureJob({
-          slot: 5,
+          bay: 5,
           nowMs,
           state: "completed",
           title: "Fixture Disc 5",
@@ -848,9 +848,9 @@ const buildThreeOutcomes = (nowMs: number): TowerSnapshot =>
       }),
       ...buildIdleBays([6, 7]),
       buildFixtureBay({
-        slot: 8,
+        bay: 8,
         job: buildFixtureJob({
-          slot: 8,
+          bay: 8,
           nowMs,
           state: "failed",
           title: "Fixture Disc 8",
@@ -891,9 +891,9 @@ const buildDataDiscs = (nowMs: number): TowerSnapshot =>
     isMqttEnabled: true,
     bays: [
       buildFixtureBay({
-        slot: 1,
+        bay: 1,
         job: buildFixtureJob({
-          slot: 1,
+          bay: 1,
           nowMs,
           title: "Proteus Sound Library Vol 1",
           discType: "cd_rom",
@@ -914,9 +914,9 @@ const buildDataDiscs = (nowMs: number): TowerSnapshot =>
         }),
       }),
       buildFixtureBay({
-        slot: 2,
+        bay: 2,
         job: buildFixtureJob({
-          slot: 2,
+          bay: 2,
           nowMs,
           state: "completed",
           title: "Vintage Keys Sample Disc",
@@ -937,9 +937,9 @@ const buildDataDiscs = (nowMs: number): TowerSnapshot =>
         }),
       }),
       buildFixtureBay({
-        slot: 3,
+        bay: 3,
         job: buildFixtureJob({
-          slot: 3,
+          bay: 3,
           nowMs,
           state: "needs_attention",
           title: "Unnamed data disc",

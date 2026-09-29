@@ -36,8 +36,8 @@ describe("reading the disc's own label", () => {
     ).toBe("DUNE_PART_TWO")
   })
 
-  it("ignores MakeMKV's 16-slot padding", () => {
-    // Unused slots come back with empty strings and
+  it("ignores MakeMKV's 16-bay padding", () => {
+    // Unused bays come back with empty strings and
     // visible === 256.
     expect(
       extractDiscName(
@@ -213,7 +213,7 @@ describe("telling a disc that was read apart from one that was not", () => {
     ).toBe(false)
   })
 
-  it("treats MakeMKV's 16-slot padding as a disc not read", () => {
+  it("treats MakeMKV's 16-bay padding as a disc not read", () => {
     expect(
       wasDiscRead(events(['DRV:2,256,999,0,"","",""'])),
     ).toBe(false)
@@ -331,7 +331,7 @@ describe("retrying a read the drive never answered", () => {
 
   it("re-reads a drive that answered before its disc had opened", async () => {
     // The UHD regression (2026-07-30, "SOYLENT GREEN - UHD",
-    // slot 9): the DRIVE is listed, but the disc has not cleared
+    // bay 9): the DRIVE is listed, but the disc has not cleared
     // LibreDrive/BD+ decrypt, so no CINFO and no name. The old
     // "a populated DRV line is a blank disc" rule latched this
     // permanently; it is a transient, and the next read lands the

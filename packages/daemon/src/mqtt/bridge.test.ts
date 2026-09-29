@@ -264,7 +264,7 @@ describe("publishDriveState", () => {
       driveId: "usb-2-1.1.2.4.4.2",
       job: job({ state: "ripping" }),
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
       nowMs: 1_000,
     })
 
@@ -290,7 +290,7 @@ describe("publishDriveState", () => {
       driveId: "usb-2-1.1.2.4.4.2",
       job: null,
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
       nowMs: 1_000,
       disc: {
         bay: {
@@ -340,7 +340,7 @@ describe("publishDriveState", () => {
       driveId: "usb-2-1.1.2.4.4.2",
       job: null,
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
       nowMs: 1_000,
     })
 
@@ -363,7 +363,7 @@ describe("publishDriveAlert", () => {
         "12 read errors, scattered",
       ]),
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
     })
 
     expect(isPublished).toBe(true)
@@ -388,7 +388,7 @@ describe("publishDriveAlert", () => {
       driveId: "usb-2-1.1.2.4.4.2",
       verdict: makeVerdict("disc_dirty", "suspected", []),
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
     })
 
     expect(isPublished).toBe(false)
@@ -409,7 +409,7 @@ describe("publishDriveAlert", () => {
         driveId: "usb-2-1.1.2.4.4.2",
         verdict: makeVerdict("ok", "confirmed", []),
         driveLabel: "07 - Pioneer BDR-211M",
-        slot: 7,
+        bay: 7,
       }),
     ).toBe(false)
 
@@ -448,7 +448,7 @@ describe("publishLivenessAlert — H3", () => {
       driveId: "usb-2-1.1.2.4.4.2",
       liveness: hung,
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
     })
 
     expect(isPublished).toBe(true)
@@ -471,7 +471,7 @@ describe("publishLivenessAlert — H3", () => {
         driveId: "usb-2-1.1.2.4.4.2",
         liveness: working,
         driveLabel: "07 - Pioneer BDR-211M",
-        slot: 7,
+        bay: 7,
       }),
     ).toBe(false)
     expect(
@@ -493,7 +493,7 @@ describe("publishDiscovery", () => {
         {
           driveId: "usb-2-1.1.2.4.4.2",
           label: "07 - Pioneer BDR-211M",
-          slot: 7,
+          bay: 7,
         },
       ],
     })

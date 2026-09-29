@@ -33,7 +33,7 @@ import { formatBayList } from "./trayCommand.ts"
  * rather than drops when a drive leaves the bus ("a dropped bay
  * comes back as a fresh idle one, and a fresh idle bay with a
  * finished disc still in it re-rips that disc"), and the sighting
- * table, which keeps a vanished bay's slot and label.
+ * table, which keeps a vanished drive's bay number and label.
  *
  * ## Surviving a daemon restart with the tower off
  *
@@ -74,8 +74,8 @@ import { formatBayList } from "./trayCommand.ts"
 /** One disc a human still has to fetch. */
 export type LoadedDisc = {
   /** The number on the front of the rack. Null if unregistered. */
-  slot: number | null
-  /** House label, already slot-prefixed. */
+  bay: number | null
+  /** House label, already bay-prefixed. */
   label: string
   /** The disc's own name, when identify read one. */
   title: string | null
@@ -85,7 +85,7 @@ export type LoadedDisc = {
 
 /** What a caller has to hold to answer the question. */
 export type LoadedDiscBay = {
-  slot: number | null
+  bay: number | null
   label: string
   /** The drive answered the last probe. */
   isDrivePresent: boolean
@@ -149,7 +149,7 @@ export const EMPTY_LOADED_DISCS: LoadedDiscSummary = {
  * It names the SLOTS and not the drive models, for the same reason
  * `spoken_message` does
  * ([decision](docs/decisions/2026-07-30-spoken-and-written-messages-are-separate-fields.md)):
- * the slot is the number written on the rack, and it is what he
+ * the bay is the number written on the rack, and it is what he
  * will be looking at when he finally walks down there.
  *
  * It also says what to DO, and that changes with the tower's power:
@@ -217,15 +217,15 @@ export const summariseLoadedDiscs = (
   const discs: LoadedDisc[] = bays
     .filter((bay) => bay.hasDisc && bay.isLatched)
     .map((bay) => ({
-      slot: bay.slot,
+      bay: bay.bay,
       label: bay.label,
       title: bay.title,
       isRipped: bay.isRipped,
     }))
-    // Lowest slot first, so the list reads the way the rack does.
-    // An unregistered bay has no slot and sorts last rather than
+    // Lowest bay first, so the list reads the way the rack does.
+    // An unregistered bay has no bay and sorts last rather than
     // first, which a bare `?? 0` would do.
-    .sort((a, b) => (a.slot ?? 99) - (b.slot ?? 99))
+    .sort((a, b) => (a.bay ?? 99) - (b.bay ?? 99))
 
   const isTowerOn = bays.some((bay) => bay.isDrivePresent)
 
@@ -292,9 +292,9 @@ export const phantomLoadedBays = (input: {
   records: readonly LedgerLoadedRecord[]
   /** Drives the live probe already built a bay for — skip these. */
   liveDriveIds: ReadonlySet<string>
-  /** Slot + house label for a driveId, from the registry. */
+  /** Bay + house label for a driveId, from the registry. */
   placementOf: (driveId: string) => {
-    slot: number | null
+    bay: number | null
     label: string
   }
 }): LoadedDiscBay[] =>
@@ -303,12 +303,12 @@ export const phantomLoadedBays = (input: {
       (record) => !input.liveDriveIds.has(record.driveId),
     )
     .map((record) => {
-      const { slot, label } = input.placementOf(
+      const { bay, label } = input.placementOf(
         record.driveId,
       )
 
       return {
-        slot,
+        bay,
         label,
         // A powered-off tower is not on the bus, and a phantom
         // exists precisely because its drive did not answer.
@@ -364,7 +364,7 @@ export const shouldPublishLoadedDiscs = (
  *
  * It carries the finished SENTENCES as well as the numbers on
  * purpose. Home Assistant's job here is to decide *when* to remind
- * somebody, not to compose the reminder out of a slot array in
+ * somebody, not to compose the reminder out of a bay array in
  * Jinja — that is the same split `spoken_message` settled for the
  * announcement
  * ([decision](docs/decisions/2026-07-30-spoken-and-written-messages-are-separate-fields.md)).
@@ -372,8 +372,12 @@ export const shouldPublishLoadedDiscs = (
 export type LoadedDiscsPayload = {
   count: number
   /** The numbers on the front of the rack, lowest first. */
+  bays: number[]
+  /** Previous MQTT field, retained for existing automations. */
   slots: number[]
   discs: {
+    bay: number | null
+    /** Previous MQTT field, retained for existing automations. */
     slot: number | null
     label: string
     title: string | null
@@ -394,11 +398,15 @@ export const buildLoadedDiscsPayload = (input: {
   nowMs: number
 }): LoadedDiscsPayload => ({
   count: input.summary.count,
+  bays: input.summary.discs
+    .map((disc) => disc.bay)
+    .filter((bay): bay is number => bay !== null),
   slots: input.summary.discs
-    .map((disc) => disc.slot)
-    .filter((slot): slot is number => slot !== null),
+    .map((disc) => disc.bay)
+    .filter((bay): bay is number => bay !== null),
   discs: input.summary.discs.map((disc) => ({
-    slot: disc.slot,
+    bay: disc.bay,
+    slot: disc.bay,
     label: disc.label,
     title: disc.title,
     is_ripped: disc.isRipped,

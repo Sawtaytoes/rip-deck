@@ -38,7 +38,7 @@ const COPY_COMPLETE_THREE =
 /**
  * The lines below are TRANSCRIBED from real captures, not
  * invented. `CSS_PROBE_ERROR` is byte-for-byte the one MSG:2003
- * in slot 1's 51,811-line capture of 2026-08-27, drive name and
+ * in bay 1's 51,811-line capture of 2026-08-27, drive name and
  * offset included.
  */
 const BACKUP_STARTED =
@@ -416,7 +416,7 @@ describe("backup mode proves itself differently", () => {
 
 describe("the CSS handshake probe is not a read error", () => {
   it("ignores a scrambled-sector error raised before the backup starts", () => {
-    // The exact line off slot 1 on 2026-08-27, at offset 1 MB,
+    // The exact line off bay 1 on 2026-08-27, at offset 1 MB,
     // before MSG:5072. Every CSS DVD produces one. Counting it
     // badged a perfect 8 GB backup `fail`.
     const observations = fold([
@@ -463,7 +463,7 @@ describe("the CSS handshake probe is not a read error", () => {
     expect(observations.cssProbeErrorCount).toBe(0)
   })
 
-  it("reads the real slot-1 capture as one clean warning-free rip", () => {
+  it("reads the real bay-1 capture as one clean warning-free rip", () => {
     // End to end over the exact lines the live tower produced:
     // one CSS probe error, the backup, `Backup done` twice. The
     // daemon badged this `fail`.

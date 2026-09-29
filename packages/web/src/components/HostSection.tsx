@@ -114,7 +114,7 @@ export function HostSection({
    * The startup hold fires on every loaded bay at once, so the
    * owner's three discs each carry the same paragraph word for
    * word — three copies of five lines, with the one thing that
-   * actually differs (which disc, which slot) buried inside
+   * actually differs (which disc, which bay) buried inside
    * them. Said once, then pointed at, exactly as `VerdictBadge`
    * already handles the hub fault.
    *

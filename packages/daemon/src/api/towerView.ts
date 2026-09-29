@@ -83,7 +83,7 @@ export type BayAction =
 export type BayView = {
   drive_id: string
   label: string
-  slot: number | null
+  bay: number | null
   /** `/dev/srN`. EPHEMERAL — never an identity. */
   dev_path: string | null
   is_present: boolean
@@ -258,7 +258,7 @@ const buildBayView = (input: {
   return {
     drive_id: bay.driveId,
     label: bay.label,
-    slot: bay.slot,
+    bay: bay.bay,
     dev_path: bay.devPath,
     is_present: bay.isPresent,
     disc_size_sectors: bay.discSizeSectors,
@@ -269,7 +269,7 @@ const buildBayView = (input: {
     state: buildDriveStatePayload({
       job: bay.job,
       driveLabel: bay.label,
-      slot: bay.slot,
+      bay: bay.bay,
       nowMs,
       // The tray, so `state` here really is byte-for-byte the
       // retained `drive/<slug>` payload the comment above
@@ -290,7 +290,7 @@ const buildBayView = (input: {
         ? buildDriveAlertPayload({
             verdict,
             driveLabel: bay.label,
-            slot: bay.slot,
+            bay: bay.bay,
           })
         : null,
     alert_topic: topics.driveAlert(slug),
@@ -453,7 +453,7 @@ export const buildTowerView = (input: {
               ? []
               : [
                   {
-                    slot: bay.slot,
+                    bay: bay.bay,
                     label: bay.label,
                     isDrivePresent: bay.isPresent,
                     hasDisc:

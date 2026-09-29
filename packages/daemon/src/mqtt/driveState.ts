@@ -29,8 +29,8 @@ import type { BayState } from "../rip/watcher.ts"
  * were the same word on the wire**. They are opposite physical
  * situations: one needs nothing, the other has a disc a human
  * must take out. Three Troy discs sat latched `completed` in
- * slots 7-9 across restarts while Home Assistant's list of
- * loaded slots rendered `[]`.
+ * bays 7-9 across restarts while Home Assistant's list of
+ * loaded bays rendered `[]`.
  *
  * The fix is the PHYSICAL half below, added alongside `state`
  * rather than folded into it:
@@ -164,6 +164,8 @@ export const buildDriveDiscState = ({
 
 export type DriveStatePayload = {
   drive: string
+  bay: number | null
+  /** Old MQTT attribute retained for existing Home Assistant templates. */
   slot: number | null
   state: DriveActivity
   job_id: string | null
@@ -210,7 +212,7 @@ export const buildDriveStatePayload = (input: {
   job: Job | null
   /** Display label for the bay, e.g. "07 - Pioneer BDR-211M". */
   driveLabel: string
-  slot: number | null
+  bay: number | null
   nowMs: number
   /**
    * The tray, for a caller that holds the bay table.
@@ -225,7 +227,7 @@ export const buildDriveStatePayload = (input: {
    */
   disc?: BayDiscFacts
 }): DriveStatePayload => {
-  const { job, driveLabel, slot, nowMs } = input
+  const { job, driveLabel, bay, nowMs } = input
 
   const disc =
     input.disc === undefined
@@ -235,7 +237,8 @@ export const buildDriveStatePayload = (input: {
   if (!job) {
     return {
       drive: driveLabel,
-      slot,
+      bay,
+      slot: bay,
       state: "idle",
       job_id: null,
       title: null,
@@ -254,7 +257,8 @@ export const buildDriveStatePayload = (input: {
 
   return {
     drive: driveLabel,
-    slot,
+    bay,
+    slot: bay,
     state: job.state,
     job_id: job.id,
     title: job.identity?.title ?? null,

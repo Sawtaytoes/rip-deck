@@ -8,7 +8,7 @@ import { parseMakemkvLine } from "./parseLine.ts"
  * The whole robot-mode stream of one real Blu-ray backup.
  *
  * Captured 2026-07-25 from the rip that satisfied the Stage 3
- * stop rule: `Ivanhoe (1952)`, slot 9, 24m29s, exit 0, zero read
+ * stop rule: `Ivanhoe (1952)`, bay 9, 24m29s, exit 0, zero read
  * errors, 32.2 GB verified on the dataset.
  *
  * This corpus exists because ARM structurally cannot produce

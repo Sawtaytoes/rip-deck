@@ -15,8 +15,8 @@ import { useTrayCommand } from "../hooks/useTrayCommand"
 import { kioskBaySummary } from "../kioskFormat"
 import type { BayView } from "../types"
 
-const slotPath = (bay: BayView) =>
-  `/kiosk/slots/${encodeURIComponent(bay.drive_id)}`
+const bayPath = (bay: BayView) =>
+  `/kiosk/bays/${encodeURIComponent(bay.drive_id)}`
 
 const CANCEL_HELP =
   "Cancel stops the rip, keeps its partial output, and opens its tray after the ripper exits."
@@ -138,7 +138,7 @@ const useFocusedKioskBays = (
   })
 }
 
-/** Active slots in physical order, with dedicated full-size controls. */
+/** Active bays in physical order, with dedicated full-size controls. */
 export const Kiosk = () => {
   const { driveId } = useParams<{ driveId: string }>()
   const { search } = useLocation()
@@ -152,7 +152,7 @@ export const Kiosk = () => {
   const tower = query.data?.ripDeck
   const bays = [...(tower?.bays ?? [])].sort(
     (first, second) =>
-      (first.slot ?? 999) - (second.slot ?? 999),
+      (first.bay ?? 999) - (second.bay ?? 999),
   )
   const focusedBays = useFocusedKioskBays(bays)
   const selected = bays.find(
@@ -242,7 +242,7 @@ export const Kiosk = () => {
       {selected && summary ? (
         <section
           className="rip-kiosk-details"
-          aria-label={`Slot ${selected.slot ?? "?"} controls`}
+          aria-label={`Bay ${selected.bay ?? "?"} controls`}
         >
           <div className="rip-kiosk-heading">
             <h1>
@@ -251,7 +251,7 @@ export const Kiosk = () => {
                 intent={summary.intent}
                 appearance="solid"
               >
-                {selected.slot ?? "?"}
+                {selected.bay ?? "?"}
               </Badge>
               <span className="rip-kiosk-title">
                 {summary.title}
@@ -290,7 +290,7 @@ export const Kiosk = () => {
                     : selected.outcome_detail}
               </p>
               <ProgressBar
-                label={`Slot ${selected.slot ?? "?"} progress`}
+                label={`Bay ${selected.bay ?? "?"} progress`}
                 value={summary.percent}
                 intent={summary.intent}
                 size="lg"
@@ -393,7 +393,7 @@ export const Kiosk = () => {
                   (isCancelOffered
                     ? CANCEL_HELP
                     : summary.isActive
-                      ? "Tray controls are unavailable while this slot rips."
+                      ? "Tray controls are unavailable while this bay rips."
                       : selected.outcome_detail))}
           </p>
         </section>
@@ -418,15 +418,13 @@ export const Kiosk = () => {
           aria-label="Rip status"
         >
           <h1>No rips running</h1>
-          <p>
-            Active slots will appear here automatically.
-          </p>
+          <p>Active bays will appear here automatically.</p>
         </section>
       ) : (
         !driveId && (
           <section
             className="rip-kiosk-rows"
-            aria-label="Active drive slots"
+            aria-label="Active drive bays"
             data-visible-count={focusedBays.length}
             data-row-density={
               focusedBays.length <= 3
@@ -444,7 +442,7 @@ export const Kiosk = () => {
               return (
                 <ButtonLink
                   key={bay.drive_id}
-                  href={`${slotPath(bay)}${search}`}
+                  href={`${bayPath(bay)}${search}`}
                   appearance="soft"
                   intent={row.intent}
                   className="rip-kiosk-row"
@@ -452,15 +450,15 @@ export const Kiosk = () => {
                     row.isEmpty ? "true" : "false"
                   }
                   data-castkit-loading="disc-details"
-                  data-castkit-target={`slot:${bay.drive_id}`}
-                  aria-label={`Slot ${bay.slot ?? "?"}: ${row.status}, ${row.percent}%`}
+                  data-castkit-target={`bay:${bay.drive_id}`}
+                  aria-label={`Bay ${bay.bay ?? "?"}: ${row.status}, ${row.percent}%`}
                 >
                   <Badge
                     className="rip-kiosk-number"
                     intent={row.intent}
                     appearance="solid"
                   >
-                    {bay.slot ?? "?"}
+                    {bay.bay ?? "?"}
                   </Badge>
                   <span className="rip-kiosk-line">
                     <strong className="rip-kiosk-title">
@@ -479,7 +477,7 @@ export const Kiosk = () => {
                       bay number, not the bar's hidden label. */}
                   <ProgressBar
                     className="rip-kiosk-fill"
-                    label={`Slot ${bay.slot ?? "?"} progress`}
+                    label={`Bay ${bay.bay ?? "?"} progress`}
                     value={row.percent}
                     intent={row.intent}
                     size="md"

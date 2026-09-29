@@ -6,7 +6,7 @@ import type { RipSortMode } from "../ripSort"
 const GROUP_LABEL = "order"
 
 const SORT_MODES: readonly SegmentedItem[] = [
-  { value: "slot", label: "slot number" },
+  { value: "bay", label: "bay number" },
   {
     value: "finishing-soonest",
     label: "finishing soonest",
@@ -32,7 +32,7 @@ export function RipSortModeControl({
         label={GROUP_LABEL}
         onChange={(value) => {
           if (
-            value === "slot" ||
+            value === "bay" ||
             value === "finishing-soonest"
           ) {
             onChoose(value)

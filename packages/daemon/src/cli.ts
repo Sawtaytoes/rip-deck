@@ -145,8 +145,8 @@ const runProbe = async (isMakemkvEnabled: boolean) => {
 
   rows.sort(
     (a, b) =>
-      (a.resolution.placement?.slot ?? 99) -
-      (b.resolution.placement?.slot ?? 99),
+      (a.resolution.placement?.bay ?? 99) -
+      (b.resolution.placement?.bay ?? 99),
   )
 
   console.log(
@@ -171,7 +171,7 @@ const runProbe = async (isMakemkvEnabled: boolean) => {
       [
         pad(
           resolution.placement
-            ? String(resolution.placement.slot)
+            ? String(resolution.placement.bay)
             : "?",
           5,
         ),
@@ -209,7 +209,7 @@ const runProbe = async (isMakemkvEnabled: boolean) => {
 
   console.log(
     `\n${probed.length} drive(s) present, ` +
-      `${probed.length - unresolved.length} resolved to a slot.`,
+      `${probed.length - unresolved.length} resolved to a bay.`,
   )
 
   if (unresolved.length > 0) {
@@ -312,11 +312,11 @@ const formatDuration = (seconds: number): string => {
 }
 
 /**
- * `rip-deck rip` — rip the disc in ONE named slot, by hand.
+ * `rip-deck rip` — rip the disc in ONE named bay, by hand.
  *
- * One slot because that is what "rip this disc" means, not
+ * One bay because that is what "rip this disc" means, not
  * because of any limit on how many rips may run. The old refusal
- * here — "Stage 3 is bound to a single slot so ARM keeps the
+ * here — "Stage 3 is bound to a single bay so ARM keeps the
  * other eight" — is gone: ARM is retired
  * ([decision](docs/decisions/2026-07-26-arm-stays-disabled.md))
  * and the owner has settled concurrency at nine
@@ -325,18 +325,19 @@ const formatDuration = (seconds: number): string => {
  * `rip-deck watch` does it without being asked.
  */
 const runRip = async (flags: string[]) => {
-  const slotArg =
+  const bayArg =
+    flagValue(flags, "--bay") ??
     flagValue(flags, "--slot") ??
     process.env.RIPD_DRIVES ??
     ""
 
   // A comma list is still refused, but for a different reason
   // than it used to be: `Number.parseInt("3,4")` is 3, so
-  // honouring it would silently rip one of the two slots asked
+  // honouring it would silently rip one of the two bays asked
   // for and say nothing about the other.
-  if (slotArg.includes(",")) {
+  if (bayArg.includes(",")) {
     console.error(
-      "This command rips one slot. Pass a single --slot N, " +
+      "This command rips one bay. Pass a single --bay N, " +
         "or run `rip-deck watch`, which rips every disc you " +
         "insert without being told which.",
     )
@@ -344,10 +345,10 @@ const runRip = async (flags: string[]) => {
     return
   }
 
-  const slot = Number.parseInt(slotArg, 10)
-  if (!Number.isInteger(slot)) {
+  const bay = Number.parseInt(bayArg, 10)
+  if (!Number.isInteger(bay)) {
     console.error(
-      "Which slot? Pass --slot N (or set RIPD_DRIVES=N).",
+      "Which bay? Pass --bay N (or set RIPD_DRIVES=N).",
     )
     process.exitCode = 1
     return
@@ -371,13 +372,12 @@ const runRip = async (flags: string[]) => {
       }),
     }))
     .find(
-      ({ resolution }) =>
-        resolution.placement?.slot === slot,
+      ({ resolution }) => resolution.placement?.bay === bay,
     )
 
   if (matched === undefined) {
     console.error(
-      `No drive in slot ${slot}. ` +
+      `No drive in bay ${bay}. ` +
         `${probed.length} drive(s) are present — is the tower ` +
         `powered on?`,
     )
@@ -387,9 +387,9 @@ const runRip = async (flags: string[]) => {
 
   const { drive, resolution } = matched
   const devPath = drive.address.devPath
-  const name = resolution.placement?.name ?? `slot ${slot}`
+  const name = resolution.placement?.name ?? `bay ${bay}`
 
-  console.log(`Slot ${slot}: ${name} (${devPath})`)
+  console.log(`Bay ${bay}: ${name} (${devPath})`)
 
   // --- Three-layer settle. ---------------------------------
   console.log("Waiting for the disc to settle…")
@@ -690,7 +690,7 @@ const runRip = async (flags: string[]) => {
   if (result.wrongDriveDevPath !== null) {
     console.error(
       `MakeMKV opened ${result.wrongDriveDevPath} for ` +
-        `disc:${discIndex}, but slot ${slot} is ${devPath}. ` +
+        `disc:${discIndex}, but bay ${bay} is ${devPath}. ` +
         "The bus renumbered mid-flight, so this was stopped " +
         "before it wrote anything. Re-run it.",
     )
@@ -748,10 +748,10 @@ const main = async () => {
           "drive identity table\n" +
           "  rip-deck parse < capture.log    " +
           "replay robot-mode output\n" +
-          "  rip-deck rip --slot N [--name X] [--dry-run]\n" +
+          "  rip-deck rip --bay N [--name X] [--dry-run]\n" +
           "                     [--event-log PATH | --no-event-log]\n" +
           "                                 " +
-          "rip the disc in one slot\n" +
+          "rip the disc in one bay\n" +
           "  rip-deck watch [--max N] [--poll-interval MS]\n" +
           "                                 " +
           "rip every disc that gets inserted",

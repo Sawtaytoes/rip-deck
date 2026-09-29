@@ -295,7 +295,7 @@ export const evaluateDrive = (
   // One or two errors do not contain enough shape to call the
   // disc dirty or scratched. They are still positive evidence
   // of a failed read. Never let a later throughput branch call
-  // such a run "reading cleanly", as the live slot 4 failure did.
+  // such a run "reading cleanly", as the live bay 4 failure did.
   if (observation.errorLbas.length > 0) {
     return makeVerdict("disc_read_error", confidence, [
       `${observation.errorLbas.length} read ` +

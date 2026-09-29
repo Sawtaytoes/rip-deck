@@ -106,7 +106,7 @@ export type Rip = {
   job_uuid: string
   /** Stable drive identity. `drive` is ephemeral. */
   drive_id: string
-  slot: number | null
+  bay: number | null
   disctype: DiscType
   /** House label for the disc type, e.g. "4K". */
   disctype_label: string | null
@@ -161,7 +161,7 @@ export type Drive = {
 
   // --- rip-deck-native. -----------------------------------
   drive_id: string
-  slot: number | null
+  bay: number | null
   is_quarantined: boolean
   quarantine_reason: string | null
 }
@@ -182,7 +182,7 @@ export type Host = {
 /** Live per-bay state. Byte-for-byte the retained MQTT payload. */
 export type DriveStatePayload = {
   drive: string
-  slot: number | null
+  bay: number | null
   state: JobState | "idle"
   job_id: string | null
   title: string | null
@@ -208,7 +208,7 @@ export type DriveStatePayload = {
 /** Mid-rip trouble alert. Byte-for-byte the MQTT payload. */
 export type DriveAlertPayload = {
   drive: string
-  slot: number | null
+  bay: number | null
   verdict: VerdictKind
   action: VerdictAction
   message: string
@@ -277,7 +277,7 @@ export type BayAction =
 export type BayView = {
   drive_id: string
   label: string
-  slot: number | null
+  bay: number | null
   dev_path: string | null
   is_present: boolean
   /**
@@ -527,9 +527,9 @@ export type TrayBayResultKind =
  */
 export type LoadedDiscsView = {
   count: number
-  slots: number[]
+  bays: number[]
   discs: {
-    slot: number | null
+    bay: number | null
     label: string
     title: string | null
     is_ripped: boolean
@@ -542,7 +542,7 @@ export type LoadedDiscsView = {
 
 export type TrayBayReport = {
   drive_id: string
-  slot: number | null
+  bay: number | null
   label: string
   result: TrayBayResultKind
   /**
@@ -589,7 +589,7 @@ export type TrayCommandReport = {
    *
    * ⚠️ **Not for this dashboard.** It exists for the Home Assistant
    * automation that speaks a tray problem through the house
-   * speakers, and it deliberately says LESS — no counts, no slot
+   * speakers, and it deliberately says LESS — no counts, no bay
    * lists, no device text. A reader can scroll back and a listener
    * cannot, so rendering this instead of `message` would drop the
    * per-bay detail that is the only thing an operator at the screen
@@ -695,7 +695,7 @@ export type Leftover = {
 export type HistoryRip = {
   job_uuid: string
   drive_id: string
-  slot: number | null
+  bay: number | null
   /** The bay's house label, or the raw drive id when unmapped. */
   bay_name: string
   disc_name: string | null

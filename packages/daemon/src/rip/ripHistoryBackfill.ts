@@ -145,15 +145,15 @@ export type RipHistoryBackfillResult = {
 export const backfillRipHistory = async (input: {
   stateDir: string
   /**
-   * The slot map, so an old row can name its bay.
+   * The bay map, so an old row can name its bay.
    *
    * ⚠️ Resolved by the registry's CACHED `usbPortPath`, which is
    * a hint and not identity — and on this tower it has already
    * moved: the rips from July sit on `2-2.3.4.x` port paths and
    * the tower is on `2-1.1.2.x` today, because it was re-cabled.
-   * A row whose drive id matches nothing gets `slot: null` and
+   * A row whose drive id matches nothing gets `bay: null` and
    * its raw drive id as the label. That is honest; inventing a
-   * slot from a port path that now belongs to a different bay
+   * bay from a port path that now belongs to a different bay
    * would not be.
    */
   registry?: DriveRegistry | null
@@ -213,7 +213,7 @@ export const backfillRipHistory = async (input: {
       // filename is then what the capture beside it is named for.
       jobUuid: vector.jobId ?? jobUuid,
       driveId: vector.driveId,
-      slot: entry?.slot ?? null,
+      bay: entry?.bay ?? null,
       bayName: entry?.name ?? null,
       // Not recoverable. See the header — all three routes were
       // measured and all three are dead.

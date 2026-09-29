@@ -1,10 +1,10 @@
 {
   "$comment": [
-    "Operator-maintained slot map for the optical rip tower.",
+    "Operator-maintained bay map for the optical rip tower.",
     "",
     "Keyed on `firmwareSerial` — the drive's own serial, read from MakeMKV's",
     "DRV: line. It is unique per physical drive and is RETAINED across a",
-    "firmware reflash, which matters here: slots 2-4 are LG drives running",
+    "firmware reflash, which matters here: bays 2-4 are LG drives running",
     "OmniDrive firmware that makes them report as ASUS, so the model string",
     "cannot identify them but the serial can.",
     "",
@@ -13,8 +13,8 @@
     "firmware serial after a re-cable. Never hand-edit them to force a mapping.",
     "",
     "Slots are physical tower order, top = 1 to bottom = 9, established",
-    "2026-07-24 by ejecting each drive and having the owner call out the slot.",
-    "Correlation verified 2026-07-24: slot order maps monotonically onto USB",
+    "2026-07-24 by ejecting each drive and having the owner call out the bay.",
+    "Correlation verified 2026-07-24: bay order maps monotonically onto USB",
     "port path, which is what makes the port path a trustworthy runtime key.",
     "",
     "`/dev/srN` appears nowhere in this file on purpose — it reshuffles on",
@@ -49,7 +49,7 @@
   ],
   "drives": [
     {
-      "slot": 1,
+      "bay": 1,
       "name": "01 - ASUS BW-16D1HT",
       "firmwareSerial": "EXAMPLE00001",
       "trueModel": "ASUS BW-16D1HT",
@@ -60,7 +60,7 @@
       "readOffsetSamples": 6
     },
     {
-      "slot": 2,
+      "bay": 2,
       "name": "02 - LG WH14NS40",
       "firmwareSerial": "EXAMPLE00002",
       "trueModel": "LG WH14NS40",
@@ -72,7 +72,7 @@
       "readOffsetSamples": 6
     },
     {
-      "slot": 3,
+      "bay": 3,
       "name": "03 - LG WH14NS40",
       "firmwareSerial": "EXAMPLE00003",
       "trueModel": "LG WH14NS40",
@@ -84,7 +84,7 @@
       "readOffsetSamples": 6
     },
     {
-      "slot": 4,
+      "bay": 4,
       "name": "04 - LG WH16NS40",
       "firmwareSerial": "EXAMPLE00004",
       "trueModel": "LG WH16NS40",
@@ -96,7 +96,7 @@
       "readOffsetSamples": 6
     },
     {
-      "slot": 5,
+      "bay": 5,
       "name": "05 - Pioneer BDR-212U",
       "firmwareSerial": "EXAMPLE00005",
       "trueModel": "Pioneer BDR-212U",
@@ -107,7 +107,7 @@
       "readOffsetSamples": 667
     },
     {
-      "slot": 6,
+      "bay": 6,
       "name": "06 - Pioneer BDR-211M",
       "firmwareSerial": "EXAMPLE00006",
       "trueModel": "Pioneer BDR-211M",
@@ -118,7 +118,7 @@
       "readOffsetSamples": 667
     },
     {
-      "slot": 7,
+      "bay": 7,
       "name": "07 - Pioneer BDR-211M",
       "firmwareSerial": "EXAMPLE00007",
       "trueModel": "Pioneer BDR-211M",
@@ -129,7 +129,7 @@
       "readOffsetSamples": 667
     },
     {
-      "slot": 8,
+      "bay": 8,
       "name": "08 - Pioneer BDR-211M",
       "firmwareSerial": "EXAMPLE00008",
       "trueModel": "Pioneer BDR-211M",
@@ -140,7 +140,7 @@
       "readOffsetSamples": 667
     },
     {
-      "slot": 9,
+      "bay": 9,
       "name": "09 - Pioneer BDR-211M",
       "firmwareSerial": "EXAMPLE00009",
       "trueModel": "Pioneer BDR-211M",

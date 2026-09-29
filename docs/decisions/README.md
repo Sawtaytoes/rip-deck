@@ -9,6 +9,7 @@ default instinct.
 
 | Date | Decision |
 | --- | --- |
+| 2026-09-29 | [Drive compartments are bays throughout Rip Deck](2026-09-29-drive-compartments-are-bays-throughout-rip-deck.md) — the internal model and operator wording use bay; old external fields and IDs remain compatible. |
 | 2026-09-25 | [Visual regression shoots the Storybook and the real routes](2026-09-25-visual-regression-shoots-the-storybook-and-the-real-routes.md) — the shared `vrt` workflow compares 28 Storybook shots (every story, dark and light) and 42 route shots written by `yarn vrt:capture` (the dashboard in the Wide and Narrow Views, the 480x320 kiosk, the history), all on fixture data, with the clock, drift, time zone and page size pinned. |
 | 2026-09-23 | [The kiosk focuses on active rips](2026-09-23-the-kiosk-focuses-on-active-rips.md) — inactive slots leave the overview after 12 seconds of transition feedback, and active rows divide the full 480×320 height with type sized to the number of live rips. |
 | 2026-09-21 | [The kiosk can cancel one rip](2026-09-21-the-kiosk-can-cancel-one-rip.md) — an active rip's detail view offers an in-page, CastKit-touchable confirmation, then uses the existing safe per-bay cancel operation. The partial output stays, and the tray opens only after that ripper exits. |

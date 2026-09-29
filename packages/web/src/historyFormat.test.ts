@@ -19,7 +19,7 @@ const rip = (
 ): HistoryRip => ({
   job_uuid: "a1659124-308c-4f16-be4f-e0be021fee87",
   drive_id: "2-1.1.2.4.2",
-  slot: 5,
+  bay: 5,
   bay_name: "05 - Pioneer BDR-212U",
   disc_name: "THE MUMMY",
   is_named: true,
@@ -103,7 +103,7 @@ describe("the outcome chip", () => {
     // not name fell through to red — and `completed_with_warnings`
     // arrived after they were written. The backup is on disk; a
     // red "Failed" beside it is the same wrong answer the owner
-    // reported on slot 1.
+    // reported on bay 1.
     const warned = rip({
       outcome_kind: "completed_with_warnings",
     })
@@ -206,20 +206,20 @@ describe("read errors", () => {
 })
 
 describe("where the rip happened", () => {
-  it("leads with the slot when the bay is mapped", () => {
+  it("leads with the bay when the bay is mapped", () => {
     expect(historyBayText(rip())).toBe(
-      "Slot 5 · 05 - Pioneer BDR-212U",
+      "Bay 5 · 05 - Pioneer BDR-212U",
     )
   })
 
-  it("⚠️ falls back to the raw drive id, never an invented slot", () => {
+  it("⚠️ falls back to the raw drive id, never an invented bay", () => {
     // A row from before the tower was re-cabled has a port path
-    // the registry no longer knows. The id is honest; a slot
+    // the registry no longer knows. The id is honest; a bay
     // number from a path that now belongs to a different bay
     // would not be.
     expect(
       historyBayText(
-        rip({ bay_name: "2-2.3.4.2", slot: null }),
+        rip({ bay_name: "2-2.3.4.2", bay: null }),
       ),
     ).toBe("2-2.3.4.2")
   })

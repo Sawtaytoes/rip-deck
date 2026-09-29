@@ -24,7 +24,7 @@ import { useTrayCommand } from "../hooks/useTrayCommand"
  * words to `Alert` and nothing else — and stays that way so its
  * test can render it without a query client or a data source. The
  * command, its pending state and its failure live here, and this
- * is handed to the banner's `actions` slot from `HostSection`,
+ * is handed to the banner's `actions` bay from `HostSection`,
  * which already sits inside the providers `useTrayCommand` needs.
  *
  * ## Why there is no success line

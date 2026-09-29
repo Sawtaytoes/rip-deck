@@ -19,13 +19,13 @@ import type { MakemkvCommand } from "./ripCommand.ts"
  * takes only one of them.
  *
  * That forces a THIRD numbering on us. We already juggle the
- * physical slot and the kernel's `srN` (which is the inverse of
+ * physical bay and the kernel's `srN` (which is the inverse of
  * physical order); the disc index is a separate sequence again,
  * assigned in MakeMKV's own scan order. Measured on this rig,
  * all three disagree:
  *
- *   slot 9  ->  /dev/sr0  ->  disc:5
- *   slot 1  ->  /dev/sr8  ->  disc:0
+ *   bay 9  ->  /dev/sr0  ->  disc:5
+ *   bay 1  ->  /dev/sr8  ->  disc:0
  *
  * So the index is meaningless without the lookup, and it must be
  * resolved immediately before the rip: it is derived from
@@ -35,7 +35,7 @@ import type { MakemkvCommand } from "./ripCommand.ts"
  * at the wrong drive.
  */
 
-/** MakeMKV pads its list to 16 slots with `visible=256`. */
+/** MakeMKV pads its list to 16 bays with `visible=256`. */
 const PADDING_VISIBLE = 256
 
 /** Enumeration is a full bus scan; bound it. */
@@ -128,7 +128,7 @@ export const buildIndexByDevPath = (
   const indexByDevPath = new Map<string, number>()
 
   for (const drive of drives) {
-    // The 16-slot padding carries an empty device path; mapping
+    // The 16-bay padding carries an empty device path; mapping
     // "" to an index would make every unmatched lookup resolve
     // to a real drive, which is the worst possible failure here.
     if (drive.visible === PADDING_VISIBLE) continue

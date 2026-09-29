@@ -2,10 +2,10 @@ import { isJobActive } from "@rip-deck/contracts"
 
 import type { BayView, Rip } from "./types"
 
-export type RipSortMode = "slot" | "finishing-soonest"
+export type RipSortMode = "bay" | "finishing-soonest"
 
 type SortFacts = {
-  slot: number | null
+  bay: number | null
   isActive: boolean
   etaSeconds: number | null
 }
@@ -16,8 +16,8 @@ type Indexed<T> = {
   facts: SortFacts
 }
 
-const validSlot = (slot: number | null): number | null =>
-  slot !== null && Number.isFinite(slot) ? slot : null
+const validSlot = (bay: number | null): number | null =>
+  bay !== null && Number.isFinite(bay) ? bay : null
 
 /**
  * Only a positive, finite ETA on an active rip predicts a finish.
@@ -36,8 +36,8 @@ const validActiveEta = ({
     : null
 
 /**
- * Slots are the deterministic fallback. An unknown slot follows
- * every numbered slot, and equal/unknown slots keep their input
+ * Bays are the deterministic fallback. An unknown bay follows
+ * every numbered bay, and equal/unknown bays keep their input
  * order through the final index comparison in `sortByMode`.
  */
 const compareSlots = (
@@ -59,9 +59,9 @@ const compareByMode = <T>(
   right: Indexed<T>,
   mode: RipSortMode,
 ): number => {
-  if (mode === "slot") {
+  if (mode === "bay") {
     return (
-      compareSlots(left.facts.slot, right.facts.slot) ||
+      compareSlots(left.facts.bay, right.facts.bay) ||
       left.index - right.index
     )
   }
@@ -72,7 +72,7 @@ const compareByMode = <T>(
   if (leftEta !== null && rightEta !== null) {
     return (
       leftEta - rightEta ||
-      compareSlots(left.facts.slot, right.facts.slot) ||
+      compareSlots(left.facts.bay, right.facts.bay) ||
       left.index - right.index
     )
   }
@@ -81,7 +81,7 @@ const compareByMode = <T>(
   if (rightEta !== null) return 1
 
   return (
-    compareSlots(left.facts.slot, right.facts.slot) ||
+    compareSlots(left.facts.bay, right.facts.bay) ||
     left.index - right.index
   )
 }
@@ -106,21 +106,21 @@ export const sortRips = (
   mode: RipSortMode,
 ): Rip[] =>
   sortByMode(rips, mode, (rip) => ({
-    slot: rip.slot,
+    bay: rip.bay,
     isActive: rip.active,
     etaSeconds: rip.eta_seconds,
   }))
 
 /**
  * Held and quarantined cards have no finish estimate. They use
- * the same slot fallback in both modes.
+ * the same bay fallback in both modes.
  */
 export const sortBayViews = (
   bays: readonly BayView[],
   mode: RipSortMode,
 ): BayView[] =>
   sortByMode(bays, mode, (bay) => ({
-    slot: bay.slot,
+    bay: bay.bay,
     isActive:
       bay.state.state !== "idle" &&
       isJobActive(bay.state.state),

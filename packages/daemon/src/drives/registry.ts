@@ -5,13 +5,13 @@ import {
 } from "@rip-deck/contracts"
 
 /**
- * Resolve a physically-present drive to its tower slot.
+ * Resolve a physically-present drive to its tower bay.
  *
  * The identity tiering, strongest first:
  *
  *  1. `firmwareSerial` — CANONICAL. The drive's own serial, and
  *     the only key that is genuinely unique per physical unit.
- *     It survives a firmware reflash (slots 2-4 are LG drives
+ *     It survives a firmware reflash (bays 2-4 are LG drives
  *     running OmniDrive firmware that reports them as ASUS, and
  *     their original serials came through intact) and it
  *     survives re-cabling. Its one cost: it is not in sysfs on
@@ -29,7 +29,7 @@ import {
  */
 
 export type DriveRegistryEntry = {
-  slot: number
+  bay: number
   name: string
   firmwareSerial: string
   trueModel: string
@@ -46,7 +46,7 @@ export type DriveRegistryEntry = {
    * string, and that is not a stylistic preference.**
    * AccurateRip publishes its offsets per drive MODEL, so the
    * obvious shortcut is a model table — and on this tower that
-   * shortcut is silently wrong for three of nine bays: slots
+   * shortcut is silently wrong for three of nine bays: bays
    * 2-4 are LG drives running OmniDrive firmware that reports
    * them as ASUS, so a model lookup would hand an ASUS offset
    * to an LG drive. The only symptom would be AccurateRip
@@ -70,7 +70,9 @@ export type DriveRegistry = {
 
 type RegistryFile = {
   towerRootPortPath?: string
-  drives?: Partial<DriveRegistryEntry>[]
+  drives?: (Partial<DriveRegistryEntry> & {
+    slot?: number
+  })[]
 }
 
 export const loadDriveRegistry = async (
@@ -80,33 +82,47 @@ export const loadDriveRegistry = async (
     await readFile(path, "utf8"),
   ) as RegistryFile
 
-  const entries = (parsed.drives ?? []).flatMap((drive) =>
-    // A slot without a firmware serial cannot be resolved
-    // reliably, so drop it loudly rather than half-trust it.
-    typeof drive.slot === "number" &&
-    typeof drive.firmwareSerial === "string"
-      ? [
-          {
-            slot: drive.slot,
-            name: drive.name ?? `${drive.slot}`,
-            firmwareSerial: drive.firmwareSerial,
-            trueModel: drive.trueModel ?? "",
-            reportedModel: drive.reportedModel ?? "",
-            usbPortPath: drive.usbPortPath ?? "",
-            bridgeSerial: drive.bridgeSerial ?? "",
-            isUhdCapable: drive.isUhdCapable ?? false,
-            // Unmeasured, mistyped and implausible all land on
-            // null here. A bad offset must cost one drive its
-            // `-s` flag, never cost nine bays their watcher, so
-            // this is the one field the loader validates rather
-            // than defaults.
-            readOffsetSamples: parseReadOffsetSamples(
-              drive.readOffsetSamples,
-            ),
-          },
-        ]
-      : [],
-  )
+  const entries = (parsed.drives ?? []).flatMap((drive) => {
+    // Old mounted config files use `slot`. Read it at this one
+    // boundary; the rest of Rip Deck uses physical bays.
+    if (
+      drive.bay != null &&
+      drive.slot != null &&
+      drive.bay !== drive.slot
+    ) {
+      throw new Error(
+        "conflicting bay and legacy slot numbers in drives.json",
+      )
+    }
+    const bay = drive.bay ?? drive.slot
+    return (
+      // A bay without a firmware serial cannot be resolved
+      // reliably, so drop it loudly rather than half-trust it.
+      typeof bay === "number" &&
+        typeof drive.firmwareSerial === "string"
+        ? [
+            {
+              bay,
+              name: drive.name ?? `${bay}`,
+              firmwareSerial: drive.firmwareSerial,
+              trueModel: drive.trueModel ?? "",
+              reportedModel: drive.reportedModel ?? "",
+              usbPortPath: drive.usbPortPath ?? "",
+              bridgeSerial: drive.bridgeSerial ?? "",
+              isUhdCapable: drive.isUhdCapable ?? false,
+              // Unmeasured, mistyped and implausible all land on
+              // null here. A bad offset must cost one drive its
+              // `-s` flag, never cost nine bays their watcher, so
+              // this is the one field the loader validates rather
+              // than defaults.
+              readOffsetSamples: parseReadOffsetSamples(
+                drive.readOffsetSamples,
+              ),
+            },
+          ]
+        : []
+    )
+  })
 
   return {
     towerRootPortPath: parsed.towerRootPortPath ?? "",
@@ -125,7 +141,7 @@ export const loadDriveRegistry = async (
  * rather than a maker invented out of half a model number.
  *
  * This is the ONLY trustworthy source for either field on this
- * tower: slots 2-4 are LG drives whose OmniDrive firmware
+ * tower: bays 2-4 are LG drives whose OmniDrive firmware
  * reports them as ASUS, so the drive's own answer is known to
  * lie and the operator's file is the truth.
  */
@@ -189,7 +205,7 @@ export const resolveDrive = (
   const toPlacement = (
     entry: DriveRegistryEntry,
   ): DrivePlacement => ({
-    slot: entry.slot,
+    bay: entry.bay,
     name: entry.name,
   })
 

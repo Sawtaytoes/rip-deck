@@ -53,7 +53,7 @@ import type { MakemkvCommand } from "./ripCommand.ts"
  *    finished opening — a UHD disc trailing its own DRV line while
  *    it clears LibreDrive + BD+ decrypt and loads its content-hash
  *    table (proven live on 2026-07-30: "SOYLENT GREEN - UHD" in
- *    slot 9, DRV line present at insert, CINFO seconds later). Both
+ *    bay 9, DRV line present at insert, CINFO seconds later). Both
  *    are transient; both are worth another look. Retried, up to
  *    `maxAttempts`, with a pause between to let the disc open and a
  *    re-enumerating bus settle.
@@ -149,7 +149,7 @@ export const chooseDiscNameSource = (input: {
 /** CINFO attribute id 2 is the disc name. */
 const CINFO_DISC_NAME = 2
 
-/** MakeMKV pads its list to 16 slots with `visible=256`. */
+/** MakeMKV pads its list to 16 bays with `visible=256`. */
 const PADDING_VISIBLE = 256
 
 export const IDENTIFY_TUNING = {

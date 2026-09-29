@@ -70,7 +70,7 @@ const buildRip = (
 ): HistoryRip => ({
   job_uuid: "a1659124-308c-4f16-be4f-e0be021fee87",
   drive_id: "2-1.1.2.4.2",
-  slot: 5,
+  bay: 5,
   bay_name: "05 - Pioneer BDR-212U",
   disc_name: "THE MUMMY",
   is_named: true,

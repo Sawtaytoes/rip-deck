@@ -108,7 +108,7 @@ describe("parseMakemkvLine — DRV", () => {
     })
   })
 
-  it("parses the unattached padding slots", () => {
+  it("parses the unattached padding bays", () => {
     // MakeMKV always pads its drive list to 16 entries.
     const event = parseMakemkvLine(
       'DRV:9,256,999,0,"","",""',

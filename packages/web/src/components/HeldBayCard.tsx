@@ -52,7 +52,7 @@ import { TrayToggle } from "./TrayToggle"
  *
  * ## The card used to be a dead end, and that was the defect
  *
- * It said *"rip it by hand with `rip-deck rip --slot N --name
+ * It said *"rip it by hand with `rip-deck rip --bay N --name
  * "…"`"* — a CLI command a dashboard cannot run — and offered ⏏ as
  * its only control. ⏏ does not even un-hold on this hardware: the
  * drives keep reporting the disc after the tray opens, so the bay
@@ -94,7 +94,7 @@ export function HeldBayCard({
    * shape as the hub-fault text that ended up repeated on five
    * surfaces (`docs/HANDOFF-eject-and-open-questions.md` §4).
    * The repetition also buries the one thing that DOES differ
-   * per card, which is which disc is in which slot. So this
+   * per card, which is which disc is in which bay. So this
    * borrows `VerdictBadge`'s answer: say it once, then point.
    */
   isSharedDetail?: boolean
@@ -132,13 +132,13 @@ export function HeldBayCard({
     lastError,
     driveId: bay.drive_id,
   })
-  // The slot is said once, in its own chip, so the registry's
+  // The bay is said once, in its own chip, so the registry's
   // "07 - " prefix comes off the model (§3). This card's whole
-  // job is to say WHICH disc is waiting in WHICH slot, and the
+  // job is to say WHICH disc is waiting in WHICH bay, and the
   // prefix was burying both under a repeated number.
   const model = bareDriveModel({
     label: bay.label,
-    slot: bay.slot,
+    bay: bay.bay,
   })
 
   return (
@@ -146,7 +146,7 @@ export function HeldBayCard({
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
         <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 font-semibold text-intent-warning-content">
           <span className="shrink-0 rounded-md border border-intent-warning-border bg-surface-raised px-1.5 py-0.5 text-sm font-normal tabular-nums text-intent-warning-content">
-            {bay.slot ?? "?"}
+            {bay.bay ?? "?"}
           </span>
           <span className="min-w-0 break-words">
             ⏸ {bay.state.title ?? model} · held — not ripped
@@ -243,8 +243,8 @@ export function HeldBayCard({
             }}
             disabled={isRipPending}
             placeholder="Name this disc (optional)"
-            aria-label={`Name for the disc in slot ${
-              bay.slot ?? "?"
+            aria-label={`Name for the disc in bay ${
+              bay.bay ?? "?"
             }`}
             className="min-w-0 flex-1 rounded-md border border-intent-warning-border bg-surface-raised px-2.5 py-1 text-sm text-content-primary placeholder:text-content-muted focus:border-intent-warning-border focus:outline-none disabled:opacity-50"
           />

@@ -6,16 +6,16 @@ import type { BayView } from "../types"
 import { DriveRail } from "./DriveRail"
 
 describe("DriveRail", () => {
-  // Slot, `/dev/srN` and MakeMKV's disc index are three
+  // Bay, `/dev/srN` and MakeMKV's disc index are three
   // different numberings and only one of them is a place the
   // owner can walk up to and count.
-  it("labels each chip with the slot, not the kernel name", () => {
+  it("labels each chip with the bay, not the kernel name", () => {
     render(
       <DriveRail
         bays={[
           buildBayView({
             drive_id: "usb-a",
-            slot: 7,
+            bay: 7,
             dev_path: "/dev/sr2",
             label: "07 - Pioneer BDR-211M",
           }),
@@ -35,7 +35,7 @@ describe("DriveRail", () => {
         bays={[
           buildBayView({
             drive_id: "usb-a",
-            slot: 1,
+            bay: 1,
             state: {
               ...buildBayView().state,
               state: "idle",

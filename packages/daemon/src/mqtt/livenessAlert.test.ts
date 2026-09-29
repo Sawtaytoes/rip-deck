@@ -98,12 +98,12 @@ describe("buildLivenessAlertPayload", () => {
     const payload = buildLivenessAlertPayload({
       liveness,
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
     })
 
     expect(payload.message).toBe(liveness.reason)
     expect(payload.drive).toBe("07 - Pioneer BDR-211M")
-    expect(payload.slot).toBe(7)
+    expect(payload.bay).toBe(7)
   })
 
   it("never blames the disc from a clock alone", () => {
@@ -114,7 +114,7 @@ describe("buildLivenessAlertPayload", () => {
     const payload = buildLivenessAlertPayload({
       liveness: hung(),
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
     })
 
     expect(payload.verdict).toBe("unknown")
@@ -125,7 +125,7 @@ describe("buildLivenessAlertPayload", () => {
     const payload = buildLivenessAlertPayload({
       liveness: silent(),
       driveLabel: "07 - Pioneer BDR-211M",
-      slot: 7,
+      bay: 7,
     })
 
     expect(payload.action).toBe("check_drive")
@@ -136,7 +136,7 @@ describe("buildLivenessAlertPayload", () => {
       buildLivenessAlertPayload({
         liveness: hung(),
         driveLabel: "07",
-        slot: 7,
+        bay: 7,
       }).is_keep_trying_sensible,
     ).toBe(true)
   })
@@ -146,7 +146,7 @@ describe("buildLivenessAlertPayload", () => {
       buildLivenessAlertPayload({
         liveness: silent(),
         driveLabel: "07",
-        slot: 7,
+        bay: 7,
       }).is_keep_trying_sensible,
     ).toBe(false)
   })
@@ -155,7 +155,7 @@ describe("buildLivenessAlertPayload", () => {
     const payload = buildLivenessAlertPayload({
       liveness: silent(),
       driveLabel: "07",
-      slot: 7,
+      bay: 7,
     })
 
     expect(payload.evidence).toContain("Liveness: silent")

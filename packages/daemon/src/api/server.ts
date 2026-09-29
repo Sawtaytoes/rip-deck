@@ -53,7 +53,7 @@ export const DEFAULT_API_PORT = 3007
  * The most a request body may be.
  *
  * The only body this server reads is a tray command — four words
- * and a slot number, under 200 bytes. The cap exists because a
+ * and a bay number, under 200 bytes. The cap exists because a
  * body read with no bound is an unbounded allocation in the
  * process that is supervising nine rips, and the socket is not
  * the daemon's to trust.

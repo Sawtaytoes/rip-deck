@@ -79,8 +79,8 @@ export type RipDeckMqtt = {
     job: Job
     verdict: Verdict
     driveLabel: string
-    /** The bay's slot, for the payload's spoken line. */
-    slot?: number | null
+    /** The bay number, for the payload's spoken line. */
+    bay?: number | null
   }) => Promise<void>
   publishActivity: (params: {
     payload: ActivityPayload
@@ -89,7 +89,7 @@ export type RipDeckMqtt = {
     driveId: string
     job: Job | null
     driveLabel: string
-    slot: number | null
+    bay: number | null
     nowMs?: number
     /** What is in the tray. See `DriveDiscState`. */
     disc?: BayDiscFacts
@@ -98,13 +98,13 @@ export type RipDeckMqtt = {
     driveId: string
     verdict: Verdict
     driveLabel: string
-    slot: number | null
+    bay: number | null
   }) => Promise<boolean>
   publishLivenessAlert: (params: {
     driveId: string
     liveness: Liveness
     driveLabel: string
-    slot: number | null
+    bay: number | null
   }) => Promise<boolean>
   subscribeToDriveCommands: (params: {
     handler: CommandHandler
@@ -162,7 +162,7 @@ export const createRipDeckMqtt = async ({
       drives,
       clearObjectIds,
     }) => {
-      // Tombstones first so a slot that moved path does not
+      // Tombstones first so a bay that moved path does not
       // briefly keep two discovery configs for the same bay.
       for (const message of buildDiscoveryClearMessages({
         objectIds: clearObjectIds ?? [],
@@ -222,7 +222,7 @@ export const createRipDeckMqtt = async ({
       driveId,
       job,
       driveLabel,
-      slot,
+      bay,
       nowMs = Date.now(),
       disc,
     }) => {
@@ -231,7 +231,7 @@ export const createRipDeckMqtt = async ({
         payload: buildDriveStatePayload({
           job,
           driveLabel,
-          slot,
+          bay,
           nowMs,
           disc,
         }),
@@ -243,7 +243,7 @@ export const createRipDeckMqtt = async ({
       driveId,
       verdict,
       driveLabel,
-      slot,
+      bay,
     }) => {
       // Only a confirmed, non-ok verdict may announce: a disc
       // verdict seen on one drive is a UI hint and a "retry in
@@ -256,7 +256,7 @@ export const createRipDeckMqtt = async ({
         payload: buildDriveAlertPayload({
           verdict,
           driveLabel,
-          slot,
+          bay,
         }),
         isRetained: false,
       })
@@ -268,7 +268,7 @@ export const createRipDeckMqtt = async ({
       driveId,
       liveness,
       driveLabel,
-      slot,
+      bay,
     }) => {
       // H3: say mid-rip that a bay has stopped moving. ARM could
       // only ever say it after the rip had already failed.
@@ -279,7 +279,7 @@ export const createRipDeckMqtt = async ({
         payload: buildLivenessAlertPayload({
           liveness,
           driveLabel,
-          slot,
+          bay,
         }),
         isRetained: false,
       })

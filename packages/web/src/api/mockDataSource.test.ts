@@ -20,23 +20,23 @@ import {
 
 const bayOf = (
   state: RipDeckState,
-  slot: number,
+  bayNumber: number,
 ): BayView => {
   const bay = state.ripDeck.bays.find(
-    (candidate) => candidate.slot === slot,
+    (candidate) => candidate.bay === bayNumber,
   )
 
-  if (!bay) throw new Error(`no bay in slot ${slot}`)
+  if (!bay) throw new Error(`no bay ${bayNumber}`)
 
   return bay
 }
 
-const ripOf = (state: RipDeckState, slot: number): Rip => {
+const ripOf = (state: RipDeckState, bay: number): Rip => {
   const rip = state.hosts[0]?.rips.find(
-    (candidate) => candidate.slot === slot,
+    (candidate) => candidate.bay === bay,
   )
 
-  if (!rip) throw new Error(`no rip in slot ${slot}`)
+  if (!rip) throw new Error(`no rip in bay ${bay}`)
 
   return rip
 }
@@ -200,8 +200,8 @@ describe("a hub fault across several bays", () => {
     const state = createFixtureState("hub-fault")
     const faulted = [4, 5, 6, 7]
 
-    for (const slot of faulted) {
-      expect(bayOf(state, slot).state.verdict).toBe(
+    for (const bay of faulted) {
+      expect(bayOf(state, bay).state.verdict).toBe(
         "hub_fault",
       )
     }
@@ -236,9 +236,9 @@ describe("a hub fault across several bays", () => {
   it("leaves the unaffected bays alone", () => {
     const state = createFixtureState("hub-fault")
 
-    for (const slot of [1, 2, 3, 8, 9]) {
-      expect(bayOf(state, slot).state.verdict).toBe("ok")
-      expect(bayOf(state, slot).alert).toBeNull()
+    for (const bay of [1, 2, 3, 8, 9]) {
+      expect(bayOf(state, bay).state.verdict).toBe("ok")
+      expect(bayOf(state, bay).alert).toBeNull()
     }
   })
 })
@@ -350,21 +350,21 @@ describe("a quarantined drive", () => {
 describe("discs held at startup", () => {
   /**
    * The state the owner's tower is in RIGHT NOW: three Troy
-   * discs in slots 7–9, held by `adoptBayAtStartup`'s
+   * discs in bays 7–9, held by `adoptBayAtStartup`'s
    * fail-closed branch because there was no `bays.json` yet.
-   * Slot 1 is a genuinely failed rip in the same document,
+   * Bay 1 is a genuinely failed rip in the same document,
    * because these two are the pair the dashboard most has to
    * keep apart.
    */
   it("holds three discs and rips none of them", () => {
     const state = createFixtureState("held-at-startup")
 
-    for (const slot of [7, 8, 9]) {
-      const bay = bayOf(state, slot)
+    for (const bayNumber of [7, 8, 9]) {
+      const bay = bayOf(state, bayNumber)
 
       expect(bay.state.state).toBe("needs_attention")
       expect(bay.state.title).toContain("TROY")
-      expect(ripOf(state, slot).active).toBe(false)
+      expect(ripOf(state, bayNumber).active).toBe(false)
     }
 
     expect(state.ripDeck.active_count).toBe(0)
@@ -434,7 +434,7 @@ describe("discs held at startup", () => {
 
     // A tray command is answered against the scenario this
     // source last SERVED — the mock has no other memory of which
-    // rack the caller is looking at, and slot 7 is mid-rip in the
+    // rack the caller is looking at, and bay 7 is mid-rip in the
     // default one. The app always polls before it can offer a
     // control, so this is the app's own ordering.
     await mockDataSource.fetchState("held-at-startup")
@@ -463,7 +463,7 @@ describe("drift", () => {
       await mockDataSource.fetchState("nine-rips")
 
     const percentOf = (state: RipDeckState) =>
-      state.hosts[0]?.rips.find((rip) => rip.slot === 1)
+      state.hosts[0]?.rips.find((rip) => rip.bay === 1)
         ?.percent ?? 0
 
     expect(percentOf(second)).toBeGreaterThan(

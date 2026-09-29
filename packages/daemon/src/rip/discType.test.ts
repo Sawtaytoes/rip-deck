@@ -678,7 +678,7 @@ function assertAttention(
 describe("a udev record that never described the medium", () => {
   /**
    * What `/run/udev/data/b11:8` actually held on 2026-08-27
-   * while a dual-layer DVD sat in slot 1.
+   * while a dual-layer DVD sat in bay 1.
    *
    * Every key describes the DRIVE. There is not one
    * `ID_CDROM_MEDIA*` property and not one `ID_FS_*` property,
@@ -699,7 +699,7 @@ describe("a udev record that never described the medium", () => {
     ID_CDROM_RW_REMOVABLE: "1",
   })
 
-  /** The DVD-9 in slot 1, as sysfs sized it. */
+  /** The DVD-9 in bay 1, as sysfs sized it. */
   const dualLayerDvdSectors = 16_011_328
 
   it("rips it rather than holding the bay", () => {

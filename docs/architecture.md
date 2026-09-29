@@ -9,7 +9,7 @@ Rip Deck separates the long-running watcher, per-rip execution, shared contracts
 | `packages/contracts` | Shared drive, rip, health, MQTT, and API types. |
 | `packages/daemon` | Drive discovery, watcher state, rip processes, health analysis, MQTT, and HTTP. |
 | `packages/web` | React dashboard served on the daemon origin. |
-| `config/drives.json` | Operator-maintained physical slot map. The repository copy contains examples. |
+| `config/drives.json` | Operator-maintained physical bay map. The repository copy contains examples. |
 
 ## Watcher and rip processes
 
@@ -17,7 +17,7 @@ The daemon polls drive facts, maintains bay memory, and starts work for new disc
 
 The daemon still owns each child process. Its shutdown path cancels active rips. Container isolation limits device access; it does not make a rip survive a daemon restart.
 
-`rip-deck rip --slot N` addresses one slot by design. The watcher can run several of those jobs concurrently, up to the configured limit.
+`rip-deck rip --bay N` addresses one bay by design. The watcher can run several of those jobs concurrently, up to the configured limit.
 
 ## Drive identity
 

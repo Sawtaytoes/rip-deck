@@ -11,14 +11,14 @@ import type { BayView } from "../types"
  *
  * Ported from the viewer's `DriveRail`, moved off `host.drives`
  * and onto `rip-deck.bays`. That is not a cosmetic swap: the
- * ARM-shaped drive list has no quarantine flag and no slot, so
+ * ARM-shaped drive list has no quarantine flag and no bay, so
  * the ported version could not show a bay taken out of service,
  * and it labelled chips `sr0`…`sr8` — which is nine labels that
  * silently mean a different nine drives after the tower is
  * power-cycled.
  *
  * The chip label is the SLOT, because that is the number the
- * owner can walk up to the rack and count. Slot, `/dev/srN` and
+ * owner can walk up to the rack and count. Bay, `/dev/srN` and
  * MakeMKV's disc index are three different numberings and only
  * one of them is a place.
  */
@@ -167,9 +167,9 @@ export function DriveRail({ bays }: { bays: BayView[] }) {
       {bays.map((bay) => {
         const { state, detail } = bayStatus(bay)
         const label =
-          bay.slot === null
+          bay.bay === null
             ? driveName(bay.dev_path)
-            : String(bay.slot).padStart(2, "0")
+            : String(bay.bay).padStart(2, "0")
 
         return (
           <span

@@ -53,7 +53,7 @@ const registry = {
   towerRootPortPath: "2-1.1",
   entries: [
     {
-      slot: 5,
+      bay: 5,
       name: "05 - Pioneer BDR-212U",
       firmwareSerial: "SERIAL",
       trueModel: "BDR-212U",
@@ -117,7 +117,7 @@ describe("rebuilding history from the job files", () => {
         v: RIP_HISTORY_VERSION,
         jobUuid: "job-a",
         driveId: "2-1.1.2.4.2",
-        slot: 5,
+        bay: 5,
         bayName: "05 - Pioneer BDR-212U",
         discName: "THE MUMMY",
         discType: "bluray",
@@ -181,14 +181,14 @@ describe("rebuilding history from the job files", () => {
       path: ripHistoryPath(tmpRoot),
     })
 
-    expect(row.slot).toBe(5)
+    expect(row.bay).toBe(5)
     expect(row.bayName).toBe("05 - Pioneer BDR-212U")
   })
 
-  it("⚠️ leaves the slot null for a port path the tower has moved off", async () => {
+  it("⚠️ leaves the bay null for a port path the tower has moved off", async () => {
     // Not hypothetical: the July rips sit on `2-2.3.4.x` and
     // this tower is on `2-1.1.2.x` because it was re-cabled.
-    // Claiming a slot from a port path that now belongs to a
+    // Claiming a bay from a port path that now belongs to a
     // different bay would be an invented fact.
     await writeVector({
       jobUuid: "job-a",
@@ -204,7 +204,7 @@ describe("rebuilding history from the job files", () => {
       path: ripHistoryPath(tmpRoot),
     })
 
-    expect(row.slot).toBeNull()
+    expect(row.bay).toBeNull()
     expect(row.bayName).toBeNull()
     expect(row.driveId).toBe("2-2.3.4.4.4")
   })

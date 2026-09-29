@@ -25,7 +25,7 @@ const buildReport = (
   request_id: null,
   command: "open_bay",
   is_accepted: true,
-  message: "Opened 1 drive: slot 7.",
+  message: "Opened 1 drive: bay 7.",
   started_at: 1_780_000_000_000,
   finished_at: 1_780_000_001_240,
   counts: {
@@ -39,7 +39,7 @@ const buildReport = (
   bays: [
     {
       drive_id: DRIVE_ID,
-      slot: 7,
+      bay: 7,
       label: "07 - Pioneer BDR-211M",
       result: "opened",
       detail: "the tray is open",
@@ -56,7 +56,7 @@ const buildBayReport = (input: {
     bays: [
       {
         drive_id: DRIVE_ID,
-        slot: 7,
+        bay: 7,
         label: "07 - Pioneer BDR-211M",
         result: input.result,
         detail: input.detail,
@@ -118,7 +118,7 @@ describe("useTrayCommand", () => {
 
     await waitFor(() => {
       expect(result.current.lastReport?.message).toBe(
-        "Opened 1 drive: slot 7.",
+        "Opened 1 drive: bay 7.",
       )
     })
     expect(result.current.pendingDriveIds.size).toBe(0)

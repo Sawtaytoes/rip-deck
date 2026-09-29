@@ -136,7 +136,7 @@ export type TrayCommandKind =
    * `watcher.ts`'s business; what it may reach is decided here.
    *
    * The gap it closes: a held card told the operator to run
-   * `rip-deck rip --slot N --name "…"`, a CLI command the dashboard
+   * `rip-deck rip --bay N --name "…"`, a CLI command the dashboard
    * cannot run, and offered ⏏ as its only control — which does not
    * even un-hold on this hardware, because the drives keep
    * reporting the disc after the tray opens
@@ -216,9 +216,9 @@ const LEGACY_COMMAND_ALIASES: Record<
  */
 export type BayTrayCommand = "open_bay" | "close_bay"
 
-/** How an operator names one bay. Slot is what he can read. */
+/** How an operator names one bay. Bay is what he can read. */
 export type BayTarget =
-  | { slot: number }
+  | { bay: number }
   | { driveId: string }
 
 export type TrayCommandRequest =
@@ -358,7 +358,7 @@ export const parseTrayCommand = (
             `\`${trimmed}\` is not a bulk command. The bare ` +
             "form takes `open_trays`, `close_trays`, " +
             "`power_off` or `clear_loaded`; the single-bay " +
-            "commands need JSON with a `slot` or `drive_id`.",
+            "commands need JSON with a `bay` or `drive_id`.",
         }
   }
 
@@ -405,7 +405,7 @@ export const parseTrayCommand = (
 
   const hasClearTarget =
     command === "clear_loaded" &&
-    ("slot" in body || "drive_id" in body)
+    ("bay" in body || "slot" in body || "drive_id" in body)
 
   if (bulkKind !== null && !hasClearTarget) {
     return {
@@ -431,12 +431,14 @@ export const parseTrayCommand = (
     | "close_bay"
     | "rip_bay"
 
-  const slot = body.slot
+  // MQTT senders may still have the previous JSON field. Normalize
+  // at the input boundary so the command model only speaks bays.
+  const bay = body.bay ?? body.slot
   const driveId = body.drive_id
 
   const target: BayTarget | null =
-    typeof slot === "number" && Number.isFinite(slot)
-      ? { slot }
+    typeof bay === "number" && Number.isFinite(bay)
+      ? { bay }
       : typeof driveId === "string" && driveId !== ""
         ? { driveId }
         : null
@@ -446,7 +448,7 @@ export const parseTrayCommand = (
       isValid: false,
       requestId,
       reason:
-        `\`${command}\` needs a \`slot\` (a number) or a ` +
+        `\`${command}\` needs a \`bay\` (a number) or a ` +
         "`drive_id` (the bay's stable USB port path) saying " +
         "which bay to act on.",
     }
@@ -542,10 +544,10 @@ export const isRipCompleted = (
 export const isBayTargeted = (input: {
   target: BayTarget
   driveId: string
-  slot: number | null
+  bay: number | null
 }): boolean =>
-  "slot" in input.target
-    ? input.slot === input.target.slot
+  "bay" in input.target
+    ? input.bay === input.target.bay
     : input.driveId === input.target.driveId
 
 export type TrayBayResultKind =
@@ -915,7 +917,7 @@ export const decideTrayBayAction = (input: {
 
 export type TrayBayResult = {
   driveId: string
-  slot: number | null
+  bay: number | null
   label: string
   resultKind: TrayBayResultKind
   detail: string
@@ -942,7 +944,7 @@ export type TrayCommandResponsePayload = {
    *
    * Rules it keeps and `message` does not: no backticks, no CLI
    * syntax, no raw device text, no drive model numbers, and at
-   * most two short sentences. Slots are the operator's numbering
+   * most two short sentences. Bays are the operator's numbering
    * and the one identifier worth saying aloud.
    *
    * Additive, so a Home Assistant automation reading `message`
@@ -963,7 +965,7 @@ export type TrayCommandResponsePayload = {
   }
   bays: {
     drive_id: string
-    slot: number | null
+    bay: number | null
     label: string
     result: TrayBayResultKind
     detail: string
@@ -971,7 +973,7 @@ export type TrayCommandResponsePayload = {
 }
 
 /**
- * "slot 7", "slots 7 and 8", "slots 7, 8 and 9".
+ * "bay 7", "bays 7 and 8", "bays 7, 8 and 9".
  *
  * Takes the two fields it actually reads rather than a whole
  * `TrayBayResult`, so `loadedDiscs.ts` can phrase its reminder the
@@ -980,17 +982,15 @@ export type TrayCommandResponsePayload = {
  */
 export const formatBayList = (
   results: readonly {
-    slot: number | null
+    bay: number | null
     label: string
   }[],
 ): string => {
   const names = results.map((result) =>
-    result.slot === null
-      ? result.label
-      : String(result.slot),
+    result.bay === null ? result.label : String(result.bay),
   )
 
-  const noun = names.length === 1 ? "slot" : "slots"
+  const noun = names.length === 1 ? "bay" : "bays"
 
   const joined =
     names.length <= 1
@@ -1071,7 +1071,7 @@ export const buildTrayCommandMessage = (input: {
   if (ripStarted.length > 0) {
     // NOT `: ${detail}`. The bay's detail is written to stand alone
     // on its own card ("reading the disc's own name, then
-    // ripping"), and glued to this stem it read "Ripping slot 9:
+    // ripping"), and glued to this stem it read "Ripping bay 9:
     // reading the disc's own name, then ripping" — saying ripping
     // twice. Measured on the live tower 2026-07-30. Both strings
     // are still published; the card renders the detail beside this.
@@ -1081,17 +1081,17 @@ export const buildTrayCommandMessage = (input: {
   const openedTotal = opened.length + openedNotRipped.length
 
   if (openedTotal > 0) {
-    // Sorted by slot, NOT `opened` then `openedNotRipped`. The
-    // concatenation read "slots 2, 1, 3, 4, 5, 6, 7, 8 and 9" on
+    // Sorted by bay, NOT `opened` then `openedNotRipped`. The
+    // concatenation read "bays 2, 1, 3, 4, 5, 6, 7, 8 and 9" on
     // the live tower, because the one ripped bay sorts ahead of
     // eight empty ones that happen to be in order. The split is
     // its own sentence below; this one is a list of drawers the
     // operator is about to walk over to, so it reads in the order
-    // they are racked. A null slot keeps its label and sorts last.
+    // they are racked. A null bay keeps its label and sorts last.
     const openedAll = [...opened, ...openedNotRipped].sort(
       (left, right) =>
-        (left.slot ?? Number.MAX_SAFE_INTEGER) -
-        (right.slot ?? Number.MAX_SAFE_INTEGER),
+        (left.bay ?? Number.MAX_SAFE_INTEGER) -
+        (right.bay ?? Number.MAX_SAFE_INTEGER),
     )
 
     sentences.push(
@@ -1141,7 +1141,7 @@ export const buildTrayCommandMessage = (input: {
   // no bay was open to close, and an idle tower with every tray
   // empty is one way ▲ can be.
   //
-  // The order matters. A rack where slot 4 rips and every other
+  // The order matters. A rack where bay 4 rips and every other
   // drawer is already shut has BOTH a `skipped_untouched` (the
   // ripping bay) and `skipped_already_closed` bays, and "none are
   // open" is the true answer there. Naming the rip first would
@@ -1187,9 +1187,9 @@ export const buildTrayCommandMessage = (input: {
  *
  *  - **Never the device's own words.** A `failed` bay's `detail` is
  *    whatever `eject` printed. Spoken, that is the "weird
- *    computer-style text" the owner reported. The slot number is
+ *    computer-style text" the owner reported. The bay number is
  *    the actionable half; the rest is for whoever reads the card.
- *  - **Never the counts.** "Opened 3 drives: slots 1, 2 and 3" is
+ *  - **Never the counts.** "Opened 3 drives: bays 1, 2 and 3" is
  *    a table read aloud. The trays are visible from where the
  *    listener is standing — that is why routine results are not
  *    spoken at all.
@@ -1223,7 +1223,7 @@ export const buildTraySpokenMessage = (input: {
     // "Not opening…" for every kind, so pressing **close trays** on
     // the Zigbee button spoke a refusal to *open* — which reads as
     // the tower doing the opposite of what was asked. Reported from
-    // the live tower 2026-09-08 while slots 6, 7 and 8 were ripping.
+    // the live tower 2026-09-08 while bays 6, 7 and 8 were ripping.
     // `buildTrayCommandMessage` already branched correctly; only the
     // spoken half was wrong, so the dashboard looked fine.
     const verb =
@@ -1330,7 +1330,7 @@ export const buildTrayCommandResponse = (input: {
   },
   bays: input.results.map((result) => ({
     drive_id: result.driveId,
-    slot: result.slot,
+    bay: result.bay,
     label: result.label,
     result: result.resultKind,
     detail: result.detail,
@@ -1419,8 +1419,8 @@ export const buildTowerPowerOffResponse = (input: {
     command: "power_off",
     is_accepted: true,
     message: `Turning the optical ripper tower off.${trapped}`,
-    // Short, and it drops the slot list: a listener across the
-    // house cannot act on which slots, only on the fact.
+    // Short, and it drops the bay list: a listener across the
+    // house cannot act on which bays, only on the fact.
     spoken_message:
       loaded.count === 0
         ? "Turning the optical ripper tower off."

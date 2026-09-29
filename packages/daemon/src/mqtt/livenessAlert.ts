@@ -35,13 +35,13 @@ export const buildLivenessAlertPayload = (input: {
   liveness: Liveness
   /** Display label for the bay, e.g. "07 - Pioneer BDR-211M". */
   driveLabel: string
-  slot: number | null
+  bay: number | null
 }): DriveAlertPayload => {
-  const { liveness, driveLabel, slot } = input
+  const { liveness, driveLabel, bay } = input
 
   return {
     drive: driveLabel,
-    slot,
+    bay,
     verdict: "unknown",
     action: toAlertAction(liveness),
     message: liveness.reason,

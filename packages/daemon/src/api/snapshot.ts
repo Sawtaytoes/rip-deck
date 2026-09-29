@@ -37,7 +37,7 @@ export type BaySnapshot = {
   driveId: string
   /** House display name, e.g. "07 - Pioneer BDR-211M". */
   label: string
-  slot: number | null
+  bay: number | null
   /**
    * `/dev/srN`, EPHEMERAL and never identity — it reshuffles on
    * every USB re-enumeration. Carried only because the ARM
@@ -48,7 +48,7 @@ export type BaySnapshot = {
   vendor: string | null
   /**
    * Pass the REGISTRY's true model, not the drive's reported
-   * one: slots 2-4 are LG drives whose OmniDrive firmware
+   * one: bays 2-4 are LG drives whose OmniDrive firmware
    * reports them as ASUS.
    */
   model: string | null
@@ -135,7 +135,7 @@ export const DEFAULT_HOST_LABEL = "tower"
 export const createBaySnapshot = (input: {
   driveId: string
   label: string
-  slot?: number | null
+  bay?: number | null
   devPath?: string | null
   isPresent?: boolean
   vendor?: string | null
@@ -148,7 +148,7 @@ export const createBaySnapshot = (input: {
 }): BaySnapshot => ({
   driveId: input.driveId,
   label: input.label,
-  slot: input.slot ?? null,
+  bay: input.bay ?? null,
   devPath: input.devPath ?? null,
   isPresent: input.isPresent ?? true,
   vendor: input.vendor ?? null,
@@ -181,7 +181,7 @@ export const createTowerSnapshot = (
 })
 
 /**
- * Tower order: slot 1 at the top, slot 9 at the bottom, and a
+ * Tower order: bay 1 at the top, bay 9 at the bottom, and a
  * drive we cannot place last. This is the order the owner walks
  * up to the rack in, so it is the order the dashboard shows.
  */
@@ -189,10 +189,10 @@ const compareBays = (
   left: BaySnapshot,
   right: BaySnapshot,
 ): number => {
-  if (left.slot !== right.slot) {
-    if (left.slot === null) return 1
-    if (right.slot === null) return -1
-    return left.slot - right.slot
+  if (left.bay !== right.bay) {
+    if (left.bay === null) return 1
+    if (right.bay === null) return -1
+    return left.bay - right.bay
   }
 
   return left.driveId.localeCompare(right.driveId)

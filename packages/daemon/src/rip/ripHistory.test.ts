@@ -28,7 +28,7 @@ const record = (
   v: RIP_HISTORY_VERSION,
   jobUuid: "11111111-1111-4111-8111-111111111111",
   driveId: "2-1.1.2.4.2",
-  slot: 5,
+  bay: 5,
   bayName: "05 - Pioneer BDR-212U",
   discName: "THE MUMMY",
   discType: "bluray",
@@ -54,6 +54,20 @@ describe("the history log", () => {
     expect(await readRipHistory({ path })).toEqual([
       record(),
     ])
+  })
+
+  it("reads an older slot field as the bay without rewriting the log", async () => {
+    const path = ripHistoryPath(tmpRoot)
+    await mkdir(tmpRoot, { recursive: true })
+    const { bay, ...oldRow } = record()
+    await writeFile(
+      path,
+      `${JSON.stringify({ ...oldRow, slot: bay })}\n`,
+    )
+    expect((await readRipHistory({ path }))[0]?.bay).toBe(5)
+    expect(await readFile(path, "utf8")).toContain(
+      '"slot":5',
+    )
   })
 
   it("creates the state directory rather than failing", async () => {

@@ -133,7 +133,7 @@ describe("createGovernor", () => {
     expect(governor.getActiveCount()).toBe(1)
   })
 
-  it("frees a slot on release, and release is idempotent", () => {
+  it("frees a bay on release, and release is idempotent", () => {
     const governor = createGovernor({
       maxConcurrentRips: 1,
     })

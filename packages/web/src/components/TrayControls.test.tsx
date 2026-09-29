@@ -63,7 +63,7 @@ describe("TrayControls", () => {
             buildTrayCommandReport({
               command: "power_off",
               message:
-                "NOT powering the tower off — slot 4 is " +
+                "NOT powering the tower off — bay 4 is " +
                 "still ripping. Cutting power now would " +
                 "lose it.",
               counts: {
@@ -77,7 +77,7 @@ describe("TrayControls", () => {
               },
               bays: [
                 buildTrayBayReport({
-                  slot: 4,
+                  bay: 4,
                   result: "refused_ripping",
                   detail:
                     "REFUSED — this bay is ripping. Nothing " +
@@ -101,7 +101,7 @@ describe("TrayControls", () => {
 
     // The bay, by name — `counts.refused` says how many, only
     // this says which one to go and look at.
-    expect(screen.getByText("slot 4")).toBeInTheDocument()
+    expect(screen.getByText("bay 4")).toBeInTheDocument()
     expect(
       screen.getByText(/Nothing was touched/),
     ).toBeInTheDocument()
@@ -120,7 +120,7 @@ describe("TrayControls", () => {
               command: "power_off",
               message:
                 "Turning the optical ripper tower off. ⚠️ 3 " +
-                "discs are still loaded — slots 7, 8 and 9 — " +
+                "discs are still loaded — bays 7, 8 and 9 — " +
                 "and an unpowered drive will not open its tray.",
               bays: [],
             }),
@@ -134,7 +134,7 @@ describe("TrayControls", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/still loaded — slots 7, 8 and 9/),
+        screen.getByText(/still loaded — bays 7, 8 and 9/),
       ).toBeInTheDocument()
     })
   })

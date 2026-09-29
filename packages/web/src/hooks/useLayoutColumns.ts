@@ -56,7 +56,7 @@ export const MAX_MANUAL_COLUMNS = 4
  * tight ("1 column is fine, 2 acceptable… cards become
  * accordions") — so a 360px column is still a column worth
  * having. What this number rules out is the width at which a
- * card cannot show a slot, a name and a progress bar at all.
+ * card cannot show a bay, a name and a progress bar at all.
  *
  * It is also the whole of the phone case: 390px holds one column
  * because 390 < 2 x 380, and a landscape phone at 844px gets two

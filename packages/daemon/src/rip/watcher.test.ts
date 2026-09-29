@@ -196,7 +196,7 @@ describe("the per-bay state machine", () => {
     }
   })
 
-  it("holds when the governor has no slot free", () => {
+  it("holds when the governor has no bay free", () => {
     const { decision, bay } = step({
       bay: createBayState({ driveId: SLOT_9, atMs: 0 }),
       observation: discObservation,
@@ -721,13 +721,13 @@ const nineLoadedDrives = (): ProbedDrive[] =>
   )
 
 const trayRegistry = (
-  placements: { driveId: string; slot: number }[],
+  placements: { driveId: string; bay: number }[],
 ): DriveRegistry => ({
   towerRootPortPath: "2-1",
-  entries: placements.map(({ driveId, slot }) => ({
-    slot,
-    name: `${slot.toString().padStart(2, "0")} - Test drive`,
-    firmwareSerial: `TEST-${slot}`,
+  entries: placements.map(({ driveId, bay }) => ({
+    bay,
+    name: `${bay.toString().padStart(2, "0")} - Test drive`,
+    firmwareSerial: `TEST-${bay}`,
     trueModel: "Test drive",
     reportedModel: "Test drive",
     usbPortPath: driveId,
@@ -1452,7 +1452,7 @@ describe("startWatcher loaded-discs memory", () => {
     // The gap this closes: a daemon restarted against a dark
     // tower probes, sees zero drives and builds no bays — so the
     // old fold answered "nothing loaded" even though the ledger
-    // on disk knew about a finished disc still in slot 9.
+    // on disk knew about a finished disc still in bay 9.
     const ripper = controllableRipper()
 
     const watcher = startWatcher(
@@ -2514,7 +2514,7 @@ describe("startWatcher tray commands", () => {
     // widened the scope to `"all"`, and opened every empty drawer
     // too. The tower proved the mechanism the other way round the
     // same night: with the same bay's memory reading `close_bay`,
-    // the identical press opened slot 2 alone and skipped the
+    // the identical press opened bay 2 alone and skipped the
     // other eight.
     //
     // `applyRipStarted` now records `close_bay`, because a drive
@@ -2708,7 +2708,7 @@ describe("startWatcher tray commands", () => {
     await watcher.stop()
   })
 
-  it("opens bulk trays from the highest slot down, one at a time", async () => {
+  it("opens bulk trays from the highest bay down, one at a time", async () => {
     let inFlight = 0
     let maxInFlight = 0
     const opened: string[] = []
@@ -2716,7 +2716,7 @@ describe("startWatcher tray commands", () => {
       { length: 9 },
       (_unused, index) =>
         probedDrive({
-          driveId: `drive-slot-${index + 1}`,
+          driveId: `drive-bay-${index + 1}`,
           kernelName: `sr${index}`,
           sizeSectors: EMPTY_TRAY_SECTORS,
         }),
@@ -2753,8 +2753,8 @@ describe("startWatcher tray commands", () => {
         loadRegistry: async () =>
           trayRegistry(
             Array.from({ length: 9 }, (_unused, index) => ({
-              driveId: `drive-slot-${index + 1}`,
-              slot: index + 1,
+              driveId: `drive-bay-${index + 1}`,
+              bay: index + 1,
             })),
           ),
       },
@@ -2780,7 +2780,7 @@ describe("startWatcher tray commands", () => {
     await watcher.stop()
   })
 
-  it("opens unknown slots after numbered slots in drive-id order", async () => {
+  it("opens unknown bays after numbered bays in drive-id order", async () => {
     const tray = trayRecorder()
     const drives = [
       probedDrive({
@@ -2789,7 +2789,7 @@ describe("startWatcher tray commands", () => {
         sizeSectors: EMPTY_TRAY_SECTORS,
       }),
       probedDrive({
-        driveId: "drive-slot-3",
+        driveId: "drive-bay-3",
         kernelName: "sr3",
         sizeSectors: EMPTY_TRAY_SECTORS,
       }),
@@ -2815,7 +2815,7 @@ describe("startWatcher tray commands", () => {
         }),
         loadRegistry: async () =>
           trayRegistry([
-            { driveId: "drive-slot-3", slot: 3 },
+            { driveId: "drive-bay-3", bay: 3 },
           ]),
       },
     )
@@ -3032,7 +3032,7 @@ describe("startWatcher tray commands", () => {
     expect(report.counts.closed).toBe(1)
     expect(report.counts.refused).toBe(0)
     expect(report.message).toBe(
-      "Closed 1 drive: slot 2-1.1.0.",
+      "Closed 1 drive: bay 2-1.1.0.",
     )
     expect(report.spoken_message).toBe("Closed 1 tray.")
     expect(
@@ -3162,7 +3162,7 @@ describe("startWatcher tray commands", () => {
     await watcher.tickNow()
 
     const report = await watcher.runTrayCommand({
-      request: { kind: "open_bay", target: { slot: 4 } },
+      request: { kind: "open_bay", target: { bay: 4 } },
     })
 
     expect(tray.moved).toHaveLength(0)
@@ -3453,7 +3453,7 @@ describe("startWatcher sightings", () => {
     towerRootPortPath: "2-1.1",
     entries: [
       {
-        slot: 2,
+        bay: 2,
         // Prefixed, as `config/drives.json` writes it.
         name: "02 - LG WH14NS40",
         firmwareSerial: "EXAMPLE00001",
@@ -3469,7 +3469,7 @@ describe("startWatcher sightings", () => {
 
   it("says what the drive is, not what it claims", async () => {
     // The probe reports vendor ASUS / model BD-RW BDR-211M for
-    // every fake drive here. Slots 2-4 really are LG drives
+    // every fake drive here. Bays 2-4 really are LG drives
     // running OmniDrive firmware that reports them as ASUS, so
     // a self-reported model is the one fact on this tower that
     // is known to lie — the registry overrules it.
@@ -3502,7 +3502,7 @@ describe("startWatcher sightings", () => {
       {
         driveId: "2-1.0",
         isDrivePresent: true,
-        slot: 2,
+        bay: 2,
         label: "02 - LG WH14NS40",
         devPath: "/dev/sr4",
         vendor: "LG",
@@ -3631,7 +3631,7 @@ describe("the drive read offset reaches cyanrip", () => {
   const OFFSET_DRIVE = "2-1.7"
 
   /**
-   * A slot map on disk, in the shape `config/drives.json`
+   * A bay map on disk, in the shape `config/drives.json`
    * writes it — including the `$comment` keys, which are real
    * and which the loader must ignore rather than choke on.
    */
@@ -3655,9 +3655,9 @@ describe("the drive read offset reaches cyanrip", () => {
         towerRootPortPath: "2-1",
         drives: [
           {
-            slot: 3,
+            bay: 3,
             name: "03 - LG WH14NS40",
-            // The serial is the key. Slots 2-4 are LG drives
+            // The serial is the key. Bays 2-4 are LG drives
             // whose OmniDrive firmware reports them as ASUS, so
             // an offset looked up from either model string
             // below would be the wrong drive's.
@@ -3909,7 +3909,7 @@ describe("startWatcher reset_bay", () => {
  * `rip_bay` — the operator ripping a held bay from the dashboard.
  *
  * The dead end this closes: a held card told the owner to run
- * `rip-deck rip --slot N --name "…"` and offered ⏏ as its only
+ * `rip-deck rip --bay N --name "…"` and offered ⏏ as its only
  * control — and ⏏ does not un-hold on this rig, because the drives
  * keep reporting the disc after the tray opens. *"I don't have a
  * way to do anything actionable other than eject. Horrible user
@@ -4029,7 +4029,7 @@ describe("startWatcher rip_bay", () => {
     await flush()
 
     // Targeted by drive id: this tower has no registry in these
-    // tests, so no bay has a slot number.
+    // tests, so no bay has a bay number.
     const report = await watcher.runTrayCommand({
       request: {
         kind: "rip_bay",
@@ -4087,7 +4087,7 @@ describe("startWatcher rip_bay", () => {
 
   it("re-identifies when no name is given (Try again)", async () => {
     // The other half of the card. A disc held by a transient
-    // identify race — which is what latched slot 9 — just needs the
+    // identify race — which is what latched bay 9 — just needs the
     // read attempted again on a settled disc.
     const { watcher, ripper } = await heldTower()
 
@@ -4170,14 +4170,14 @@ describe("startWatcher rip_bay", () => {
     await watcher.stop()
   })
 
-  it("refuses loudly rather than queueing when every slot is busy", async () => {
+  it("refuses loudly rather than queueing when every bay is busy", async () => {
     // A button that silently means "in a while" is the other kind
     // of dead end. The governor still has the last word — an
     // operator cannot push a rip past the cap just because he
     // pressed a button rather than inserting a disc.
     //
-    // Cap of one, two bays: slot 9 rips (and holds the only lease),
-    // slot 8 is held and is the one the operator presses Rip on.
+    // Cap of one, two bays: bay 9 rips (and holds the only lease),
+    // bay 8 is held and is the one the operator presses Rip on.
     const ripper = controllableRipper()
     const SLOT_8 = "2-1.1.2.4.4.3"
 
@@ -4227,7 +4227,7 @@ describe("startWatcher rip_bay", () => {
     expect(report.counts.rip_started).toBe(0)
     expect(report.bays[0].result).toBe("failed")
     expect(report.bays[0].detail).toContain(
-      "every rip slot is busy",
+      "every rip bay is busy",
     )
     // Still exactly the one rip the governor allowed, and the held
     // bay was not left claimed by a rip that never started.
@@ -4496,7 +4496,7 @@ describe("startWatcher power_off", () => {
   it("remembers what is loaded after the drives go away", async () => {
     // ⚠️ The reminder's whole reason for existing. Once the tower
     // is off there is nothing to probe — but `tickNow` KEEPS a bay
-    // whose drive left the bus, and the sighting keeps its slot
+    // whose drive left the bus, and the sighting keeps its bay
     // and label, so the answer outlives the power.
     const ripper = controllableRipper()
     let isTowerOn = true

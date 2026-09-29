@@ -22,7 +22,7 @@ const routes = (
     />
     <Route path="/kiosk" element={<Kiosk />} />
     <Route
-      path="/kiosk/slots/:driveId"
+      path="/kiosk/bays/:driveId"
       element={<Kiosk />}
     />
   </Routes>
@@ -81,14 +81,14 @@ test("shows disc artwork and targeted controls on a direct detail route", async 
         path="/"
         element={
           <Navigate
-            to={`/kiosk/slots/${bay.drive_id}`}
+            to={`/kiosk/bays/${bay.drive_id}`}
             replace
           />
         }
       />
       <Route path="/kiosk" element={<Kiosk />} />
       <Route
-        path="/kiosk/slots/:driveId"
+        path="/kiosk/bays/:driveId"
         element={<Kiosk />}
       />
     </Routes>
@@ -104,7 +104,7 @@ test("shows disc artwork and targeted controls on a direct detail route", async 
     name: new RegExp(`^1\\s*${bay.state.title}$`),
   })
   expect(heading).toBeVisible()
-  expect(heading).not.toHaveTextContent("Slot")
+  expect(heading).not.toHaveTextContent("Bay")
   expect(screen.getByText("Success · 100%")).toBeVisible()
   expect(
     screen.getByRole("img", {
@@ -136,12 +136,12 @@ test("shows disc artwork and targeted controls on a direct detail route", async 
   )
   expect(
     await screen.findAllByRole("link", {
-      name: /^Slot \d:/,
+      name: /^Bay \d:/,
     }),
   ).toHaveLength(8)
 })
 
-test("hides idle and finished slots so active rips fill the kiosk", async () => {
+test("hides idle and finished bays so active rips fill the kiosk", async () => {
   const fixture =
     await mockDataSource.fetchState("showcase")
   renderWithProviders(
@@ -152,26 +152,26 @@ test("hides idle and finished slots so active rips fill the kiosk", async () => 
   )
 
   const rows = await screen.findAllByRole("link", {
-    name: /^Slot \d:/,
+    name: /^Bay \d:/,
   })
   expect(rows).toHaveLength(4)
   expect(rows[0]).toHaveTextContent(/^1/)
   expect(
-    within(rows[0]).queryByText(/Slot/, {
+    within(rows[0]).queryByText(/Bay/, {
       ignore: ".sr-only",
     }),
   ).toBeNull()
   expect(
     rows.map((row) => row.getAttribute("aria-label")),
   ).toEqual([
-    expect.stringMatching(/^Slot 1:/),
-    expect.stringMatching(/^Slot 2:/),
-    expect.stringMatching(/^Slot 3:/),
-    expect.stringMatching(/^Slot 4:/),
+    expect.stringMatching(/^Bay 1:/),
+    expect.stringMatching(/^Bay 2:/),
+    expect.stringMatching(/^Bay 3:/),
+    expect.stringMatching(/^Bay 4:/),
   ])
   expect(
     screen.getByRole("region", {
-      name: "Active drive slots",
+      name: "Active drive bays",
     }),
   ).toHaveAttribute("data-row-density", "roomy")
 })
@@ -212,15 +212,15 @@ test("shows a calm idle message instead of nine empty rows", async () => {
   expect(screen.queryByRole("link")).toBeNull()
 })
 
-test("briefly includes an inactive slot after its tray changes", async () => {
+test("briefly includes an inactive bay after its tray changes", async () => {
   const fixture =
     await mockDataSource.fetchState("showcase")
   const initialTower = fixture.ripDeck
   const target = initialTower?.bays.find(
-    (bay) => bay.slot === 5,
+    (bay) => bay.bay === 5,
   )
   if (!initialTower || !target)
-    throw new Error("Fixture needs a completed slot 5")
+    throw new Error("Fixture needs a completed bay 5")
 
   let current = {
     ...fixture,
@@ -246,10 +246,10 @@ test("briefly includes an inactive slot after its tray changes", async () => {
       bays: [
         {
           drive_id: target.drive_id,
-          slot: target.slot,
+          bay: target.bay,
           label: target.label,
           result: "opened",
-          detail: "Slot 5 opened.",
+          detail: "Bay 5 opened.",
         },
       ],
     })
@@ -260,14 +260,14 @@ test("briefly includes an inactive slot after its tray changes", async () => {
         path="/"
         element={
           <Navigate
-            to={`/kiosk/slots/${target.drive_id}`}
+            to={`/kiosk/bays/${target.drive_id}`}
             replace
           />
         }
       />
       <Route path="/kiosk" element={<Kiosk />} />
       <Route
-        path="/kiosk/slots/:driveId"
+        path="/kiosk/bays/:driveId"
         element={<Kiosk />}
       />
     </Routes>
@@ -292,10 +292,10 @@ test("briefly includes an inactive slot after its tray changes", async () => {
   )
 
   expect(
-    await screen.findByRole("link", { name: /^Slot 5:/ }),
+    await screen.findByRole("link", { name: /^Bay 5:/ }),
   ).toBeVisible()
   expect(
-    screen.getAllByRole("link", { name: /^Slot \d:/ }),
+    screen.getAllByRole("link", { name: /^Bay \d:/ }),
   ).toHaveLength(5)
 })
 
@@ -311,7 +311,7 @@ test("disables all physical controls for preview data and an active rip", async 
     }),
   )
   await userEvent.click(
-    await screen.findByRole("link", { name: /^Slot 1:/ }),
+    await screen.findByRole("link", { name: /^Bay 1:/ }),
   )
   expect(
     screen.getByRole("button", {
@@ -364,7 +364,7 @@ test("confirms and cancels one live rip without a browser dialog", async () => {
   )
 
   await userEvent.click(
-    await screen.findByRole("link", { name: /^Slot 1:/ }),
+    await screen.findByRole("link", { name: /^Bay 1:/ }),
   )
   expect(
     screen.getByText(

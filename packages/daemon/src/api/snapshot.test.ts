@@ -15,12 +15,12 @@ describe("the tower store", () => {
   it("holds all nine bays at once", () => {
     const store = createTowerStore()
 
-    for (const slot of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+    for (const bay of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
       store.setBay({
         bay: createBaySnapshot({
-          driveId: `usb-2-1-1-2-4-4-${slot}`,
-          label: `0${slot} - Pioneer BDR-211M`,
-          slot,
+          driveId: `usb-2-1-1-2-4-4-${bay}`,
+          label: `0${bay} - Pioneer BDR-211M`,
+          bay,
         }),
       })
     }
@@ -31,12 +31,12 @@ describe("the tower store", () => {
   it("orders bays the way the owner walks up to the rack", () => {
     const store = createTowerStore()
 
-    for (const slot of [7, 1, 4]) {
+    for (const bay of [7, 1, 4]) {
       store.setBay({
         bay: createBaySnapshot({
-          driveId: `usb-2-1-1-2-4-4-${slot}`,
-          label: `0${slot} - Pioneer BDR-211M`,
-          slot,
+          driveId: `usb-2-1-1-2-4-4-${bay}`,
+          label: `0${bay} - Pioneer BDR-211M`,
+          bay,
         }),
       })
     }
@@ -49,7 +49,7 @@ describe("the tower store", () => {
     })
 
     expect(
-      store.readSnapshot().bays.map((bay) => bay.slot),
+      store.readSnapshot().bays.map((bay) => bay.bay),
     ).toEqual([1, 4, 7, null])
   })
 
@@ -59,7 +59,7 @@ describe("the tower store", () => {
     const bay = createBaySnapshot({
       driveId: "usb-2-1-1-2-4-4-2",
       label: "02 - Pioneer BDR-211M",
-      slot: 2,
+      bay: 2,
     })
 
     store.setBay({ bay })
@@ -78,7 +78,7 @@ describe("the tower store", () => {
       bay: createBaySnapshot({
         driveId: "usb-2-1-1-2-4-4-2",
         label: "02 - Pioneer BDR-211M",
-        slot: 2,
+        bay: 2,
       }),
     })
     store.removeBay({ driveId: "usb-2-1-1-2-4-4-2" })

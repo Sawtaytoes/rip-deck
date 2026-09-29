@@ -15,7 +15,7 @@ import {
  * without a disc, a key or a network.
  *
  * `TROY - BONUS DISC` is not a hypothetical — it is the literal
- * `CINFO:2` string `identifyDisc` read off slot 8 of the real
+ * `CINFO:2` string `identifyDisc` read off bay 8 of the real
  * tower on 2026-07-26.
  */
 

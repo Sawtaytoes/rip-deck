@@ -166,19 +166,19 @@ describe("toLegacyHealth", () => {
  * ([decision](docs/decisions/2026-07-30-spoken-and-written-messages-are-separate-fields.md)).
  */
 describe("spoken_message — what the speakers say", () => {
-  it("says the slot, never the drive model", () => {
+  it("says the bay, never the drive model", () => {
     const payload = buildRipEventPayload({
       job: job(),
       verdict: makeVerdict("ok", "confirmed", []),
       driveLabel: "09 - Pioneer BDR-211M",
-      slot: 9,
+      bay: 9,
     })
 
     // "zero nine dash Pioneer B D R two one one M" is what the
     // old line put through TTS.
     expect(payload.spoken_message).not.toContain("Pioneer")
     expect(payload.spoken_message).not.toContain("BDR")
-    expect(payload.slot).toBe(9)
+    expect(payload.bay).toBe(9)
   })
 
   it("does not call a held disc a failure", () => {
@@ -191,12 +191,12 @@ describe("spoken_message — what the speakers say", () => {
       job: job({ state: "needs_attention" }),
       verdict: makeVerdict("unknown", "suspected", []),
       driveLabel: "09 - Pioneer BDR-211M",
-      slot: 9,
+      bay: 9,
     })
 
     expect(payload.result).toBe("fail")
     expect(payload.spoken_message).toBe(
-      "Slot 9 needs attention. Rip Deck did not rip that disc.",
+      "Bay 9 needs attention. Rip Deck did not rip that disc.",
     )
   })
 
@@ -209,11 +209,11 @@ describe("spoken_message — what the speakers say", () => {
         [],
       ),
       driveLabel: "09 - Pioneer BDR-211M",
-      slot: 9,
+      bay: 9,
     })
 
     expect(payload.spoken_message).toBe(
-      "The Prestige failed to rip in slot 9. It may need a look.",
+      "The Prestige failed to rip in bay 9. It may need a look.",
     )
   })
 
@@ -223,7 +223,7 @@ describe("spoken_message — what the speakers say", () => {
         job: job(),
         verdict: makeVerdict("ok", "confirmed", []),
         driveLabel: "09 - Pioneer BDR-211M",
-        slot: 9,
+        bay: 9,
       }).spoken_message,
     ).toBe("The Prestige finished ripping.")
 
@@ -233,7 +233,7 @@ describe("spoken_message — what the speakers say", () => {
       job: job({ identity: null }),
       verdict: makeVerdict("ok", "confirmed", []),
       driveLabel: "09 - Pioneer BDR-211M",
-      slot: 9,
+      bay: 9,
     })
 
     expect(nameless.title).toBe("Unknown disc")
@@ -248,23 +248,23 @@ describe("spoken_message — what the speakers say", () => {
         job: job(),
         verdict: makeVerdict("disc_dirty", "confirmed", []),
         driveLabel: "09 - Pioneer BDR-211M",
-        slot: 9,
+        bay: 9,
       }).spoken_message,
     ).toBe(
-      "Slot 9 struggled with The Prestige. The disc may need " +
+      "Bay 9 struggled with The Prestige. The disc may need " +
         "cleaning.",
     )
   })
 
-  it("stays a sentence when the bay has no slot", () => {
-    // A drive missing from `config/drives.json` has no slot, and
+  it("stays a sentence when the bay has no bay", () => {
+    // A drive missing from `config/drives.json` has no bay, and
     // the fallback must not be the model number this field exists
     // to keep out of the speakers.
     const payload = buildRipEventPayload({
       job: job({ state: "needs_attention" }),
       verdict: makeVerdict("unknown", "suspected", []),
       driveLabel: "2-1.3.2",
-      slot: null,
+      bay: null,
     })
 
     expect(payload.spoken_message).toBe(
@@ -286,7 +286,7 @@ describe("spoken_message — what the speakers say", () => {
         job: job({ state }),
         verdict: makeVerdict("unknown", "suspected", []),
         driveLabel: "09 - Pioneer BDR-211M",
-        slot: 9,
+        bay: 9,
       }).spoken_message
 
       expect(spoken).not.toContain("`")

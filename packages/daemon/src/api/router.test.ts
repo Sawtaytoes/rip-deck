@@ -87,7 +87,7 @@ const buildRouter = (
           createBaySnapshot({
             driveId: "usb-2-1-1-2-4-4-2",
             label: "02 - Pioneer BDR-211M",
-            slot: 2,
+            bay: 2,
             devPath: "/dev/sr7",
           }),
         ],
@@ -158,7 +158,7 @@ const buildTrayReport = (
   request_id: null,
   command: "open_bay",
   is_accepted: true,
-  message: "Opened 1 drive: slot 4.",
+  message: "Opened 1 drive: bay 4.",
   spoken_message: "Opened 1 tray.",
   started_at: NOW_MS,
   finished_at: NOW_MS + 900,
@@ -194,6 +194,14 @@ describe("GET /json", () => {
     // …and rip-deck's.
     expect(document.ripDeck.schema_version).toBe(1)
     expect(document.ripDeck.bays).toHaveLength(1)
+    expect(document.ripDeck.bays[0]?.bay).toBe(2)
+    expect(
+      (
+        document.ripDeck.bays[0] as
+          | { slot?: number }
+          | undefined
+      )?.slot,
+    ).toBe(2)
     expect(document.ripDeck.generated_at).toBe(NOW_MS)
     expect(document.ripDeck.is_fake).toBe(false)
   })
@@ -457,11 +465,11 @@ describe("the dashboard", () => {
     expect(String(response.body)).toBe(INDEX_HTML)
   })
 
-  it("reloads a kiosk slot with a dotted drive id without masking missing assets", () => {
+  it("reloads a kiosk bay with a dotted drive id without masking missing assets", () => {
     const router = buildRouter(buildWebAssets())
     const response = handleSync(router, {
       method: "GET",
-      url: "/kiosk/slots/2-2.3.2",
+      url: "/kiosk/bays/2-2.3.2",
     })
     expect(response.status).toBe(200)
     expect(String(response.body)).toBe(INDEX_HTML)
@@ -616,7 +624,7 @@ describe("POST /api/tray", () => {
     const response = await postTray({
       body: JSON.stringify({
         command: "open_bay",
-        slot: 4,
+        bay: 4,
         request_id: "dash-1",
       }),
       readTrayRunner: () => runTrayCommand,
@@ -626,7 +634,7 @@ describe("POST /api/tray", () => {
     // and hands over; `decideTrayBayAction` is authoritative and
     // is reached through this call, never around it.
     expect(runTrayCommand).toHaveBeenCalledWith({
-      request: { kind: "open_bay", target: { slot: 4 } },
+      request: { kind: "open_bay", target: { bay: 4 } },
       requestId: "dash-1",
     })
 
@@ -638,7 +646,7 @@ describe("POST /api/tray", () => {
     ).toEqual(buildTrayReport())
   })
 
-  it("accepts a drive_id as well as a slot", async () => {
+  it("accepts a drive_id as well as a bay", async () => {
     const runTrayCommand = vi
       .fn<TrayCommandRunner>()
       .mockResolvedValue(buildTrayReport())
@@ -679,12 +687,12 @@ describe("POST /api/tray", () => {
     ).toEqual(["open_trays", "close_trays"])
   })
 
-  it("passes a refusal straight through, unedited", async () => {
+  it("passes a refusal through with the legacy numeric alias", async () => {
     // The load-bearing one. When the daemon refuses a ripping
     // bay, HTTP reports the refusal as the daemon worded it —
-    // the API has no opinion to add and no way to override it.
+    // the API preserves its wording and adds only the old wire key.
     const refusal = buildTrayReport({
-      message: "Refused to open slot 4: still ripping.",
+      message: "Refused to open bay 4: still ripping.",
       counts: {
         opened: 0,
         opened_not_ripped: 0,
@@ -697,7 +705,7 @@ describe("POST /api/tray", () => {
       bays: [
         {
           drive_id: "usb-2-1-1-2-4-4-2",
-          slot: 4,
+          bay: 4,
           label: "04 - Pioneer BDR-211M",
           result: "refused_ripping",
           detail: "REFUSED — this bay is ripping.",
@@ -708,7 +716,7 @@ describe("POST /api/tray", () => {
     const response = await postTray({
       body: JSON.stringify({
         command: "open_bay",
-        slot: 4,
+        bay: 4,
       }),
       readTrayRunner: () => () => Promise.resolve(refusal),
     })
@@ -719,7 +727,13 @@ describe("POST /api/tray", () => {
     expect(response.status).toBe(200)
     expect(
       parseBody<TrayCommandResponsePayload>(response.body),
-    ).toEqual(refusal)
+    ).toEqual({
+      ...refusal,
+      bays: refusal.bays.map((bay) => ({
+        ...bay,
+        slot: bay.bay,
+      })),
+    })
   })
 
   it("rejects a body cmd/drive would also reject", async () => {
@@ -755,7 +769,7 @@ describe("POST /api/tray", () => {
     expect(
       parseBody<TrayCommandResponsePayload>(response.body)
         .message,
-    ).toContain("slot")
+    ).toContain("bay")
   })
 
   it("says 503 when no watcher is attached", async () => {
