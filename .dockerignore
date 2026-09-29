@@ -14,6 +14,10 @@ build
 # .claude/settings.local.json is machine-local. Neither belongs in
 # a build context -- Stage 7 ran ten of them at once.
 .claude
+# Agent worktrees live in `.worktrees/`. A `docker build` run on the host
+# from the shared checkout would otherwise copy every worktree open at
+# build time into the image.
+.worktrees
 
 # Documentation. Nothing at runtime reads a `.md`, but `COPY . .` was baking
 # every one of them into the image — so a docs-only merge really did change the
