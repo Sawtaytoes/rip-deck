@@ -534,10 +534,10 @@ export const RIP_VISUAL_INTENT: Record<
  * reason M5 is the proof of: nine bars on one page all announcing
  * "Working" is nine controls a screen reader cannot tell apart, and
  * `getByRole("progressbar", { name })` cannot address any of them.
- * The slot is the thing the owner walks to, so it leads.
+ * The bay is the thing the owner walks to, so it leads.
  */
 export function ripProgressLabel(rip: Rip): string {
-  const where = `Slot ${rip.slot === null ? "?" : String(rip.slot)}`
+  const where = `Bay ${rip.bay === null ? "?" : String(rip.bay)}`
 
   const what = discLabel(rip)
 

@@ -39,7 +39,7 @@ const EMPTY_DRIVE_IDS: ReadonlySet<string> = new Set()
  * itself.
  *
  * The report is momentary feedback — "turning the tower off",
- * "opened 8 drives", "REFUSED, slot 4 is ripping" — and the state
+ * "opened 8 drives", "REFUSED, bay 4 is ripping" — and the state
  * it describes is already reflected in the dashboard. Left up, it
  * lingered until the next press or a manual refresh (owner,
  * 2026-07-31: *"this message didn't go away until I refreshed the

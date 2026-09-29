@@ -459,9 +459,9 @@ describe("choosing the invocation for one rip", () => {
     // out. Each container sees one device and names itself after
     // its job, so nothing about one rip is addressable from
     // another.
-    const jobs = Array.from({ length: 9 }, (_, slot) => ({
-      devPath: `/dev/sr${slot}`,
-      jobUuid: `uuid-${slot}`,
+    const jobs = Array.from({ length: 9 }, (_, bay) => ({
+      devPath: `/dev/sr${bay}`,
+      jobUuid: `uuid-${bay}`,
     }))
 
     const commands = jobs.map(({ devPath, jobUuid }) =>
@@ -477,9 +477,9 @@ describe("choosing the invocation for one rip", () => {
       }),
     )
 
-    for (const [slot, command] of commands.entries()) {
+    for (const [bay, command] of commands.entries()) {
       expect(devicesOf(command.prefixArgs)).toEqual([
-        `/dev/sr${slot}`,
+        `/dev/sr${bay}`,
       ])
     }
 

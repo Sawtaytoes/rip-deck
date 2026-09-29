@@ -14,14 +14,14 @@ import {
 
 /**
  * The real tower, as correlated on 2026-07-24 from three
- * independent sources: the operator's physical slot callout,
+ * independent sources: the operator's physical bay callout,
  * MakeMKV's DRV lines, and sysfs.
  */
 const registry: DriveRegistry = {
   towerRootPortPath: "2-1.1.2",
   entries: [
     {
-      slot: 1,
+      bay: 1,
       name: "01 - ASUS BW-16D1HT",
       firmwareSerial: "EXAMPLE00001",
       trueModel: "ASUS BW-16D1HT",
@@ -32,7 +32,7 @@ const registry: DriveRegistry = {
       readOffsetSamples: null,
     },
     {
-      slot: 5,
+      bay: 5,
       name: "05 - Pioneer BDR-212U",
       firmwareSerial: "EXAMPLE00005",
       trueModel: "Pioneer BDR-212U",
@@ -43,7 +43,7 @@ const registry: DriveRegistry = {
       readOffsetSamples: null,
     },
     {
-      slot: 9,
+      bay: 9,
       name: "09 - Pioneer BDR-211M",
       firmwareSerial: "EXAMPLE00009",
       trueModel: "Pioneer BDR-211M",
@@ -65,7 +65,7 @@ describe("resolveDrive", () => {
       bridgeSerial: "1234567891BA",
     })
 
-    expect(resolved.placement?.slot).toBe(5)
+    expect(resolved.placement?.bay).toBe(5)
     expect(resolved.matchedBy).toBe("usb_port_path")
   })
 
@@ -76,13 +76,13 @@ describe("resolveDrive", () => {
       firmwareSerial: "EXAMPLE00009",
     })
 
-    expect(resolved.placement?.slot).toBe(9)
+    expect(resolved.placement?.bay).toBe(9)
     expect(resolved.matchedBy).toBe("firmware_serial")
   })
 
   it("repairs identity across a re-cable", () => {
-    // Slot 9's drive now answers on slot 1's old port. Keying
-    // on the port path would silently attribute slot 9's rip
+    // Bay 9's drive now answers on bay 1's old port. Keying
+    // on the port path would silently attribute bay 9's rip
     // history and health baseline to the wrong physical unit.
     const resolved = resolveDrive(registry, {
       usbPortPath: "2-1.1.2.4.4.4",
@@ -90,7 +90,7 @@ describe("resolveDrive", () => {
       firmwareSerial: "EXAMPLE00009",
     })
 
-    expect(resolved.placement?.slot).toBe(9)
+    expect(resolved.placement?.bay).toBe(9)
     expect(resolved.isPortPathStale).toBe(true)
   })
 
@@ -100,14 +100,14 @@ describe("resolveDrive", () => {
       bridgeSerial: "1234567892BB",
     })
 
-    expect(resolved.placement?.slot).toBe(9)
+    expect(resolved.placement?.bay).toBe(9)
     expect(resolved.matchedBy).toBe("bridge_serial")
   })
 
   it("refuses to guess when bridge serials collide", () => {
     // The ASMedia adapters share a `123456789` vendor prefix.
     // Ours happen to differ in the trailing hex, but a
-    // replacement could collide — and a wrong slot is worse
+    // replacement could collide — and a wrong bay is worse
     // than an unknown one, because the owner would walk to the
     // wrong bay.
     const colliding: DriveRegistry = {
@@ -144,7 +144,7 @@ describe("drivesSharingHub", () => {
   it("groups the drives behind one internal hub chip", () => {
     const shared = drivesSharingHub(registry, "2-1.1.2.4.4")
 
-    expect(shared.map((entry) => entry.slot)).toEqual([1])
+    expect(shared.map((entry) => entry.bay)).toEqual([1])
   })
 
   it("groups every drive at the tower root", () => {
@@ -174,7 +174,7 @@ describe("parseTrueModel", () => {
   })
 
   it("is the only honest source for a reflashed drive", () => {
-    // Slot 2 is an LG whose OmniDrive firmware reports it as
+    // Bay 2 is an LG whose OmniDrive firmware reports it as
     // ASUS BW-16D1HT, so sysfs cannot answer this and the
     // operator's file is the truth.
     expect(parseTrueModel("LG WH14NS40")).toEqual({
@@ -201,7 +201,7 @@ describe("parseTrueModel", () => {
  * ------------------------------------------------------------ */
 
 /**
- * The shipped slot map, read from disk exactly as the daemon
+ * The shipped bay map, read from disk exactly as the daemon
  * reads it.
  *
  * Not a fixture on purpose. A fixture would prove the parser
@@ -220,7 +220,7 @@ const SHIPPED_REGISTRY_PATH = fileURLToPath(
 const driveEntry = (
   readOffsetSamples: unknown,
 ): Record<string, unknown> => ({
-  slot: 3,
+  bay: 3,
   name: "03 - LG WH14NS40",
   firmwareSerial: "EXAMPLE00003",
   trueModel: "LG WH14NS40",
@@ -254,6 +254,44 @@ const loadWithOffset = async (
     await rm(dir, { recursive: true, force: true })
   }
 }
+
+it("loads a mounted registry with the old slot field", async () => {
+  const dir = await mkdtemp(
+    join(tmpdir(), "rip-deck-legacy-registry-"),
+  )
+  const path = join(dir, "drives.json")
+  const { bay, ...entry } = driveEntry(null)
+  await writeFile(
+    path,
+    JSON.stringify({ drives: [{ ...entry, slot: bay }] }),
+  )
+  try {
+    const loaded = await loadDriveRegistry(path)
+    expect(loaded.entries[0]?.bay).toBe(3)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+it("refuses conflicting bay and legacy slot numbers", async () => {
+  const dir = await mkdtemp(
+    join(tmpdir(), "rip-deck-conflicting-registry-"),
+  )
+  const path = join(dir, "drives.json")
+  await writeFile(
+    path,
+    JSON.stringify({
+      drives: [{ ...driveEntry(null), slot: 8 }],
+    }),
+  )
+  try {
+    await expect(loadDriveRegistry(path)).rejects.toThrow(
+      "conflicting bay",
+    )
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
 
 describe("loadDriveRegistry read offsets", () => {
   it("carries a measured offset off the file", async () => {
@@ -322,18 +360,18 @@ describe("loadDriveRegistry read offsets", () => {
     // the file reached the parser.
     //
     // Measured 2026-07-27 with `cyanrip -f` against the live
-    // tower, one real audio CD per bay. Slots 1-4 are the ASUS
+    // tower, one real audio CD per bay. Bays 1-4 are the ASUS
     // BW-16D1HT group — which INCLUDES the three LG drives
     // running OmniDrive firmware that report as ASUS — and all
     // four returned +6 independently, which is the strongest
     // evidence in this file that a model string cannot be
     // trusted here but the behaviour is still per-family.
-    // Slot 6 is a Pioneer BDR-211M at +667, confidence 87.
+    // Bay 6 is a Pioneer BDR-211M at +667, confidence 87.
     //
-    // The four nulls are honest gaps, not defaults: slot 5 is a
+    // The four nulls are honest gaps, not defaults: bay 5 is a
     // BDR-212U (a DIFFERENT model, so +667 may not carry) whose
     // disc had no AccurateRip entry, and every Pioneer -- the 212U in
-    // slot 5 as well as the four 211Ms -- returned +667, from
+    // bay 5 as well as the four 211Ms -- returned +667, from
     // five different discs.
     //
     // ⚠️ SLOT 7 (EXAMPLE00007) IS INFERRED, NOT MEASURED. That

@@ -39,7 +39,7 @@ const record = (
   v: RIP_HISTORY_VERSION,
   jobUuid: "11111111-1111-4111-8111-111111111111",
   driveId: "2-1.1.2.4.2",
-  slot: 5,
+  bay: 5,
   bayName: "05 - Pioneer BDR-212U",
   discName: "THE MUMMY",
   discType: "bluray",

@@ -250,7 +250,7 @@ import { verifyDiscImage } from "./verifyDiscImage.ts"
  *
  * The governor holds the leases and is the real cap. The dispatch
  * pipeline's `mergeMap` is bounded to **that same number**, so it
- * can never queue a rip the governor has already leased a slot to
+ * can never queue a rip the governor has already leased a bay to
  * — a queued dispatch would hold a lease while doing nothing,
  * which is the one way a bound here could make the tower slower
  * rather than safer. Unbounded `mergeMap` was the alternative and
@@ -631,14 +631,14 @@ export type BaySighting = {
    * after the owner switched the tower off.
    */
   isDrivePresent: boolean
-  slot: number | null
-  /** House label, already slot-prefixed: `07 - Pioneer BDR-211M`. */
+  bay: number | null
+  /** House label, already bay-prefixed: `07 - Pioneer BDR-211M`. */
   label: string
   /** `/dev/srN`. EPHEMERAL — never identity. Null when absent. */
   devPath: string | null
   vendor: string | null
   /**
-   * The REGISTRY's true model wherever there is one: slots 2-4
+   * The REGISTRY's true model wherever there is one: bays 2-4
    * are LG drives whose OmniDrive firmware reports them as ASUS.
    */
   model: string | null
@@ -784,7 +784,7 @@ export const decideBayAction = (input: {
   if (!input.isSlotAvailable) {
     return {
       action: "hold",
-      reason: "waiting for a rip slot",
+      reason: "waiting for a rip bay",
     }
   }
 
@@ -1095,7 +1095,7 @@ export const createWatcherConfig = (
 /** One bay's dispatched task, as the pipeline sees it. */
 export type BayRipInput = {
   driveId: string
-  slot: number | null
+  bay: number | null
   name: string
   /** e.g. "sr3". Ephemeral; re-read every tick. */
   kernelName: string
@@ -1105,7 +1105,7 @@ export type BayRipInput = {
   /**
    * This drive's measured AccurateRip read offset, in samples,
    * straight off its `config/drives.json` entry — resolved by
-   * FIRMWARE SERIAL, never by model, because slots 2-4 are LG
+   * FIRMWARE SERIAL, never by model, because bays 2-4 are LG
    * drives whose OmniDrive firmware reports them as ASUS.
    *
    * Null for every drive on this tower today: nothing has been
@@ -1400,7 +1400,7 @@ const ripWithMakemkv = async (context: {
     // the disc findable again.
     //
     // What CHANGED is the instruction. This used to end *"rip it by
-    // hand with `rip-deck rip --slot N --name "…"`"* — a CLI
+    // hand with `rip-deck rip --bay N --name "…"`"* — a CLI
     // command printed on a dashboard that cannot run one, next to
     // an eject button that does not un-hold on this hardware. The
     // operator's own words: "I don't have a way to do anything
@@ -2400,19 +2400,19 @@ export const defaultWatcherDeps: WatcherDeps = {
 export type WatcherHandlers = {
   onBayNote?: (input: {
     driveId: string
-    slot: number | null
+    bay: number | null
     name: string
     message: string
   }) => void
   onBayIdentified?: (input: {
     driveId: string
-    slot: number | null
+    bay: number | null
     name: string
     identity: BayDiscIdentity
   }) => void
   onBayOutcome?: (input: {
     driveId: string
-    slot: number | null
+    bay: number | null
     name: string
     outcome: BayOutcome
     /**
@@ -2423,7 +2423,7 @@ export type WatcherHandlers = {
   }) => void
   onBayProgress?: (input: {
     driveId: string
-    slot: number | null
+    bay: number | null
     name: string
     progress: JobProgress
   }) => void
@@ -2576,7 +2576,7 @@ type BayDispatch = {
    * Created at ENQUEUE time, not at start time.
    *
    * `stop()` cancels whatever is in `controllers`, and a dispatch
-   * still waiting for a `mergeMap` slot has to be cancellable
+   * still waiting for a `mergeMap` bay has to be cancellable
    * too — otherwise Ctrl-C would leave it to start a rip nobody
    * is waiting for (E5).
    */
@@ -2763,7 +2763,7 @@ export const startWatcher = (
    * The registry is loaded once and cached: it is a config file,
    * it changes when someone re-cables the tower, and re-reading it
    * nine times a minute buys nothing. A missing one is not fatal —
-   * the slot number is how a human finds the bay, not how the code
+   * the bay number is how a human finds the bay, not how the code
    * finds the drive.
    */
   const registryEntryOf = (
@@ -2780,7 +2780,7 @@ export const startWatcher = (
     const entry = registryEntryOf(drive)
 
     return {
-      slot: entry?.slot ?? null,
+      bay: entry?.bay ?? null,
       // Already the house label, prefix and all — the registry
       // writes `07 - Pioneer BDR-211M`. Nothing downstream may
       // add the prefix a second time.
@@ -2807,7 +2807,7 @@ export const startWatcher = (
    * Everything this probe learned about one bay's hardware.
    *
    * The registry wins over the drive's own answers wherever it
-   * has one, and that is not a preference: slots 2-4 are LG
+   * has one, and that is not a preference: bays 2-4 are LG
    * drives whose OmniDrive firmware reports them as ASUS, so a
    * self-reported model is the one fact on this tower known to
    * lie. The self-reported pair is used only for a drive the
@@ -2820,7 +2820,7 @@ export const startWatcher = (
     return {
       driveId: drive.identity.usbPortPath,
       isDrivePresent: true,
-      slot: entry?.slot ?? null,
+      bay: entry?.bay ?? null,
       label: entry?.name ?? drive.identity.usbPortPath,
       devPath: drive.address.devPath,
       vendor:
@@ -2956,7 +2956,7 @@ export const startWatcher = (
   const runDispatched = (
     dispatch: BayDispatch,
   ): Observable<BayOutcome> => {
-    const { slot, name } = placementOf(dispatch.drive)
+    const { bay, name } = placementOf(dispatch.drive)
     const driveId = dispatch.drive.identity.usbPortPath
 
     // Stamped where the pipeline starts rather than read back
@@ -2979,7 +2979,7 @@ export const startWatcher = (
           })
         : deps.runBayRip({
             driveId,
-            slot,
+            bay,
             name,
             kernelName: dispatch.drive.address.kernelName,
             devPath: dispatch.drive.address.devPath,
@@ -2994,7 +2994,7 @@ export const startWatcher = (
             note: (message) =>
               handlers.onBayNote?.({
                 driveId,
-                slot,
+                bay,
                 name,
                 message,
               }),
@@ -3031,7 +3031,7 @@ export const startWatcher = (
 
               handlers.onBayIdentified?.({
                 driveId,
-                slot,
+                bay,
                 name,
                 identity,
               })
@@ -3044,7 +3044,7 @@ export const startWatcher = (
             onProgress: (progress) =>
               handlers.onBayProgress?.({
                 driveId,
-                slot,
+                bay,
                 name,
                 progress,
               }),
@@ -3113,7 +3113,7 @@ export const startWatcher = (
               v: RIP_HISTORY_VERSION,
               jobUuid: dispatch.jobUuid,
               driveId,
-              slot,
+              bay,
               bayName: name,
               discName: current.discName,
               discType: current.discType,
@@ -3129,7 +3129,7 @@ export const startWatcher = (
 
         handlers.onBayOutcome?.({
           driveId,
-          slot,
+          bay,
           name,
           outcome,
           jobUuid: dispatch.jobUuid,
@@ -3201,7 +3201,7 @@ export const startWatcher = (
       if (registry === null) {
         registry = await deps
           .loadRegistry(input.config.registryPath)
-          // A missing registry costs slot NUMBERS, not identity —
+          // A missing registry costs bay NUMBERS, not identity —
           // bays are keyed on the USB port path either way. Not a
           // reason to stop ripping.
           .catch(() => ({
@@ -3250,13 +3250,13 @@ export const startWatcher = (
       const atMs = deps.now()
       const seen = new Set<string>()
 
-      // Lowest slot first, so a scarce rip slot goes to a
+      // Lowest bay first, so a scarce rip bay goes to a
       // predictable bay rather than to whichever one sysfs
       // happened to list first.
       const ordered = [...probed].sort(
         (a, b) =>
-          (placementOf(a).slot ?? 99) -
-          (placementOf(b).slot ?? 99),
+          (placementOf(a).bay ?? 99) -
+          (placementOf(b).bay ?? 99),
       )
 
       for (const drive of ordered) {
@@ -3454,7 +3454,7 @@ export const startWatcher = (
               observation,
               action: {
                 action: "hold",
-                reason: "no rip slot free",
+                reason: "no rip bay free",
               },
               atMs,
             }),
@@ -3584,7 +3584,7 @@ export const startWatcher = (
     .subscribe()
 
   /**
-   * Slot + house label for a driveId, from the registry alone.
+   * Bay + house label for a driveId, from the registry alone.
    *
    * Phantom loaded discs (below) exist for a drive that is NOT on
    * the bus, so there is no sighting and no probe to name them
@@ -3596,14 +3596,14 @@ export const startWatcher = (
    */
   const placementForDriveId = (
     driveId: string,
-  ): { slot: number | null; label: string } => {
+  ): { bay: number | null; label: string } => {
     const entry =
       registry?.entries.find(
         (candidate) => candidate.usbPortPath === driveId,
       ) ?? null
 
     return {
-      slot: entry?.slot ?? null,
+      bay: entry?.bay ?? null,
       label: entry?.name ?? driveId,
     }
   }
@@ -3619,7 +3619,7 @@ export const startWatcher = (
    *  1. **The live bay + sighting tables.** `tickNow` KEEPS a bay
    *     whose drive left the bus (a dropped bay comes back idle and
    *     re-rips its own finished disc) and keeps its sighting with
-   *     the slot and label intact — so a tower switched off *while
+   *     the bay and label intact — so a tower switched off *while
    *     the daemon keeps running* still remembers what is loaded.
    *  2. **The on-disk bay ledger**, for the case the tables cannot
    *     cover: a daemon RESTARTED against a dark tower starts with
@@ -3640,7 +3640,7 @@ export const startWatcher = (
       const sighting = sightings.get(bay.driveId)
 
       return {
-        slot: sighting?.slot ?? null,
+        bay: sighting?.bay ?? null,
         label: sighting?.label ?? bay.driveId,
         isDrivePresent: sighting?.isDrivePresent ?? false,
         // ⚠️ The operator's word beats the drive's reading, and
@@ -3733,7 +3733,7 @@ export const startWatcher = (
         results: [
           {
             driveId: "",
-            slot: null,
+            bay: null,
             label: "the tower",
             resultKind: "failed",
             detail:
@@ -3870,7 +3870,7 @@ export const startWatcher = (
         isBayTargeted({
           target,
           driveId,
-          slot: placementForDriveId(driveId).slot,
+          bay: placementForDriveId(driveId).bay,
         }),
     )
     const selectedId =
@@ -3978,7 +3978,7 @@ export const startWatcher = (
    * Start a rip on one bay because a human pressed Rip.
    *
    * The dead end this ends: a held card offered ⏏ and a sentence
-   * telling the operator to run `rip-deck rip --slot N --name "…"`
+   * telling the operator to run `rip-deck rip --bay N --name "…"`
    * — a CLI command a dashboard cannot run — and ⏏ does not even
    * un-hold on this rig, because the drives keep reporting the disc
    * after the tray opens. Physically pulling the disc out was the
@@ -4013,7 +4013,7 @@ export const startWatcher = (
     drive: ProbedDrive
     base: {
       driveId: string
-      slot: number | null
+      bay: number | null
       label: string
     }
     bay: BayState | null
@@ -4053,14 +4053,14 @@ export const startWatcher = (
     }
 
     // The lease, before any state is changed: a bay moved to
-    // `starting` that then fails to get a slot would sit claimed
+    // `starting` that then fails to get a bay would sit claimed
     // with nothing running it.
     if (!input.governor.tryAcquire({ driveId })) {
       return {
         ...base,
         resultKind: "failed",
         detail:
-          "every rip slot is busy. Nothing was changed; press " +
+          "every rip bay is busy. Nothing was changed; press " +
           "Rip again when one of the running rips finishes.",
       }
     }
@@ -4167,7 +4167,7 @@ export const startWatcher = (
         results: [
           {
             driveId: "",
-            slot: null,
+            bay: null,
             label: "the tower",
             resultKind: "failed",
             detail:
@@ -4235,8 +4235,8 @@ export const startWatcher = (
 
     const candidates = [...probed]
       .sort((a, b) => {
-        const aSlot = placementOf(a).slot
-        const bSlot = placementOf(b).slot
+        const aSlot = placementOf(a).bay
+        const bSlot = placementOf(b).bay
 
         if (params.request.kind !== "open_trays") {
           return (aSlot ?? 99) - (bSlot ?? 99)
@@ -4244,7 +4244,7 @@ export const startWatcher = (
 
         // Bulk Open starts at the bottom of the tower so each
         // newly opened drawer has no open drawer above it. Unknown
-        // drives follow every numbered slot in a stable identity
+        // drives follow every numbered bay in a stable identity
         // order; probe order is not a physical ordering contract.
         if (aSlot !== null && bSlot !== null) {
           const byDescendingSlot = bSlot - aSlot
@@ -4268,7 +4268,7 @@ export const startWatcher = (
           : isBayTargeted({
               target,
               driveId: drive.identity.usbPortPath,
-              slot: placementOf(drive).slot,
+              bay: placementOf(drive).bay,
             }),
       )
 
@@ -4279,11 +4279,11 @@ export const startWatcher = (
         results: [
           {
             driveId: "",
-            slot: null,
+            bay: null,
             label: "that bay",
             resultKind: "skipped_not_present",
             detail:
-              "no drive on the bus matches that slot or drive " +
+              "no drive on the bus matches that bay or drive " +
               "id right now",
           },
         ],
@@ -4302,9 +4302,9 @@ export const startWatcher = (
 
       const base = {
         driveId,
-        slot: placement.slot,
+        bay: placement.bay,
         // Already `07 - Pioneer BDR-211M`. Re-applying the
-        // slot prefix here is what produced
+        // bay prefix here is what produced
         // "06 - 06 - Pioneer BDR-211M" out loud.
         label: placement.name,
       }

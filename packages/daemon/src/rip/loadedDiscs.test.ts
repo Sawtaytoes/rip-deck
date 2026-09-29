@@ -26,7 +26,7 @@ const NOW_MS = 1_780_000_000_000
 const bay = (
   input: Partial<LoadedDiscBay> = {},
 ): LoadedDiscBay => ({
-  slot: 7,
+  bay: 7,
   label: "07 - Pioneer BDR-211M",
   isDrivePresent: true,
   hasDisc: true,
@@ -39,28 +39,28 @@ const bay = (
 describe("summariseLoadedDiscs", () => {
   it("counts only discs rip-deck is finished with", () => {
     const summary = summariseLoadedDiscs([
-      bay({ slot: 7 }),
+      bay({ bay: 7 }),
       // Mid-rip: not the operator's to collect yet.
-      bay({ slot: 8, isLatched: false }),
+      bay({ bay: 8, isLatched: false }),
       // Empty tray.
-      bay({ slot: 9, hasDisc: false }),
+      bay({ bay: 9, hasDisc: false }),
     ])
 
     expect(summary.count).toBe(1)
-    expect(summary.discs.map((d) => d.slot)).toEqual([7])
+    expect(summary.discs.map((d) => d.bay)).toEqual([7])
   })
 
-  it("reads the rack in slot order", () => {
+  it("reads the rack in bay order", () => {
     const summary = summariseLoadedDiscs([
-      bay({ slot: 9 }),
-      bay({ slot: 2 }),
-      // An unregistered bay has no slot and sorts LAST — a bare
-      // `?? 0` would put it in front of slot 2.
-      bay({ slot: null, label: "2-1.3.2" }),
-      bay({ slot: 7 }),
+      bay({ bay: 9 }),
+      bay({ bay: 2 }),
+      // An unregistered bay has no bay and sorts LAST — a bare
+      // `?? 0` would put it in front of bay 2.
+      bay({ bay: null, label: "2-1.3.2" }),
+      bay({ bay: 7 }),
     ])
 
-    expect(summary.discs.map((d) => d.slot)).toEqual([
+    expect(summary.discs.map((d) => d.bay)).toEqual([
       2,
       7,
       9,
@@ -75,14 +75,14 @@ describe("summariseLoadedDiscs", () => {
     // leaves. If this ever regresses to reading presence, the
     // reminder goes silent exactly when it is needed.
     const summary = summariseLoadedDiscs([
-      bay({ slot: 7, isDrivePresent: false }),
-      bay({ slot: 8, isDrivePresent: false }),
+      bay({ bay: 7, isDrivePresent: false }),
+      bay({ bay: 8, isDrivePresent: false }),
     ])
 
     expect(summary.count).toBe(2)
     expect(summary.isTowerOn).toBe(false)
     expect(summary.message).toContain("2 discs are still")
-    expect(summary.message).toContain("slots 7 and 8")
+    expect(summary.message).toContain("bays 7 and 8")
   })
 
   it("says what to do, and it changes with the power", () => {
@@ -100,12 +100,12 @@ describe("summariseLoadedDiscs", () => {
   })
 
   it("agrees in number for one disc", () => {
-    const summary = summariseLoadedDiscs([bay({ slot: 9 })])
+    const summary = summariseLoadedDiscs([bay({ bay: 9 })])
 
     expect(summary.message).toContain("1 disc is still")
-    expect(summary.message).toContain("slot 9")
+    expect(summary.message).toContain("bay 9")
     expect(summary.spokenMessage).toBe(
-      "A disc is still in the optical ripper tower, in slot 9.",
+      "A disc is still in the optical ripper tower, in bay 9.",
     )
   })
 
@@ -123,8 +123,8 @@ describe("summariseLoadedDiscs", () => {
     // Same rule as `spoken_message`: "07 - Pioneer BDR-211M"
     // comes out of a house speaker as a part number.
     const spoken = summariseLoadedDiscs([
-      bay({ slot: 7 }),
-      bay({ slot: 8 }),
+      bay({ bay: 7 }),
+      bay({ bay: 8 }),
     ]).spokenMessage
 
     expect(spoken).not.toContain("Pioneer")
@@ -212,13 +212,13 @@ describe("phantomLoadedBays", () => {
     ...input,
   })
 
-  // Slot 7 for the one driveId the tests use, driveId as the label
+  // Bay 7 for the one driveId the tests use, driveId as the label
   // for anything the registry never heard of — the same collapse
   // `placementForDriveId` makes.
   const placementOf = (driveId: string) =>
     driveId === "usb-2-1-3-4"
-      ? { slot: 7, label: "07 - Pioneer BDR-211M" }
-      : { slot: null, label: driveId }
+      ? { bay: 7, label: "07 - Pioneer BDR-211M" }
+      : { bay: null, label: driveId }
 
   it("rebuilds a loaded disc from a ledger record alone", () => {
     // The whole point: a restart against a dark tower, no bay
@@ -231,7 +231,7 @@ describe("phantomLoadedBays", () => {
 
     expect(rest).toHaveLength(0)
     expect(phantom).toEqual({
-      slot: 7,
+      bay: 7,
       label: "07 - Pioneer BDR-211M",
       // ⚠️ Never on the bus — a phantom is a display fact, never a
       // rip input, and this false is what keeps it out of every
@@ -299,12 +299,12 @@ describe("phantomLoadedBays", () => {
 describe("buildLoadedDiscsPayload", () => {
   it("carries the numbers AND the finished sentences", () => {
     // Home Assistant's job is deciding WHEN to remind, not
-    // composing an English list out of a slot array in Jinja.
+    // composing an English list out of a bay array in Jinja.
     const payload = buildLoadedDiscsPayload({
       summary: summariseLoadedDiscs([
-        bay({ slot: 7, title: "TROY - BONUS DISC" }),
+        bay({ bay: 7, title: "TROY - BONUS DISC" }),
         bay({
-          slot: 9,
+          bay: 9,
           title: null,
           isRipped: false,
           isDrivePresent: false,
@@ -314,8 +314,10 @@ describe("buildLoadedDiscsPayload", () => {
     })
 
     expect(payload.count).toBe(2)
+    expect(payload.bays).toEqual([7, 9])
     expect(payload.slots).toEqual([7, 9])
     expect(payload.discs[0]).toEqual({
+      bay: 7,
       slot: 7,
       label: "07 - Pioneer BDR-211M",
       title: "TROY - BONUS DISC",
@@ -327,19 +329,19 @@ describe("buildLoadedDiscsPayload", () => {
     expect(payload.updated_at).toBe(NOW_MS)
   })
 
-  it("omits a slotless bay from `slots` but not from `discs`", () => {
-    // `slots` is the operator's numbering, so a bay that has none
+  it("omits an unnumbered bay from `bays` but not from `discs`", () => {
+    // `bays` is the operator's numbering, so a bay that has none
     // cannot appear in it — and dropping the disc entirely would
     // make the count disagree with the list.
     const payload = buildLoadedDiscsPayload({
       summary: summariseLoadedDiscs([
-        bay({ slot: null, label: "2-1.3.2" }),
+        bay({ bay: null, label: "2-1.3.2" }),
       ]),
       nowMs: NOW_MS,
     })
 
     expect(payload.count).toBe(1)
-    expect(payload.slots).toEqual([])
+    expect(payload.bays).toEqual([])
     expect(payload.discs).toHaveLength(1)
   })
 })

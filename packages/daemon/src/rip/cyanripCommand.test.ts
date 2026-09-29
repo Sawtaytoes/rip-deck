@@ -16,7 +16,7 @@ import {
  *
  * The tower is no longer off, though, and cyanrip is no longer
  * absent: 2026-07-27 put cyanrip 0.9.3 in the image and ran it
- * against slot 1's real drive. So the OPTION LETTERS below are
+ * against bay 1's real drive. So the OPTION LETTERS below are
  * now checked against the binary's own help rather than against
  * its README — see the last test in the first block.
  */
@@ -154,7 +154,7 @@ describe("the cyanrip command", () => {
   })
 
   it("omits the offset entirely when it is unknown", () => {
-    // Slots 2-4 are LG drives whose firmware reports them as
+    // Bays 2-4 are LG drives whose firmware reports them as
     // ASUS, so no offset can be looked up from the model string.
     // Passing a made-up 0 would look like a measured value.
     expect(args).not.toContain("-s")

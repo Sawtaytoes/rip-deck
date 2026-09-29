@@ -45,7 +45,7 @@ export const OMDB_TUNING = {
    *
    * Generous next to a sysfs probe and irrelevant next to a
    * rip: nothing waits on this. The bound exists so a hung
-   * connection cannot pin a slot in the store's in-flight set
+   * connection cannot pin a bay in the store's in-flight set
    * forever, not because eight seconds is a latency budget.
    */
   requestTimeoutMs: 8_000,

@@ -53,6 +53,10 @@ if (rootElement) {
               />
               <Route
                 element={<Kiosk />}
+                path="/kiosk/bays/:driveId"
+              />
+              <Route
+                element={<Kiosk />}
                 path="/kiosk/slots/:driveId"
               />
               <Route

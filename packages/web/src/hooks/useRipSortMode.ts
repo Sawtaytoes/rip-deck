@@ -11,9 +11,9 @@ export const readStoredRipSortMode = (): RipSortMode => {
       RIP_SORT_MODE_STORAGE_KEY,
     ) === "finishing-soonest"
       ? "finishing-soonest"
-      : "slot"
+      : "bay"
   } catch {
-    return "slot"
+    return "bay"
   }
 }
 

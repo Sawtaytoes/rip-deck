@@ -21,7 +21,7 @@ The example expects these persistent locations:
 | `/media/Disc-Rips` | Completed and incomplete rip output. |
 | `/config` | MakeMKV settings, keys, and data. |
 | `/var/lib/rip-deck` | Bay memory, history, job logs, verdicts, and poster cache. |
-| `/app/config/drives.json` | Operator-maintained slot and drive identity map. |
+| `/app/config/drives.json` | Operator-maintained bay and drive identity map. |
 
 Create the host directories and copy [`config/drives.json`](../config/drives.json) to a persistent host path. The checked-in file contains examples only.
 
@@ -55,7 +55,7 @@ Do not use a fixed `devices:` list. `/dev/srN` values can change after USB re-en
 
 Bind `/run/udev` read-only so the daemon can receive disc metadata. Bind the two USB driver controls so **Reset bay** can reconnect one validated optical drive without restarting the service. Bind `/var/run/docker.sock` when the daemon launches one device-scoped container per rip.
 
-## Map drives to slots
+## Map drives to bays
 
 Start with the tower connected and run the read-only probe:
 
@@ -63,7 +63,7 @@ Start with the tower connected and run the read-only probe:
 docker compose -f deploy/docker-compose.yaml run --rm rip-deck rip-deck probe
 ```
 
-Use the reported firmware serial for each physical drive. Update your persistent `drives.json` with the slot, display name, firmware serial, and known drive properties. Do not use `/dev/srN` as identity and do not hand-edit cached USB paths to force a mapping.
+Use the reported firmware serial for each physical drive. Update your persistent `drives.json` with the bay, display name, firmware serial, and known drive properties. Do not use `/dev/srN` as identity and do not hand-edit cached USB paths to force a mapping.
 
 The daemon reads `config/drives.json` by default. Set `RIP_DECK_DRIVES_CONFIG` only when you mount the file elsewhere.
 
@@ -110,7 +110,7 @@ docker compose -f deploy/docker-compose.yaml exec rip-deck rip-deck probe
 curl -fsS http://localhost:3007/json
 ```
 
-Verify that every physical drive resolves to the intended slot. Insert one test disc and confirm that the dashboard shows the correct bay before you allow a full automatic rip.
+Verify that every physical drive resolves to the intended bay. Insert one test disc and confirm that the dashboard shows the correct bay before you allow a full automatic rip.
 
 ## Updates
 

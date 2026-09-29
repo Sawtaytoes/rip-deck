@@ -13,40 +13,38 @@ import {
 } from "./testing/stubDataSource"
 
 describe("bareDriveModel", () => {
-  // §3: "the drives are prefixed with their slot number. Do we
-  // need that if we're going to say 'slot 9' anyway?"
-  it("drops the registry's slot prefix", () => {
+  // §3: "the drives are prefixed with their bay number. Do we
+  // need that if we're going to say 'bay 9' anyway?"
+  it("drops the registry's bay prefix", () => {
     expect(
       bareDriveModel({
         label: "07 - Pioneer BDR-211M",
-        slot: 7,
+        bay: 7,
       }),
     ).toBe("Pioneer BDR-211M")
   })
 
   // The strip is conservative on purpose. A label whose leading
-  // number is NOT this bay's slot is not a prefix — it is part
+  // number does NOT match this bay's number, it is not a prefix — it is part
   // of the name, and mangling it leaves the operator holding a
   // drive he cannot find in the registry.
-  it("leaves a number that is not this bay's slot alone", () => {
+  it("leaves a number that differs from this bay number alone", () => {
     expect(
       bareDriveModel({
         label: "07 - Pioneer BDR-211M",
-        slot: 9,
+        bay: 9,
       }),
     ).toBe("07 - Pioneer BDR-211M")
   })
 
   it("leaves a model that merely starts with a number alone", () => {
     expect(
-      bareDriveModel({ label: "4K Something", slot: 4 }),
+      bareDriveModel({ label: "4K Something", bay: 4 }),
     ).toBe("4K Something")
   })
 
   it("says nothing when there is no label", () => {
-    expect(bareDriveModel({ label: null, slot: 7 })).toBe(
-      "",
-    )
+    expect(bareDriveModel({ label: null, bay: 7 })).toBe("")
   })
 })
 
@@ -122,13 +120,13 @@ describe("trayOutcomeFor", () => {
           bays: [
             buildTrayBayReport({
               result: "refused_ripping",
-              detail: "Slot 7 is ripping.",
+              detail: "Bay 7 is ripping.",
             }),
           ],
         }),
       }),
     ).toEqual({
-      text: "Slot 7 is ripping.",
+      text: "Bay 7 is ripping.",
       isTrouble: true,
     })
   })
@@ -140,7 +138,7 @@ describe("trayOutcomeFor", () => {
         driveId,
         report: buildTrayCommandReport(),
       }),
-    ).toEqual({ text: "Slot 7 opened.", isTrouble: false })
+    ).toEqual({ text: "Bay 7 opened.", isTrouble: false })
   })
 
   it("stays quiet about a bay the command never touched", () => {

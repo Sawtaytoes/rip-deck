@@ -65,7 +65,7 @@ export type ArmRip = {
   job_uuid: string
   /** Stable drive identity. `drive` is ephemeral. */
   drive_id: string
-  slot: number | null
+  bay: number | null
   disctype: DiscType
   /** House label for the disc type, e.g. "4K". */
   disctype_label: string | null
@@ -113,7 +113,7 @@ export type ArmDrive = {
 
   // --- additive, rip-deck-only. ---
   drive_id: string
-  slot: number | null
+  bay: number | null
   is_quarantined: boolean
   quarantine_reason: string | null
 }
@@ -308,7 +308,7 @@ const buildArmRip = (input: {
 
     job_uuid: job.id,
     drive_id: bay.driveId,
-    slot: bay.slot,
+    bay: bay.bay,
     disctype: identity?.discType ?? "unknown",
     disctype_label: discTypeLabel(
       identity?.discType ?? "unknown",
@@ -352,7 +352,7 @@ const buildArmDrive = (bay: BaySnapshot): ArmDrive => {
     serial_id: bay.serial,
 
     drive_id: bay.driveId,
-    slot: bay.slot,
+    bay: bay.bay,
     is_quarantined: bay.supervision.isQuarantined,
     quarantine_reason: bay.supervision.quarantineReason,
   }

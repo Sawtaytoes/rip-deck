@@ -53,7 +53,7 @@ import {
  * Nine rips run for hours with nobody watching, so every line here
  * is written to be read afterwards, in a log, by someone asking
  * "what happened to bay 4". That means bays are named by SLOT,
- * never by `/dev/srN` — the slot is the thing with a disc in it,
+ * never by `/dev/srN` — the bay is the thing with a disc in it,
  * and `srN` reshuffles on every USB re-enumeration.
  */
 
@@ -68,12 +68,12 @@ const readFlag = (
 }
 
 const bayLabel = (input: {
-  slot: number | null
+  bay: number | null
   name: string
 }): string =>
-  input.slot === null
+  input.bay === null
     ? `[${input.name}]`
-    : `[slot ${input.slot} · ${input.name}]`
+    : `[bay ${input.bay} · ${input.name}]`
 
 const outcomeLine = (outcome: BayOutcome): string => {
   switch (outcome.kind) {

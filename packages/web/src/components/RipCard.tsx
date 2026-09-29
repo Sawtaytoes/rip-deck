@@ -111,13 +111,13 @@ const JOB_ACTION_HELP: Partial<Record<BayAction, string>> =
  * One bay's card.
  *
  * **The field order is the owner's ranked list, verbatim**
- * (`docs/HANDOFF-stage7-ui-and-naming.md` §12): slot number,
+ * (`docs/HANDOFF-stage7-ui-and-naming.md` §12): bay number,
  * disc name, thumbnail, drive controls, overall progress,
  * per-item progress, status, location, disc type, then drive
  * name/serial behind an advanced-info disclosure, then logs.
  *
  * Read what that reordering cost: the DRIVE NAME used to be this
- * card's headline and is now tenth, behind a `<details>`. Slot,
+ * card's headline and is now tenth, behind a `<details>`. Bay,
  * disc and thumbnail all outrank it. A bay is where a disc
  * happens to be sitting; it is not what the card is about.
  *
@@ -201,7 +201,7 @@ export function RipCard({
   const houseLabel = rip.drive_name ?? driveName(rip.drive)
   const model = bareDriveModel({
     label: rip.drive_name,
-    slot: rip.slot,
+    bay: rip.bay,
   })
   // Null rather than the word "disc": a bay adopted from the
   // ledger has `identity: null`, and a placeholder is not more
@@ -209,7 +209,7 @@ export function RipCard({
   // cannot honestly be recovered on this side.
   const disc = discLabel(rip)
   // Second in the ranked list, so it is the headline — and the
-  // drive falls back into that slot only when there is genuinely
+  // drive falls back into that bay only when there is genuinely
   // no disc name, which is the adopted-bay case. A card with no
   // title at all is worse than one titled by its bay.
   const title = disc ?? (model || driveName(rip.drive))
@@ -262,7 +262,7 @@ export function RipCard({
       {rip.logfile && (
         <button
           type="button"
-          aria-label={`Show the log for slot ${rip.slot ?? "?"}`}
+          aria-label={`Show the log for bay ${rip.bay ?? "?"}`}
           onClick={() => {
             onShowLog(rip)
           }}
@@ -271,7 +271,7 @@ export function RipCard({
       )}
 
       <div className="flex gap-3">
-        {/* 1 + 3. The slot badge sits above the thumbnail when
+        {/* 1 + 3. The bay badge sits above the thumbnail when
             artwork exists, so it labels the image column rather
             than interrupting the disc title. The poster remains
             always shown when present — the owner wants the poster
@@ -285,7 +285,7 @@ export function RipCard({
         {hasPoster && (
           <div className="flex shrink-0 flex-col items-start gap-1.5">
             <span className="shrink-0 rounded-md bg-surface-sunken px-1.5 py-0.5 text-sm tabular-nums text-content-muted">
-              {rip.slot ?? "?"}
+              {rip.bay ?? "?"}
             </span>
             <Lightbox
               alt={`${title} poster`}
@@ -314,7 +314,7 @@ export function RipCard({
               Keep trying / Give up / Cancel. */}
           <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
             <span className="flex min-w-0 max-w-full flex-wrap items-baseline gap-x-2">
-              {/* 1. The slot, said ONCE. When a poster exists,
+              {/* 1. The bay, said ONCE. When a poster exists,
                   the badge is above that poster in the column
                   beside this content. Without a poster it stays
                   here, next to the title. It used to be said
@@ -325,7 +325,7 @@ export function RipCard({
                   entity id; the card stops rendering it. */}
               {!hasPoster && (
                 <span className="shrink-0 rounded-md bg-surface-sunken px-1.5 py-0.5 text-sm tabular-nums text-content-muted">
-                  {rip.slot ?? "?"}
+                  {rip.bay ?? "?"}
                 </span>
               )}
               {/* 2. The disc — wrap, never truncate. The poster
@@ -373,7 +373,7 @@ export function RipCard({
                   and the marks' right edges all land on the same
                   x because the percentage below reserves a fixed
                   column. The title now starts hard against the
-                  slot pill on every card. */}
+                  bay pill on every card. */}
               <DiscKindLogo
                 className="shrink-0"
                 kind={rip.kind}

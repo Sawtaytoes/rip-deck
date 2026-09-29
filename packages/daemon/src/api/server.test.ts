@@ -110,7 +110,7 @@ const startServer = async ({
     bay: createBaySnapshot({
       driveId: "usb-2-1-1-2-4-4-2",
       label: "02 - Pioneer BDR-211M",
-      slot: 2,
+      bay: 2,
       devPath: "/dev/sr7",
     }),
   })
@@ -169,7 +169,7 @@ describe("the API server", () => {
       bay: createBaySnapshot({
         driveId: "usb-2-1-1-2-4-4-3",
         label: "03 - Pioneer BDR-211M",
-        slot: 3,
+        bay: 3,
       }),
     })
 
@@ -385,7 +385,7 @@ const createRealDecisionRunner =
         results: [
           {
             driveId: bay.driveId,
-            slot: 4,
+            bay: 4,
             label: "04 - Pioneer BDR-211M",
             resultKind:
               decision.action === "open"
@@ -433,7 +433,7 @@ describe("POST /api/tray", () => {
 
     const response = await postTray({
       port,
-      body: { command: "open_bay", slot: 4 },
+      body: { command: "open_bay", bay: 4 },
     })
 
     expect(response.status).toBe(200)
@@ -468,7 +468,7 @@ describe("POST /api/tray", () => {
     const payload = (await (
       await postTray({
         port,
-        body: { command: "open_bay", slot: 4 },
+        body: { command: "open_bay", bay: 4 },
       })
     ).json()) as TrayCommandResponsePayload
 
@@ -497,7 +497,7 @@ describe("POST /api/tray", () => {
     const payload = (await (
       await postTray({
         port,
-        body: { command: "open_bay", slot: 4 },
+        body: { command: "open_bay", bay: 4 },
       })
     ).json()) as TrayCommandResponsePayload
 
@@ -527,7 +527,7 @@ describe("POST /api/tray", () => {
             request_id: null,
             command: "open_bay",
             is_accepted: true,
-            message: "Opened 1 drive: slot 4.",
+            message: "Opened 1 drive: bay 4.",
             spoken_message: "Opened 1 tray.",
             started_at: NOW_MS,
             finished_at: NOW_MS,
@@ -555,7 +555,7 @@ describe("POST /api/tray", () => {
 
     const trayResponse = postTray({
       port,
-      body: { command: "open_bay", slot: 4 },
+      body: { command: "open_bay", bay: 4 },
     })
 
     await isTrayEntered

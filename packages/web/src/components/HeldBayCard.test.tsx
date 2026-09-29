@@ -60,7 +60,7 @@ const buildHeldBay = (
     },
     alert: {
       drive: base.label,
-      slot: base.slot,
+      bay: base.bay,
       verdict: verdict.kind,
       action: verdict.action,
       message: verdict.message,
@@ -74,12 +74,12 @@ const buildHeldBay = (
 }
 
 describe("HeldBayCard", () => {
-  it("names the slot and the disc, and says it was not ripped", () => {
+  it("names the bay and the disc, and says it was not ripped", () => {
     renderCard(
       <HeldBayCard bay={buildHeldBay()} onAction={noop} />,
     )
 
-    // §3: the slot is a field of its own, so the registry's
+    // §3: the bay is a field of its own, so the registry's
     // "07 - " prefix comes off the drive. Said once.
     expect(screen.getByText("7")).toBeInTheDocument()
     expect(
@@ -187,7 +187,7 @@ describe("HeldBayCard", () => {
                 buildTrayBayReport({
                   result: "refused_ripping",
                   detail:
-                    "Slot 7 is ripping — nothing was touched.",
+                    "Bay 7 is ripping — nothing was touched.",
                 }),
               ],
             }),
@@ -202,7 +202,7 @@ describe("HeldBayCard", () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          "Slot 7 is ripping — nothing was touched.",
+          "Bay 7 is ripping — nothing was touched.",
         ),
       ).toBeInTheDocument()
     })
@@ -233,7 +233,7 @@ describe("HeldBayCard", () => {
   /**
    * The dead end, closed.
    *
-   * This card used to print `rip-deck rip --slot N --name "…"` — a
+   * This card used to print `rip-deck rip --bay N --name "…"` — a
    * CLI command a dashboard cannot run — with ⏏ as its only
    * control, and ⏏ does not un-hold on this hardware. *"I don't
    * have a way to do anything actionable other than eject.

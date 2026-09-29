@@ -11,10 +11,10 @@ beforeEach(() => {
 })
 
 describe("the rip sort preference", () => {
-  it("defaults to slot-number order", () => {
+  it("defaults to bay-number order", () => {
     const { result } = renderHook(useRipSortMode)
 
-    expect(result.current.mode).toBe("slot")
+    expect(result.current.mode).toBe("bay")
   })
 
   it("remembers finishing-soonest order across a reload", () => {
@@ -37,7 +37,7 @@ describe("the rip sort preference", () => {
     )
   })
 
-  it("falls back to slot order for an unknown stored value", () => {
+  it("falls back to bay order for an unknown stored value", () => {
     window.localStorage.setItem(
       RIP_SORT_MODE_STORAGE_KEY,
       "fastest-drive",
@@ -45,6 +45,6 @@ describe("the rip sort preference", () => {
 
     const { result } = renderHook(useRipSortMode)
 
-    expect(result.current.mode).toBe("slot")
+    expect(result.current.mode).toBe("bay")
   })
 })

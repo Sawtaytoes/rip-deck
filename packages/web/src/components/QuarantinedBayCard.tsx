@@ -61,11 +61,11 @@ export function QuarantinedBayCard({
     lastError,
     driveId: bay.drive_id,
   })
-  // Slot in its own chip, model without the registry's "07 - "
-  // prefix — the same "say the slot once" rule as the rip card.
+  // Bay in its own chip, model without the registry's "07 - "
+  // prefix — the same "say the bay once" rule as the rip card.
   const model = bareDriveModel({
     label: bay.label,
-    slot: bay.slot,
+    bay: bay.bay,
   })
 
   return (
@@ -73,7 +73,7 @@ export function QuarantinedBayCard({
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
         <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 font-semibold text-intent-danger-content">
           <span className="shrink-0 rounded-md bg-surface-sunken px-1.5 py-0.5 text-sm font-normal tabular-nums text-content-muted">
-            {bay.slot ?? "?"}
+            {bay.bay ?? "?"}
           </span>
           <span className="min-w-0 break-words">
             ⚠ {model} · out of service

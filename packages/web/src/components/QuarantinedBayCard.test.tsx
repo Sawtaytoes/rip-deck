@@ -48,7 +48,7 @@ const renderCard = (
 ) => renderWithProviders(ui, dataSource)
 
 describe("QuarantinedBayCard", () => {
-  it("names the slot and the bare drive, and says why", () => {
+  it("names the bay and the bare drive, and says why", () => {
     renderCard(
       <QuarantinedBayCard
         bay={buildQuarantinedBay()}
@@ -131,7 +131,7 @@ describe("QuarantinedBayCard", () => {
               bays: [
                 buildTrayBayReport({
                   result: "skipped_no_disc",
-                  detail: "Slot 7 has nothing in it.",
+                  detail: "Bay 7 has nothing in it.",
                 }),
               ],
             }),
@@ -145,7 +145,7 @@ describe("QuarantinedBayCard", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Slot 7 has nothing in it."),
+        screen.getByText("Bay 7 has nothing in it."),
       ).toBeInTheDocument()
     })
   })

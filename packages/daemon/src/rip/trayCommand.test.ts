@@ -66,7 +66,7 @@ const result = (
   input: Partial<TrayBayResult>,
 ): TrayBayResult => ({
   driveId: "usb-2-1.1.2.4.4.2",
-  slot: 7,
+  bay: 7,
   label: "07 - Pioneer BDR-211M",
   resultKind: "opened",
   detail: "opened",
@@ -166,13 +166,21 @@ describe("parseTrayCommand", () => {
     })
   })
 
-  it("addresses one bay by slot or by drive id", () => {
+  it("addresses one bay by bay or by drive id", () => {
+    expect(
+      parseTrayCommand('{"command":"open_bay","bay":7}'),
+    ).toEqual({
+      isValid: true,
+      requestId: null,
+      request: { kind: "open_bay", target: { bay: 7 } },
+    })
+
     expect(
       parseTrayCommand('{"command":"open_bay","slot":7}'),
     ).toEqual({
       isValid: true,
       requestId: null,
-      request: { kind: "open_bay", target: { slot: 7 } },
+      request: { kind: "open_bay", target: { bay: 7 } },
     })
 
     expect(
@@ -209,9 +217,9 @@ describe("parseTrayCommand", () => {
   })
 
   it("never invents a bay for a single-bay command", () => {
-    // A missing slot must not default to "all of them".
+    // A missing bay must not default to "all of them".
     const parsed = parseTrayCommand(
-      '{"command":"open_bay","slot":"seven"}',
+      '{"command":"open_bay","bay":"seven"}',
     )
 
     expect(parsed.isValid).toBe(false)
@@ -219,11 +227,11 @@ describe("parseTrayCommand", () => {
 })
 
 describe("parseTrayCommand — rip_bay", () => {
-  it("takes a slot and an operator-supplied name", () => {
+  it("takes a bay and an operator-supplied name", () => {
     const parsed = parseTrayCommand(
       JSON.stringify({
         command: "rip_bay",
-        slot: 9,
+        bay: 9,
         name: "Soylent Green - UHD",
       }),
     )
@@ -233,7 +241,7 @@ describe("parseTrayCommand — rip_bay", () => {
       requestId: null,
       request: {
         kind: "rip_bay",
-        target: { slot: 9 },
+        target: { bay: 9 },
         name: "Soylent Green - UHD",
       },
     })
@@ -268,7 +276,7 @@ describe("parseTrayCommand — rip_bay", () => {
     const parsed = parseTrayCommand(
       JSON.stringify({
         command: "rip_bay",
-        slot: 9,
+        bay: 9,
         name: "  Soylent Green - UHD  ",
       }),
     )
@@ -290,7 +298,7 @@ describe("parseTrayCommand — rip_bay", () => {
 
     expect(parsed.isValid).toBe(false)
     expect(parsed.isValid ? "" : parsed.reason).toContain(
-      "`slot`",
+      "`bay`",
     )
   })
 
@@ -311,14 +319,14 @@ describe("decideTrayBayAction", () => {
   it("⚠️ REFUSES direct work on a bay that is ripping", () => {
     for (const phase of ["starting", "ripping"] as const) {
       for (const request of [
-        { kind: "open_bay", target: { slot: 7 } },
-        { kind: "close_bay", target: { slot: 7 } },
+        { kind: "open_bay", target: { bay: 7 } },
+        { kind: "close_bay", target: { bay: 7 } },
         // `rip_bay` overrules the latch, the fingerprint and the
         // start counter — and this one thing it does not overrule.
         // A second rip on a drive one already owns is two writers.
         {
           kind: "rip_bay",
-          target: { slot: 7 },
+          target: { bay: 7 },
           name: "Soylent Green - UHD",
         },
       ] as const) {
@@ -383,8 +391,8 @@ describe("decideTrayBayAction", () => {
     // eject/insert flap-storm starts (B3), and unlike a power cut
     // it fixes nothing when the bus is down.
     for (const request of [
-      { kind: "open_bay", target: { slot: 7 } },
-      { kind: "close_bay", target: { slot: 7 } },
+      { kind: "open_bay", target: { bay: 7 } },
+      { kind: "close_bay", target: { bay: 7 } },
     ] as const) {
       expect(
         decideTrayBayAction({
@@ -404,7 +412,7 @@ describe("decideTrayBayAction", () => {
     // opinions about one device is how a drive gets two
     // writers.
     const decision = decideTrayBayAction({
-      request: { kind: "open_bay", target: { slot: 7 } },
+      request: { kind: "open_bay", target: { bay: 7 } },
       bay: bay({ phase: "ripping" }),
       observation: loaded({ hasMedia: false }),
     })
@@ -586,7 +594,7 @@ describe("decideTrayBayAction", () => {
 
   it("closes a bay it opened, even one still reading a disc", () => {
     // ⚠️ The regression that shipped and was caught on the rack,
-    // 2026-07-27. `open_trays` opened slots 7-9 and every
+    // 2026-07-27. `open_trays` opened bays 7-9 and every
     // one of them went on reporting `hasMedia` — so the branch
     // above skipped exactly the bays the paired command had just
     // opened, and the owner's short-▲ / short-▼ pair could not
@@ -653,7 +661,7 @@ describe("decideTrayBayAction", () => {
     // reach — including an idle, empty one.
     expect(
       decideTrayBayAction({
-        request: { kind: "open_bay", target: { slot: 7 } },
+        request: { kind: "open_bay", target: { bay: 7 } },
         bay: bay({ phase: "idle" }),
         observation: loaded({ hasMedia: false }),
       }),
@@ -771,20 +779,20 @@ describe("isRipCompleted", () => {
 })
 
 describe("isBayTargeted", () => {
-  it("matches on slot or on the stable drive id", () => {
+  it("matches on bay or on the stable drive id", () => {
     expect(
       isBayTargeted({
-        target: { slot: 7 },
+        target: { bay: 7 },
         driveId: "usb-2-1.1",
-        slot: 7,
+        bay: 7,
       }),
     ).toBe(true)
 
     expect(
       isBayTargeted({
-        target: { slot: 7 },
+        target: { bay: 7 },
         driveId: "usb-2-1.1",
-        slot: 8,
+        bay: 8,
       }),
     ).toBe(false)
 
@@ -792,7 +800,7 @@ describe("isBayTargeted", () => {
       isBayTargeted({
         target: { driveId: "usb-2-1.1" },
         driveId: "usb-2-1.1",
-        slot: null,
+        bay: null,
       }),
     ).toBe(true)
   })
@@ -800,32 +808,32 @@ describe("isBayTargeted", () => {
 
 describe("formatBayList", () => {
   it("reads like a sentence", () => {
-    expect(formatBayList([result({ slot: 7 })])).toBe(
-      "slot 7",
+    expect(formatBayList([result({ bay: 7 })])).toBe(
+      "bay 7",
     )
 
     expect(
       formatBayList([
-        result({ slot: 7 }),
-        result({ slot: 8 }),
+        result({ bay: 7 }),
+        result({ bay: 8 }),
       ]),
-    ).toBe("slots 7 and 8")
+    ).toBe("bays 7 and 8")
 
     expect(
       formatBayList([
-        result({ slot: 7 }),
-        result({ slot: 8 }),
-        result({ slot: 9 }),
+        result({ bay: 7 }),
+        result({ bay: 8 }),
+        result({ bay: 9 }),
       ]),
-    ).toBe("slots 7, 8 and 9")
+    ).toBe("bays 7, 8 and 9")
   })
 
-  it("falls back to the label when there is no slot", () => {
+  it("falls back to the label when there is no bay", () => {
     expect(
       formatBayList([
-        result({ slot: null, label: "usb-2-1.1" }),
+        result({ bay: null, label: "usb-2-1.1" }),
       ]),
-    ).toBe("slot usb-2-1.1")
+    ).toBe("bay usb-2-1.1")
   })
 })
 
@@ -834,9 +842,9 @@ describe("buildTrayCommandMessage", () => {
     const message = buildTrayCommandMessage({
       request: { kind: "open_trays" },
       results: [
-        result({ slot: 7, resultKind: "opened" }),
+        result({ bay: 7, resultKind: "opened" }),
         result({
-          slot: 4,
+          bay: 4,
           resultKind: "refused_ripping",
           detail: "REFUSED — this bay is ripping.",
         }),
@@ -844,7 +852,7 @@ describe("buildTrayCommandMessage", () => {
     })
 
     expect(message.startsWith("Refused")).toBe(true)
-    expect(message).toContain("slot 4")
+    expect(message).toContain("bay 4")
     expect(message).toContain("Opened 1 drive")
   })
 
@@ -854,13 +862,13 @@ describe("buildTrayCommandMessage", () => {
     const message = buildTrayCommandMessage({
       request: { kind: "open_trays" },
       results: [
-        result({ slot: 7, resultKind: "opened" }),
+        result({ bay: 7, resultKind: "opened" }),
         result({
-          slot: 8,
+          bay: 8,
           resultKind: "opened_not_ripped",
         }),
         result({
-          slot: 9,
+          bay: 9,
           resultKind: "opened_not_ripped",
         }),
       ],
@@ -870,12 +878,12 @@ describe("buildTrayCommandMessage", () => {
     expect(message).toContain(
       "2 of those were never ripped",
     )
-    expect(message).toContain("slots 8 and 9")
+    expect(message).toContain("bays 8 and 9")
   })
 
   it("refuses in the VERB of the command that ran", () => {
     // Measured on the live tower 2026-08-20: a `close_trays`
-    // press with slot 2 mid-rip answered "Refused to OPEN slot 2",
+    // press with bay 2 mid-rip answered "Refused to OPEN bay 2",
     // which is the one sentence Home Assistant speaks out loud.
     // Every non-rip_bay, non-power_off command shared the open
     // wording.
@@ -884,32 +892,32 @@ describe("buildTrayCommandMessage", () => {
         request: { kind: "close_trays" },
         results: [
           result({
-            slot: 2,
+            bay: 2,
             resultKind: "refused_ripping",
             detail: "REFUSED — this bay is ripping.",
           }),
         ],
       }),
-    ).toBe("Refused to close slot 2: still ripping.")
+    ).toBe("Refused to close bay 2: still ripping.")
 
     expect(
       buildTrayCommandMessage({
         request: { kind: "open_trays" },
         results: [
           result({
-            slot: 2,
+            bay: 2,
             resultKind: "refused_ripping",
             detail: "REFUSED — this bay is ripping.",
           }),
         ],
       }),
-    ).toBe("Refused to open slot 2: still ripping.")
+    ).toBe("Refused to open bay 2: still ripping.")
   })
 
-  it("lists the opened drawers in slot order", () => {
+  it("lists the opened drawers in bay order", () => {
     // The list is what the operator walks the rack against, so it
     // reads in rack order. Concatenating `opened` then
-    // `openedNotRipped` produced "slots 2, 1, 3, 4, 5, 6, 7, 8
+    // `openedNotRipped` produced "bays 2, 1, 3, 4, 5, 6, 7, 8
     // and 9" on the live tower: the single ripped bay sorted ahead
     // of eight empty ones that were already in order. The
     // never-ripped split is a separate sentence and keeps its own
@@ -917,15 +925,15 @@ describe("buildTrayCommandMessage", () => {
     const message = buildTrayCommandMessage({
       request: { kind: "open_trays" },
       results: [
-        result({ slot: 2, resultKind: "opened" }),
-        ...[1, 3, 4].map((slot) =>
-          result({ slot, resultKind: "opened_not_ripped" }),
+        result({ bay: 2, resultKind: "opened" }),
+        ...[1, 3, 4].map((bay) =>
+          result({ bay, resultKind: "opened_not_ripped" }),
         ),
       ],
     })
 
     expect(message).toContain(
-      "Opened 4 drives: slots 1, 2, 3 and 4.",
+      "Opened 4 drives: bays 1, 2, 3 and 4.",
     )
   })
 
@@ -939,14 +947,14 @@ describe("buildTrayCommandMessage", () => {
       openScope: "all",
       results: Array.from({ length: 9 }, (_unused, index) =>
         result({
-          slot: index + 1,
+          bay: index + 1,
           resultKind: "opened_not_ripped",
         }),
       ),
     })
 
     expect(message).toBe(
-      "Opened 9 drives: slots 1, 2, 3, 4, 5, 6, 7, 8 and 9.",
+      "Opened 9 drives: bays 1, 2, 3, 4, 5, 6, 7, 8 and 9.",
     )
     expect(message).not.toContain("never ripped")
   })
@@ -1001,7 +1009,7 @@ describe("buildTrayCommandMessage", () => {
     )
 
     // ⚠️ And a mixed rack reads as "none are open", never as the
-    // rip sentence. Slot 4 rips; every other drawer was already
+    // rip sentence. Bay 4 rips; every other drawer was already
     // shut. Blaming the rip for a press that had nothing to do is
     // what made the old wording look like the bug it was not.
     expect(
@@ -1021,7 +1029,7 @@ describe("buildTrayCommandMessage", () => {
         request: { kind: "open_trays" },
         results: [
           result({
-            slot: 7,
+            bay: 7,
             resultKind: "failed",
             detail:
               "this rip-deck image has no `eject` binary",
@@ -1040,21 +1048,21 @@ describe("buildTrayCommandResponse", () => {
       startedAtMs: NOW_MS,
       finishedAtMs: NOW_MS + 1_200,
       results: [
-        result({ slot: 7, resultKind: "opened" }),
+        result({ bay: 7, resultKind: "opened" }),
         result({
-          slot: 8,
+          bay: 8,
           resultKind: "opened_not_ripped",
         }),
         result({
-          slot: 4,
+          bay: 4,
           resultKind: "refused_ripping",
         }),
-        result({ slot: 5, resultKind: "failed" }),
+        result({ bay: 5, resultKind: "failed" }),
         result({
-          slot: 6,
+          bay: 6,
           resultKind: "skipped_not_finished",
         }),
-        result({ slot: 3, resultKind: "skipped_no_disc" }),
+        result({ bay: 3, resultKind: "skipped_no_disc" }),
       ],
     })
 
@@ -1073,7 +1081,7 @@ describe("buildTrayCommandResponse", () => {
     expect(payload.bays).toHaveLength(6)
     expect(payload.bays[0]).toEqual({
       drive_id: "usb-2-1.1.2.4.4.2",
-      slot: 7,
+      bay: 7,
       label: "07 - Pioneer BDR-211M",
       result: "opened",
       detail: "opened",
@@ -1154,18 +1162,18 @@ describe("buildClearLoadedResponse", () => {
 describe("buildTrayCommandMessage — rip_bay", () => {
   it("says ripping ONCE", () => {
     // Measured on the live tower 2026-07-30: gluing the bay's own
-    // detail onto the stem produced "Ripping slot 9: reading the
+    // detail onto the stem produced "Ripping bay 9: reading the
     // disc's own name, then ripping". Both strings are published;
     // the card renders the detail beside this one.
     const message = buildTrayCommandMessage({
       request: {
         kind: "rip_bay",
-        target: { slot: 9 },
+        target: { bay: 9 },
         name: null,
       },
       results: [
         result({
-          slot: 9,
+          bay: 9,
           resultKind: "rip_started",
           detail:
             "reading the disc's own name, then ripping",
@@ -1173,7 +1181,7 @@ describe("buildTrayCommandMessage — rip_bay", () => {
       ],
     })
 
-    expect(message).toBe("Ripping slot 9.")
+    expect(message).toBe("Ripping bay 9.")
   })
 
   it("says the bay's own sentence when nothing started", () => {
@@ -1184,12 +1192,12 @@ describe("buildTrayCommandMessage — rip_bay", () => {
       buildTrayCommandMessage({
         request: {
           kind: "rip_bay",
-          target: { slot: 9 },
+          target: { bay: 9 },
           name: null,
         },
         results: [
           result({
-            slot: 9,
+            bay: 9,
             resultKind: "skipped_no_disc",
             detail: "there is no disc in this bay to rip",
           }),
@@ -1205,17 +1213,17 @@ describe("buildTrayCommandMessage — rip_bay", () => {
       buildTrayCommandMessage({
         request: {
           kind: "rip_bay",
-          target: { slot: 9 },
+          target: { bay: 9 },
           name: null,
         },
         results: [
           result({
-            slot: 9,
+            bay: 9,
             resultKind: "refused_ripping",
           }),
         ],
       }),
-    ).toBe("Refused: slot 9 is already ripping.")
+    ).toBe("Refused: bay 9 is already ripping.")
   })
 })
 
@@ -1226,9 +1234,9 @@ describe("buildTraySpokenMessage", () => {
     const spoken = buildTraySpokenMessage({
       request: { kind: "open_trays" },
       results: [
-        result({ slot: 7, resultKind: "opened" }),
+        result({ bay: 7, resultKind: "opened" }),
         result({
-          slot: 4,
+          bay: 4,
           resultKind: "refused_ripping",
           detail: "REFUSED — this bay is ripping.",
         }),
@@ -1236,7 +1244,7 @@ describe("buildTraySpokenMessage", () => {
     })
 
     expect(spoken).toBe(
-      "Not opening slot 4 — it is still ripping.",
+      "Not opening bay 4 — it is still ripping.",
     )
     expect(spoken).not.toContain("Opened")
   })
@@ -1247,23 +1255,23 @@ describe("buildTraySpokenMessage", () => {
         request: { kind: "open_trays" },
         results: [
           result({
-            slot: 8,
+            bay: 8,
             resultKind: "refused_ripping",
           }),
           result({
-            slot: 9,
+            bay: 9,
             resultKind: "refused_ripping",
           }),
         ],
       }),
     ).toBe(
-      "Not opening slots 8 and 9 — they are still ripping.",
+      "Not opening bays 8 and 9 — they are still ripping.",
     )
   })
 
   it("speaks CLOSING when the command was close_trays", () => {
     // Pressing "close trays" on the Zigbee button spoke "Not
-    // opening slots 6, 7 and 8", which reads as the tower doing
+    // opening bays 6, 7 and 8", which reads as the tower doing
     // the opposite of what was asked. Reported from the live
     // tower 2026-09-08.
     expect(
@@ -1271,50 +1279,50 @@ describe("buildTraySpokenMessage", () => {
         request: { kind: "close_trays" },
         results: [
           result({
-            slot: 6,
+            bay: 6,
             resultKind: "refused_ripping",
           }),
           result({
-            slot: 7,
+            bay: 7,
             resultKind: "refused_ripping",
           }),
           result({
-            slot: 8,
+            bay: 8,
             resultKind: "refused_ripping",
           }),
         ],
       }),
     ).toBe(
-      "Not closing slots 6, 7 and 8 — they are still ripping.",
+      "Not closing bays 6, 7 and 8 — they are still ripping.",
     )
   })
 
   it("speaks CLOSING for a single-bay close_bay too", () => {
     expect(
       buildTraySpokenMessage({
-        request: { kind: "close_bay", target: { slot: 7 } },
+        request: { kind: "close_bay", target: { bay: 7 } },
         results: [
           result({
-            slot: 7,
+            bay: 7,
             resultKind: "refused_ripping",
           }),
         ],
       }),
-    ).toBe("Not closing slot 7 — it is still ripping.")
+    ).toBe("Not closing bay 7 — it is still ripping.")
   })
 
   it("still speaks OPENING for an open command", () => {
     expect(
       buildTraySpokenMessage({
-        request: { kind: "open_bay", target: { slot: 7 } },
+        request: { kind: "open_bay", target: { bay: 7 } },
         results: [
           result({
-            slot: 7,
+            bay: 7,
             resultKind: "refused_ripping",
           }),
         ],
       }),
-    ).toBe("Not opening slot 7 — it is still ripping.")
+    ).toBe("Not opening bay 7 — it is still ripping.")
   })
 
   it("never speaks the device's own words on a failure", () => {
@@ -1325,7 +1333,7 @@ describe("buildTraySpokenMessage", () => {
       request: { kind: "open_trays" },
       results: [
         result({
-          slot: 5,
+          bay: 5,
           resultKind: "failed",
           detail:
             "eject exited 1: `/dev/sr4`: CDROMEJECT: Input/" +
@@ -1335,18 +1343,18 @@ describe("buildTraySpokenMessage", () => {
     })
 
     expect(spoken).toBe(
-      "One bay did not answer: slot 5. Nothing else was " +
+      "One bay did not answer: bay 5. Nothing else was " +
         "affected.",
     )
     expect(spoken).not.toContain("CDROMEJECT")
     expect(spoken).not.toContain("`")
   })
 
-  it("keeps the counts and the slot list off the speaker", () => {
+  it("keeps the counts and the bay list off the speaker", () => {
     const results = [
-      result({ slot: 1, resultKind: "opened" }),
-      result({ slot: 2, resultKind: "opened_not_ripped" }),
-      result({ slot: 3, resultKind: "opened_not_ripped" }),
+      result({ bay: 1, resultKind: "opened" }),
+      result({ bay: 2, resultKind: "opened_not_ripped" }),
+      result({ bay: 3, resultKind: "opened_not_ripped" }),
     ]
 
     // The written line is a table; the spoken one is a fact.
@@ -1355,7 +1363,7 @@ describe("buildTraySpokenMessage", () => {
         request: { kind: "open_trays" },
         results,
       }),
-    ).toContain("slots 1, 2 and 3")
+    ).toContain("bays 1, 2 and 3")
 
     expect(
       buildTraySpokenMessage({

@@ -221,7 +221,7 @@ export function historyReadErrorText(
 
 /** Where the bay was, as a label a human recognises. */
 export function historyBayText(rip: HistoryRip): string {
-  return rip.slot === null
+  return rip.bay === null
     ? rip.bay_name
-    : `Slot ${String(rip.slot)} · ${rip.bay_name}`
+    : `Bay ${String(rip.bay)} · ${rip.bay_name}`
 }

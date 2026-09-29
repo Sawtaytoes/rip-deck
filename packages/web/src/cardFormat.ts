@@ -157,12 +157,12 @@ export function trayOutcomeFor(input: {
 }
 
 /**
- * The drive's model, without the slot number in front of it.
+ * The drive's model, without the bay number in front of it.
  *
- * > *"the drives are prefixed with their slot number. Do we need
- * > that if we're going to say 'slot 9' anyway?"*
+ * > *"the drives are prefixed with their bay number. Do we need
+ * > that if we're going to say 'bay 9' anyway?"*
  *
- * No — the card says the slot once, in its own field, and the
+ * No — the card says the bay once, in its own field, and the
  * model is just the model.
  *
  * ⚠️ **Fixed here rather than in `config/drives.json`.** The
@@ -174,20 +174,20 @@ export function trayOutcomeFor(input: {
  * gain.
  *
  * The strip is deliberately CONSERVATIVE: the leading number has
- * to be this bay's own slot. `"07 - Pioneer BDR-211M"` in slot 7
+ * to be this bay's own bay. `"07 - Pioneer BDR-211M"` in bay 7
  * loses its prefix; a drive genuinely called `"4K Something"`,
- * or a label whose number disagrees with the slot, is left
+ * or a label whose number disagrees with the bay, is left
  * exactly as the registry spelled it. A label the operator does
  * not recognise is worse than a redundant one.
  */
 export function bareDriveModel(input: {
   label: string | null
-  slot: number | null
+  bay: number | null
 }): string {
-  const { label, slot } = input
+  const { label, bay } = input
 
   if (label === null) return ""
-  if (slot === null) return label
+  if (bay === null) return label
 
   const match = /^(\d+)\s*-\s*(.+)$/.exec(label)
 
@@ -195,5 +195,5 @@ export function bareDriveModel(input: {
 
   const [, prefix = "", model = ""] = match
 
-  return Number(prefix) === slot ? model : label
+  return Number(prefix) === bay ? model : label
 }

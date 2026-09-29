@@ -11,7 +11,7 @@ import {
 /**
  * The rip that made this change necessary, replayed.
  *
- * Slot 1 of the live tower, 2026-08-27: a CSS-protected DVD that
+ * Bay 1 of the live tower, 2026-08-27: a CSS-protected DVD that
  * rode to `MSG:5070` / `MSG:5081` "Backup done" and left an
  * 8,070,922,240-byte ISO on the dataset. Rip Deck recorded
  * `fail`, reason `read_errors`, on the strength of ONE
