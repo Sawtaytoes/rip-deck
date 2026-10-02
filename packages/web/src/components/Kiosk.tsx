@@ -144,8 +144,13 @@ export const Kiosk = () => {
   const { search } = useLocation()
   const fixture = readFixtureName(search)
   const query = useRipDeckState(fixture)
-  const { run, pendingDriveIds, lastReport, lastError } =
-    useTrayCommand()
+  const {
+    run,
+    pendingDriveIds,
+    isBulkPending,
+    lastReport,
+    lastError,
+  } = useTrayCommand()
   const { runConfirmedAction, actionFor } = useBayActions()
   const [cancelTarget, setCancelTarget] =
     useState<CancelTarget | null>(null)
@@ -419,6 +424,27 @@ export const Kiosk = () => {
         >
           <h1>No rips running</h1>
           <p>Active bays will appear here automatically.</p>
+          <Button
+            size="lg"
+            intent="danger"
+            isDisabled={
+              isReadOnly ||
+              isBulkPending ||
+              tower.active_count > 0 ||
+              bays.some(
+                (bay) => kioskBaySummary(bay).isActive,
+              )
+            }
+            data-castkit-target="kiosk-power-off:idle"
+            onClick={() => run({ command: "power_off" })}
+          >
+            {isBulkPending
+              ? "Turning off…"
+              : "Turn Off Ripper"}
+          </Button>
+          <p className="rip-kiosk-report" role="status">
+            {reportText}
+          </p>
         </section>
       ) : (
         !driveId && (
