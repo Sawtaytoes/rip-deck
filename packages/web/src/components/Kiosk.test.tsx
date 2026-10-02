@@ -212,6 +212,69 @@ test("shows a calm idle message instead of nine empty rows", async () => {
   expect(screen.queryByRole("link")).toBeNull()
 })
 
+test.each([false, true])(
+  "idle shutdown uses the guarded command and disables preview controls (preview: %s)",
+  async (isFake) => {
+    const fixture = await mockDataSource.fetchState(
+      "held-at-startup",
+    )
+    const tower = fixture.ripDeck
+    if (!tower) throw new Error("Fixture needs a tower")
+    const runTrayCommand = vi.fn(async () =>
+      buildTrayCommandReport({
+        message: "Shutdown refused: a rip started.",
+      }),
+    )
+    renderWithProviders(
+      routes,
+      createStubDataSource({
+        fetchState: async () => ({
+          ...fixture,
+          ripDeck: {
+            ...tower,
+            is_fake: isFake,
+            is_tower_present: true,
+            active_count: 0,
+            bays: tower.bays.map((bay) => ({
+              ...bay,
+              state: {
+                ...bay.state,
+                state: "idle" as const,
+              },
+            })),
+          },
+        }),
+        runTrayCommand,
+      }),
+    )
+    const button = await screen.findByRole("button", {
+      name: "Turn Off Ripper",
+    })
+    expect(button).toHaveAttribute(
+      "data-castkit-target",
+      "kiosk-power-off:idle",
+    )
+    if (isFake) {
+      expect(button).toBeDisabled()
+      expect(runTrayCommand).not.toHaveBeenCalled()
+    } else {
+      await userEvent.click(button)
+      await waitFor(() =>
+        expect(runTrayCommand).toHaveBeenCalledWith({
+          command: "power_off",
+          driveId: undefined,
+          name: undefined,
+        }),
+      )
+      expect(
+        await screen.findByText(
+          "Shutdown refused: a rip started.",
+        ),
+      ).toBeVisible()
+    }
+  },
+)
+
 test("briefly includes an inactive bay after its tray changes", async () => {
   const fixture =
     await mockDataSource.fetchState("showcase")
