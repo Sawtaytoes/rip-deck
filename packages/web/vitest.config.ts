@@ -1,3 +1,7 @@
+import {
+  createCiTimeouts,
+  createViewportInstances,
+} from "@charcuterie/vitest-config"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import { playwright } from "@vitest/browser-playwright"
@@ -55,11 +59,21 @@ export default defineConfig({
   test: {
     name: "web",
     include: ["src/**/*.test.{ts,tsx}"],
+    // Four windows means four times the work on one runner, and this
+    // hand-rolled config never had the factory's 30s CI budget.
+    ...createCiTimeouts(),
     browser: {
       enabled: true,
       provider: playwright(),
       headless: true,
-      instances: [{ browser: "chromium" }],
+      // Every test runs once in each of the fleet's four windows —
+      // `web-narrow` (384x824), `web-tall` (1080x1920), `web-wide`
+      // (1920x1080), and `web-ultrawide` (3440x1440). `project` keeps
+      // the instance names unique across the root workspace.
+      // `vitest run --project 'web-narrow'` runs one window alone.
+      instances: createViewportInstances({
+        project: "web",
+      }),
     },
     setupFiles: ["./vitest.setup.ts"],
   },

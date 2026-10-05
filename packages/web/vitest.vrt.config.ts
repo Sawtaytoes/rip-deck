@@ -49,6 +49,10 @@ export default defineConfig({
     provide: { vrtActualDirectory: actualDirectory },
     browser: {
       ...baseConfig.test?.browser,
+      // ONE capture, not the suite's four windows: each shot sets its
+      // own size (see `sizeViewport`), and four instances would write every
+      // PNG four times over the same file names.
+      instances: [{ browser: "chromium" }],
       // The runner SCALES the test iframe down to fit this window, so
       // a 1280x800 route in the default 1280x720 page came out at 0.9
       // and blurred. A window larger than every viewport the shots

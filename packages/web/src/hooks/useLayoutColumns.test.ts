@@ -1,5 +1,12 @@
 import { act, renderHook } from "@testing-library/react"
-import { beforeEach, describe, expect, it } from "vitest"
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest"
 
 import {
   COLUMNS_STORAGE_KEY,
@@ -36,35 +43,39 @@ const columnsAt = (input: {
   })
 
 /**
- * Force the viewport the hook reads.
+ * Force the size the hook reads, for the ONE test that is about a
+ * resize.
  *
  * Under the old jsdom setup this was a plain
  * `window.innerWidth = …` assignment. In the real chromium
  * vitest browser mode now runs in, `innerWidth`/`innerHeight`
  * are read-only accessors backed by the actual browser window,
  * so an assignment is a silent no-op and the hook would read the
- * live viewport instead of the size under test. `defineProperty`
- * shadows the accessor with an own value the hook reads instead;
- * `configurable` lets `beforeEach` and the resize test redefine
- * it each time.
+ * live viewport instead of the size under test. `vi.stubGlobal`
+ * shadows the accessor with an own value the hook reads instead,
+ * and `vi.unstubAllGlobals` in `afterEach` puts the real accessor
+ * back.
+ *
+ * ⚠️ Never stub a size in `beforeEach`. This file used to, at
+ * 1024x768, which pinned every hook test to one window while the
+ * suite runs in four. The override tests compare `columns` with
+ * `autoColumns`, so they hold in whatever window the instance
+ * gives them, and they now run in all four.
  */
 const setViewport = (input: {
   width: number
   height: number
 }): void => {
-  Object.defineProperty(window, "innerWidth", {
-    configurable: true,
-    value: input.width,
-  })
-  Object.defineProperty(window, "innerHeight", {
-    configurable: true,
-    value: input.height,
-  })
+  vi.stubGlobal("innerWidth", input.width)
+  vi.stubGlobal("innerHeight", input.height)
 }
 
 beforeEach(() => {
   window.localStorage.clear()
-  setViewport({ width: 1024, height: 768 })
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe("height is spent before width", () => {
