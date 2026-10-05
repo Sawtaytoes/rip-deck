@@ -44,6 +44,8 @@ PLAYWRIGHT_BROWSERS_PATH=/tmp/pw-browsers corepack yarn playwright install chrom
 PLAYWRIGHT_BROWSERS_PATH=/tmp/pw-browsers corepack yarn test --run
 ```
 
+Every web test runs in four windows — `web-narrow` 384x824, `web-tall` 1080x1920, `web-wide` 1920x1080, and `web-ultrawide` 3440x1440 — and a test that fails in one is triaged, never pinned back to one window ([decision](https://github.com/Sawtaytoes/charcuterie/blob/master/docs/decisions/2026-10-04-every-browser-test-runs-in-four-named-windows.md)). `vitest run --project web-narrow` runs one window alone. The visual-regression capture (`yarn vrt:capture`) keeps its own single window.
+
 Do not change the repository's Playwright version to match a browser in the agent image. `yarn install-playwright-browser` is the CI command and includes `--with-deps`, which can need root package installation.
 
 ## Pull request gates
