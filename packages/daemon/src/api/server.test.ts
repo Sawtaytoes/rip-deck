@@ -56,7 +56,7 @@ const INDEX_HTML =
  * A dashboard described rather than built.
  *
  * The suite must pass whether or not `packages/web/dist` exists
- * — CI runs `yarn install` and the tests, not `vite build` — so
+ * — CI runs `pnpm install` and the tests, not `vite build` — so
  * asserting against the real bundle here would make this file
  * green or red for a reason that has nothing to do with the
  * server. Loading the real `dist/` is `loadWebAssets`' job and is
@@ -303,7 +303,7 @@ describe("the dashboard, over the same socket", () => {
       "text/plain; charset=utf-8",
     )
     expect(await response.text()).toContain(
-      "yarn workspace @rip-deck/web build",
+      "pnpm --filter @rip-deck/web build",
     )
   })
 })

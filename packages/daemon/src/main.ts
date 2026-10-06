@@ -44,7 +44,7 @@ import {
  *
  * It runs on import — but only when it was imported in order to
  * BE the daemon, which is what `isWatchInvocation` decides. Both
- * `yarn dev` (`tsx packages/daemon/src/main.ts`) and
+ * `pnpm dev` (`tsx packages/daemon/src/main.ts`) and
  * `rip-deck watch` (a dynamic import from `cli.ts`) come in that
  * way; a test importing it does not.
  *
@@ -510,7 +510,7 @@ export const runWatch = async (
  *
  * Two ways in, and both have to work:
  *
- *  - `tsx packages/daemon/src/main.ts`, which is what `yarn dev`
+ *  - `tsx packages/daemon/src/main.ts`, which is what `pnpm dev`
  *    runs. Here this file is the process entry.
  *  - `rip-deck watch`, which reaches it through `await import()`
  *    from `cli.ts` precisely so that a `rip-deck probe` does not

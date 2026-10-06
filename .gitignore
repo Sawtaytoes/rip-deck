@@ -10,7 +10,6 @@ storybook-static/
 build/
 .yarn/*
 !.yarn/patches
-!.yarn/releases
 .pnp.*
 *.log
 # Captured robot-mode output IS a test fixture, not a stray log.

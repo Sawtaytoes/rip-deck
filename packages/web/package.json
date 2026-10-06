@@ -40,6 +40,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/browser": "^4.1.9",
     "@vitest/browser-playwright": "^4.1.9",
+    "expect-type": "1.4.0",
     "storybook": "^10.5.5",
     "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3",

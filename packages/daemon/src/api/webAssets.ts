@@ -100,7 +100,7 @@ export type WebAssets = {
  *
  * Resolved from `import.meta.url` rather than `process.cwd()`
  * on purpose: `rip-deck` is invoked from several directories
- * (`yarn dev`, the container's `/usr/local/bin/rip-deck` wrapper,
+ * (`pnpm dev`, the container's `/usr/local/bin/rip-deck` wrapper,
  * a per-rip container's bare argv) and a cwd-relative default
  * would serve the dashboard from only one of them.
  */
@@ -160,7 +160,7 @@ export const loadWebAssets = ({
       return walkFiles({ directory: root })
     } catch (error) {
       // A missing `dist/` is an ordinary state, not a failure:
-      // `yarn dev` before a build, or an image built before the
+      // `pnpm dev` before a build, or an image built before the
       // dashboard shipped. The router answers those with a page
       // saying exactly that, and ripping is unaffected either
       // way. Anything else — a permissions problem, say — is a
