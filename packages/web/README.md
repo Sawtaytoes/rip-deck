@@ -4,9 +4,9 @@ React 19 + Vite + Tailwind 4, ported from the ARM viewer's
 `web/packages/dashboard` and moved onto rip-deck's data.
 
 ```
-yarn workspace @rip-deck/web dev        # http://localhost:5173
-yarn workspace @rip-deck/web build      # -> dist/, which the daemon serves
-yarn test --run                        # all workspaces, this one included
+pnpm --filter @rip-deck/web dev        # http://localhost:5173
+pnpm --filter @rip-deck/web build      # -> dist/, which the daemon serves
+pnpm test --run                        # all workspaces, this one included
 ```
 
 ## Who serves this
@@ -158,8 +158,8 @@ can be exercised.
 
 ## Tests
 
-`yarn test --run`. jsdom, not vitest browser mode — CI installs nothing
-but `yarn install`, and the logic under test is data-shaping rather
+`pnpm test --run`. jsdom, not vitest browser mode — CI installs nothing
+but `pnpm install`, and the logic under test is data-shaping rather
 than layout. `.spec.ts` stays reserved for Playwright and is not
 matched by the vitest `include`. See the comments in
 `vitest.config.ts`, including why `optimizeDeps.include` is there

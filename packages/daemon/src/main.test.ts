@@ -12,7 +12,7 @@ import {
  *
  * The predicate, because getting it wrong is not a wrong string
  * in a log — it is a nine-bay daemon starting inside a test run,
- * or `yarn dev` starting nothing at all. Everything else about
+ * or `pnpm dev` starting nothing at all. Everything else about
  * the console is formatting over decisions that live, and are
  * tested, in `rip/watcher.ts` and `rip/governor.ts`.
  *
@@ -26,7 +26,7 @@ import {
  */
 
 describe("isWatchInvocation", () => {
-  it("runs when it is the process entry (`yarn dev`)", () => {
+  it("runs when it is the process entry (`pnpm dev`)", () => {
     expect(
       isWatchInvocation([
         "/usr/bin/node",

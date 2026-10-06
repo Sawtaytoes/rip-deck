@@ -735,7 +735,7 @@ const main = async () => {
 
     case "watch":
       // A dynamic import because `main.ts` IS the daemon — it runs
-      // on import, which is also how `yarn dev` starts it. Importing
+      // on import, which is also how `pnpm dev` starts it. Importing
       // it statically would start a watcher every time anyone ran
       // `rip-deck probe`.
       await import("./main.ts")

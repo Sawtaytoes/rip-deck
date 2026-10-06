@@ -334,7 +334,7 @@ const DASHBOARD_NOT_BUILT_BODY = (root: string): string =>
   `Nothing was found at ${root}, so \`packages/web\` was ` +
   "never built here.\n\n" +
   "Fix: rebuild the container image (its Dockerfile runs\n" +
-  "`yarn workspace @rip-deck/web build`), or run that command\n" +
+  "`pnpm --filter @rip-deck/web build`), or run that command\n" +
   "yourself if you are working from a checkout.\n\n" +
   "The JSON API is unaffected — /json, /fixtures and /health\n" +
   "all still answer.\n"
