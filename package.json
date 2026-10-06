@@ -2,11 +2,8 @@
   "name": "rip-deck",
   "license": "MIT",
   "private": true,
-  "packageManager": "yarn@4.14.1",
+  "packageManager": "pnpm@12.9.1",
   "version": "1.2.9",
-  "workspaces": [
-    "packages/*"
-  ],
   "type": "module",
   "scripts": {
     "rip-deck": "tsx packages/daemon/src/cli.ts",
@@ -14,11 +11,11 @@
     "build:daemon": "node scripts/build-daemon.mjs",
     "lint:biome": "biome check --write --unsafe",
     "lint:eslint": "eslint . --fix",
-    "lint": "yarn lint:biome && yarn lint:eslint",
-    "install-playwright-browser": "yarn playwright install chromium --with-deps",
+    "lint": "pnpm lint:biome && pnpm lint:eslint",
+    "install-playwright-browser": "pnpm playwright install chromium --with-deps",
     "test": "vitest",
-    "vrt:capture": "yarn workspace @rip-deck/web vitest run --config vitest.vrt.config.ts",
-    "typecheck": "tsc --noEmit && yarn workspaces foreach -Ap run typecheck"
+    "vrt:capture": "pnpm --filter @rip-deck/web vitest run --config vitest.vrt.config.ts",
+    "typecheck": "tsc --noEmit && pnpm -r --parallel run typecheck"
   },
   "dependencies": {
     "@rip-deck/contracts": "workspace:*",

@@ -73,7 +73,7 @@ FROM ghcr.io/jlesage/makemkv:v26.07.2 AS makemkv
 # ============================================================= #
 # Build stage — installs the FULL workspace (devDependencies and
 # all) to compile the dashboard and BUNDLE the daemon to plain
-# JS. Nothing here — not yarn, not tsx, not the TypeScript source,
+# JS. Nothing here — not pnpm, not tsx, not the TypeScript source,
 # not node_modules — crosses into the runtime image below. Only
 # the two build outputs do.
 # ============================================================= #
@@ -81,25 +81,24 @@ FROM node:26-trixie-slim AS build
 
 WORKDIR /app
 
+RUN npm install --global --force --allow-scripts=pnpm pnpm@12.9.1
+
 # Manifests before source, so editing a .ts does not re-run a
-# full yarn install on every rebuild.
-COPY .yarnrc.yml package.json yarn.lock ./
-COPY .yarn/releases ./.yarn/releases
+# full pnpm install on every rebuild.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/contracts/package.json ./packages/contracts/
 COPY packages/daemon/package.json ./packages/daemon/
 #
 # ⚠️ EVERY workspace's manifest must be listed here, including ones
-# this image never runs. `package.json` declares `workspaces:
-# ["packages/*"]`, so yarn resolves against the whole set; omit one
-# and `--immutable` fails with YN0028 "the lockfile would have been
-# modified" — which reads like a corrupt lockfile and is not.
+# this image never runs. `pnpm-workspace.yaml` declares `packages/*`, so pnpm resolves against
+# the whole set; omit one and `--frozen-lockfile` fails — which reads like a corrupt lockfile and is not.
 #
 # Leaving `packages/web` out broke the build the moment it was
-# added (2026-07-26). No gate catches this: `yarn test`,
+# added (2026-07-26). No gate catches this: `pnpm test`,
 # `typecheck`, `biome` and `eslint` never build the image. If you
 # add a workspace, add it here in the same commit.
 COPY packages/web/package.json ./packages/web/
-RUN npm install -g corepack@latest && corepack enable && yarn install --immutable
+RUN --mount=type=cache,id=rip-deck-pnpm,target=/pnpm/store,sharing=locked pnpm install --frozen-lockfile --store-dir /pnpm/store
 
 COPY . .
 
@@ -111,7 +110,7 @@ COPY . .
 # is ~260 KB across three files and ships to the runtime image as
 # static files. Vite and the rest of the web toolchain stay in
 # THIS stage.
-RUN yarn workspace @rip-deck/web build \
+RUN pnpm --filter @rip-deck/web build \
   && test -s packages/web/dist/index.html
 
 # --- The daemon, compiled -------------------------------------
@@ -127,12 +126,12 @@ RUN yarn workspace @rip-deck/web build \
 # `rxjs` and `mqtt` in. The runtime image then needs no
 # node_modules at all.
 # ([decision](docs/decisions/2026-07-28-compiled-js-on-node-not-tsx.md))
-RUN yarn build:daemon \
+RUN pnpm build:daemon \
   && test -s packages/daemon/dist/cli.js
 
 # ============================================================= #
 # Runtime stage — node + makemkvcon, the compiled bundle, and the
-# static dashboard. No yarn, no tsx, no node_modules, no source.
+# static dashboard. No pnpm, no tsx, no node_modules, no source.
 # ============================================================= #
 #
 # Debian rather than Alpine: MakeMKV's bundled libraries are
@@ -347,7 +346,7 @@ COPY --from=build /app/packages/web/dist ./packages/web/dist
 COPY config ./config
 
 # `node` on the compiled bundle, not `tsx` on source: one less
-# process, no esbuild resident, and no yarn preamble polluting
+# process, no esbuild resident, and no package-manager preamble polluting
 # stdout — which matters because robot-mode output is parsed, not
 # read.
 #

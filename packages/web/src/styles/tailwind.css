@@ -26,7 +26,7 @@
    component would render unstyled with no error and no failing
    test. The path reaches the repo root's `node_modules` because
    that is where a hoisting linker puts the dependency. */
-@source "../../../../node_modules/@charcuterie/ui/dist";
+@source "../../node_modules/@charcuterie/ui/dist";
 
 /* The palette that used to live here is gone. `:root` set
    `color-scheme: dark` and `body` hardcoded `#0f1115` / `#e6e6e6`

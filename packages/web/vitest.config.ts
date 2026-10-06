@@ -29,7 +29,7 @@ import { optimizeDepsInclude } from "./optimizeDeps.js"
  *
  * The CI cost the old comment worried about (a ~170 MB chromium
  * plus system libs) is paid the fleet's way: `.forgejo/
- * workflows/ci.yml` runs `yarn install-playwright-browser`
+ * workflows/ci.yml` runs `pnpm install-playwright-browser`
  * (`playwright install chromium --with-deps`) before the tests,
  * exactly as mux-magic's `unit-tests` job does.
  *

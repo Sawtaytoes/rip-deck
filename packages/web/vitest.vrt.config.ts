@@ -17,10 +17,10 @@ import baseConfig from "./vitest.config.ts"
  * `vrt` workflow in Charcuterie compares that directory against the
  * baseline in this repo's bucket.
  *
- * Kept out of `yarn test` on purpose: the plain suite matches
+ * Kept out of `pnpm test` on purpose: the plain suite matches
  * `*.test.{ts,tsx}` only, so a normal run never writes screenshots.
  *
- * Run from the repo root: `yarn vrt:capture`.
+ * Run from the repo root: `pnpm vrt:capture`.
  */
 const actualDirectory =
   process.env.VRT_ACTUAL_DIR ??

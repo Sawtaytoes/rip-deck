@@ -582,7 +582,7 @@ describe("the dashboard", () => {
       "text/plain; charset=utf-8",
     )
     expect(String(response.body)).toContain(
-      "yarn workspace @rip-deck/web build",
+      "pnpm --filter @rip-deck/web build",
     )
     // And it points at the JSON API, which still works.
     expect(String(response.body)).toContain("/json")

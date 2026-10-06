@@ -20,7 +20,7 @@ export default tseslint.config(
       // Agent fan-out worktrees live at `.claude/worktrees/<slug>`
       // (see the root workspace's subagent-pr-workflow runbook),
       // and each one is a FULL checkout of this repo. Without
-      // this, `yarn lint` in the main tree lints every parallel
+      // this, `pnpm lint` in the main tree lints every parallel
       // agent's half-written branch as if it were ours: Stage 7
       // ran six at once, which reported another unit's unused
       // variable as a failure here and pushed eslint past node's

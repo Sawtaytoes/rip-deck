@@ -165,8 +165,17 @@ describe("a hub fault across several bays", () => {
       /Part of the tower-wide problem/,
     )
 
+    // The backup warning is loaded separately. "leftover"
+    // must not count as the card's "~15m left" estimate.
+    const warnings = await screen.findAllByText(
+      /this is a real rip, not a leftover/,
+    )
+    for (const warning of warnings) {
+      expect(warning).toBeVisible()
+    }
+
     expect(
-      screen.queryByText(/left/),
+      screen.queryByText(/^~.+ left$/),
     ).not.toBeInTheDocument()
   })
 

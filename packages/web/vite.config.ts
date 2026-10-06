@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => {
   // `"."` rather than a resolved directory: this file is in the
   // browser program, which deliberately has no `node` types, and
   // `loadEnv` resolves a relative dir against the cwd — which is
-  // this package for both `yarn build` and `yarn workspace
+  // this package for both `pnpm build` and `yarn workspace
   // @rip-deck/web build`. Worst case it finds nothing and this
   // says nothing, which is the safe direction.
   if (
