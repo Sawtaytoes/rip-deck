@@ -10,8 +10,8 @@
 ## Install
 
 ```sh
-npm install --global pnpm@12.9.1
-npm install --global pnpm@12.9.1
+npm install --global --force --allow-scripts=pnpm pnpm@12.9.1
+npm install --global --force --allow-scripts=pnpm pnpm@12.9.1
 pnpm install --frozen-lockfile
 ```
 

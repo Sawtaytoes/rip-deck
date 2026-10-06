@@ -44,7 +44,12 @@ jobs:
       - name: Install
         # --frozen-lockfile so a lockfile that disagrees with package.json
         # fails here instead of resolving to something no one ran.
-        run: npm install --global pnpm@12.9.1 && pnpm install --frozen-lockfile --store-dir ~/.local/share/pnpm/store
+        run: |
+          npm install --global --force --allow-scripts=pnpm pnpm@12.9.1
+          pnpm_global_bin="$(npm prefix --global)/bin"
+          export PATH="$pnpm_global_bin:$PATH"
+          echo "$pnpm_global_bin" >> "$GITHUB_PATH"
+          pnpm install --frozen-lockfile --store-dir ~/.local/share/pnpm/store
 
       - name: Install Playwright chromium
         # The web suite runs in vitest browser mode, which needs a real

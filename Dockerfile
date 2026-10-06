@@ -81,7 +81,7 @@ FROM node:26-trixie-slim AS build
 
 WORKDIR /app
 
-RUN npm install --global pnpm@12.9.1
+RUN npm install --global --force --allow-scripts=pnpm pnpm@12.9.1
 
 # Manifests before source, so editing a .ts does not re-run a
 # full pnpm install on every rebuild.
