@@ -148,7 +148,9 @@ jobs:
   # "UNKNOWN DRIVE".
   docker-deploy:
     needs: [check]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # A manual dispatch rebuilds the image on a fresh node base without a
+    # code change — the way a Node security release reaches the drive host.
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
