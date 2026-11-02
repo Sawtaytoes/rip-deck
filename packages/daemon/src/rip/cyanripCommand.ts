@@ -82,6 +82,7 @@
  */
 
 import { isValidReadOffsetSamples } from "@rip-deck/contracts"
+import { sanitiseFolderName } from "./destination.ts"
 
 /**
  * FLAC, and never anything lossy.
@@ -153,6 +154,7 @@ export type CyanripCommandInput = {
    */
   isMetadataLookupEnabled?: boolean
   /** Comma-separated encodings. Overridable only for tests. */
+  albumName?: string
   outputFormat?: string
 }
 
@@ -161,6 +163,7 @@ export const buildCyanripArgs = ({
   driveOffsetSamples = null,
   isMetadataLookupEnabled = true,
   outputFormat = CYANRIP_OUTPUT_FORMAT,
+  albumName,
 }: CyanripCommandInput): string[] => [
   "-d",
   devPath,
@@ -178,6 +181,12 @@ export const buildCyanripArgs = ({
     ? ["-s", String(driveOffsetSamples)]
     : []),
   ...(isMetadataLookupEnabled ? [] : ["-N"]),
+  ...(albumName
+    ? [
+        "-a",
+        `album=${sanitiseFolderName(albumName).replaceAll(/[:=]/g, " ")}`,
+      ]
+    : []),
 ]
 
 /**

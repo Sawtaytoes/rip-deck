@@ -41,6 +41,8 @@ services:
       RIP_DECK_RIP_ISOLATION_IMAGE: ghcr.io/sawtaytoes/rip-deck:latest
       RIP_DECK_RIP_ISOLATION_ARGS: "-v /media/Disc-Rips:/media/Disc-Rips -v /srv/rip-deck/makemkv:/config"
       RIP_DECK_RIP_CACHE_MB: "1024"
+      # Set true to identify unnamed discs after ripping instead.
+      RIP_DECK_ALLOW_UNNAMED_DISCS: "false"
       RIP_DECK_MQTT_URL: mqtts://example.com:8883
       RIP_DECK_MQTT_USERNAME: rip-deck
       RIP_DECK_MQTT_PASSWORD: __FROM_ROOT_ENV__
