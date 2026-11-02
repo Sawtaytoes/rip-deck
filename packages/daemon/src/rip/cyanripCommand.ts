@@ -158,6 +158,15 @@ export type CyanripCommandInput = {
   outputFormat?: string
 }
 
+/** FFmpeg dictionary values use backslash escaping, not shell escaping. */
+export const escapeCyanripMetadataValue = (
+  value: string,
+): string =>
+  value.replaceAll(
+    /[\\':=]/g,
+    (character) => `\\${character}`,
+  )
+
 export const buildCyanripArgs = ({
   devPath,
   driveOffsetSamples = null,
@@ -184,7 +193,7 @@ export const buildCyanripArgs = ({
   ...(albumName
     ? [
         "-a",
-        `album=${sanitiseFolderName(albumName).replaceAll(/[:=]/g, " ")}`,
+        `album=${escapeCyanripMetadataValue(sanitiseFolderName(albumName))}`,
       ]
     : []),
 ]

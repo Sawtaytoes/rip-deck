@@ -10,6 +10,10 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
+  buildCyanripArgs,
+  escapeCyanripMetadataValue,
+} from "./cyanripCommand.ts"
+import {
   type BayRipInput,
   createWatcherConfig,
   ripAudioCd,
@@ -73,6 +77,48 @@ console.log('offline rip finished');
 `
 
 describe("headless disc ripping", () => {
+  it.each([
+    "MusicBrainz lookup failed, but DiscID has a matching stub",
+    "Could not connect to MusicBrainz.",
+    "MusicBrainz query failed: timeout",
+    "Please specify which release to use by adding the -R argument with an index or ID.",
+  ])("retries metadata refusal: %s", async (message) => {
+    const script = audioScript.replace(
+      "Unable to find release info for this CD, and metadata hasn't been manually added!",
+      message,
+    )
+    const input = await setup(script)
+    expect(
+      (await ripAudioCd({ input, capacityBytes: 65536 }))
+        .kind,
+    ).toBe("completed")
+    expect(
+      (
+        await readFile(
+          join(
+            input.config.destinationRoot,
+            "attempts.jsonl",
+          ),
+          "utf8",
+        )
+      )
+        .trim()
+        .split("\n"),
+    ).toHaveLength(2)
+  })
+  it("escapes apostrophes and dictionary separators in manual metadata", () => {
+    expect(
+      escapeCyanripMetadataValue("Bob's Album=Live:1"),
+    ).toBe(String.raw`Bob\'s Album\=Live\:1`)
+    expect(
+      buildCyanripArgs({
+        devPath: "/dev/sr0",
+        albumName: "Bob's Album",
+        isMetadataLookupEnabled: false,
+      }),
+    ).toContain(String.raw`album=Bob\'s Album`)
+  })
+
   it("is opt-in", () => {
     expect(
       createWatcherConfig({}).isUnnamedDiscRippingEnabled,

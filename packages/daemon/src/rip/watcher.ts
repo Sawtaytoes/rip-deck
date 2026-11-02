@@ -1833,9 +1833,13 @@ export const shouldRetryAudioWithoutMetadata = (
   input.isEnabled &&
   !input.isAborted &&
   input.exitCode === 1 &&
-  input.outputTail.includes(
+  [
     "Unable to find release info for this CD, and metadata hasn't been manually added!",
-  )
+    "MusicBrainz lookup failed, but DiscID has a matching stub",
+    "Could not connect to MusicBrainz.",
+    "MusicBrainz query failed:",
+    "Please specify which release to use by adding the -R argument with an index or ID.",
+  ].some((message) => input.outputTail.includes(message))
 
 export const spawnCyanrip = async (input: {
   invocation: {
