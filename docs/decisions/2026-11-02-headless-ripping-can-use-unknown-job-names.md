@@ -26,8 +26,16 @@ unknown discs and connect output to history. Existing verification, offsets,
 read-error detection, blank-media refusal, and uncertain-type holds remain.
 The original mandatory-name behavior remains the default.
 
-## Alternatives
+## Why
 
 Requiring names before reading prevents headless ingest. Disabling all lookup
 would discard metadata that is available, so only the specific missing-metadata
 refusal triggers an automatic retry.
+
+## Evidence
+
+Subprocess integration tests cover unnamed data images and their mapfiles,
+missing audio metadata, manual album names, preserved process logs, opt-out
+behavior, and unchanged read failures. All 1,379 daemon tests passed.
+An information-only probe of cyanrip 0.9.3 confirmed that `-N -a album=...`
+continues with manual metadata while retaining AccurateRip and maximum paranoia.
