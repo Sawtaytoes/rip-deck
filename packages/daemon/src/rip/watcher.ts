@@ -1073,6 +1073,8 @@ export type WatcherConfig = {
   ripCacheMb: number
   /** Raw robot-mode capture, on by default (HANDOFF §5). */
   isEventLogEnabled?: boolean
+  /** Continue without a disc name or audio metadata. Opt-in. */
+  isUnnamedDiscRippingEnabled?: boolean
 }
 
 export const createWatcherConfig = (
@@ -1090,6 +1092,8 @@ export const createWatcherConfig = (
   isolation: resolveRipIsolation(env),
   ripCacheMb: resolveRipCacheMb(env.RIP_DECK_RIP_CACHE_MB),
   isEventLogEnabled: env.RIP_DECK_EVENT_LOG !== "false",
+  isUnnamedDiscRippingEnabled:
+    env.RIP_DECK_ALLOW_UNNAMED_DISCS === "true",
 })
 
 /** One bay's dispatched task, as the pipeline sees it. */
@@ -1121,10 +1125,8 @@ export type BayRipInput = {
    * point of that flag: a disc whose label is unreadable is not
    * unrippable, it just needs a human to say what it is.
    *
-   * ⚠️ **Requirement B3 is untouched.** B3 forbids *rip-deck*
-   * inventing a name. Nothing here invents one — with `null` the
-   * disc is identified and a nameless disc is still held; with a
-   * value, a person typed it.
+   * With headless naming enabled, a missing name becomes an
+   * explicit Unknown title containing this job's UUID.
    */
   explicitName?: string | null
   config: WatcherConfig
@@ -1271,22 +1273,6 @@ export const runBayRip = async (
     )
   }
 
-  // Said out loud rather than swallowed. An audio CD's folder is
-  // built from its own AccurateRip/CDDB metadata, not from a
-  // volume label, so there is no identify step for a name to
-  // stand in for — and a name silently ignored is worse than one
-  // refused, because the operator has no way to tell.
-  if (
-    input.explicitName != null &&
-    typed.ripper === "cyanrip"
-  ) {
-    input.note(
-      "an audio CD names itself from its own disc metadata, " +
-        `so the name you gave ("${input.explicitName}") is ` +
-        "not used.",
-    )
-  }
-
   switch (typed.ripper) {
     case "cyanrip":
       return await ripAudioCd({
@@ -1392,6 +1378,16 @@ const ripWithMakemkv = async (context: {
         "so this is a rip-deck/deployment fault, not a disc " +
         "fault; `--name` will not help.",
     }
+  }
+
+  if (
+    identified.discName === null &&
+    config.isUnnamedDiscRippingEnabled
+  ) {
+    identified.discName = unknownDiscName(input.jobUuid)
+    input.note(
+      `No disc name found; using "${identified.discName}".`,
+    )
   }
 
   if (identified.discName === null) {
@@ -1634,6 +1630,7 @@ export const buildBayCyanripInvocation = (input: {
   cyanrip: CyanripCommand
   incompletePath: string
   rip: BayRipInput
+  fallbackName?: string
 }): CyanripInvocation =>
   buildCyanripInvocation({
     cyanrip: input.cyanrip,
@@ -1641,18 +1638,22 @@ export const buildBayCyanripInvocation = (input: {
     rip: {
       devPath: input.rip.devPath,
       driveOffsetSamples: input.rip.readOffsetSamples,
+      isMetadataLookupEnabled: !(
+        input.fallbackName ?? input.rip.explicitName
+      ),
+      albumName:
+        input.fallbackName ??
+        input.rip.explicitName ??
+        undefined,
     },
   })
 
 /**
  * The audio-CD path: cyanrip to FLAC.
  *
- * ⚠️ **Nothing here has ever met a disc.** The MakeMKV path has
- * two complete real rips behind it; this has zero, and cyanrip has
- * never run on this rig at all. The invocation comes from
- * `cyanripCommand.ts` — read its warnings before trusting any of
- * this — and what is added here is only the spawn and the move
- * into place.
+ * Metadata lookup is attempted first. In headless mode only a
+ * missing-metadata refusal is retried offline with a unique name.
+ * Read errors and all other failures remain failures.
  *
  * ## Why it is a spawn here rather than a `runCyanripJob`
  *
@@ -1674,7 +1675,10 @@ export const buildBayCyanripInvocation = (input: {
  * `Album/Album [flac]/01 - …` — one level too deep. The album
  * directory is therefore resolved afterwards and moved on its own.
  */
-const ripAudioCd = async (context: {
+export const unknownDiscName = (jobUuid: string): string =>
+  `Unknown ${jobUuid}`
+
+export const ripAudioCd = async (context: {
   input: BayRipInput
   capacityBytes: number
 }): Promise<BayOutcome> => {
@@ -1711,22 +1715,62 @@ const ripAudioCd = async (context: {
   })
 
   input.onRipStarted()
-  input.note(
-    "ripping with cyanrip (never verified on this rig)",
-  )
+  input.note("ripping audio with cyanrip")
 
-  const exitCode = await spawnCyanrip({
-    invocation,
-    cyanrip: config.cyanrip,
-    devPath: input.devPath,
-    signal: input.signal,
-  })
+  const log =
+    config.isEventLogEnabled === false
+      ? createNullEventLog()
+      : await createEventLog({
+          path: join(
+            config.stateDir,
+            `${input.jobUuid}.robot.log`,
+          ),
+        })
+  let result: CyanripProcessResult
+  try {
+    result = await spawnCyanrip({
+      invocation,
+      cyanrip: config.cyanrip,
+      devPath: input.devPath,
+      signal: input.signal,
+      log,
+    })
+    if (
+      shouldRetryAudioWithoutMetadata({
+        ...result,
+        isEnabled:
+          config.isUnnamedDiscRippingEnabled === true,
+        isAborted: input.signal.aborted,
+      })
+    ) {
+      const title = unknownDiscName(input.jobUuid)
+      input.note(
+        `No audio metadata found; ripping as "${title}".`,
+      )
+      input.onIdentified?.({ title, discType: "cd" })
+      result = await spawnCyanrip({
+        invocation: buildBayCyanripInvocation({
+          cyanrip: config.cyanrip,
+          incompletePath,
+          rip: input,
+          fallbackName: title,
+        }),
+        cyanrip: config.cyanrip,
+        devPath: input.devPath,
+        signal: input.signal,
+        log,
+      })
+    }
+  } finally {
+    await log.close()
+  }
+  const exitCode = result.exitCode
 
   if (exitCode !== 0) {
     return {
       kind: "failed",
       detail:
-        `cyanrip exited ${String(exitCode)}. Partial output ` +
+        `cyanrip exited ${String(exitCode)}: ${result.outputTail.trim().slice(-2048)}. Partial output ` +
         `KEPT at ${incompletePath}`,
     }
   }
@@ -1775,7 +1819,29 @@ const ripAudioCd = async (context: {
 }
 
 /** Run cyanrip, and make sure a cancel actually lands (E5). */
-const spawnCyanrip = async (input: {
+export type CyanripProcessResult = {
+  exitCode: number | null
+  outputTail: string
+}
+
+export const shouldRetryAudioWithoutMetadata = (
+  input: CyanripProcessResult & {
+    isEnabled: boolean
+    isAborted: boolean
+  },
+): boolean =>
+  input.isEnabled &&
+  !input.isAborted &&
+  input.exitCode === 1 &&
+  [
+    "Unable to find release info for this CD, and metadata hasn't been manually added!",
+    "MusicBrainz lookup failed, but DiscID has a matching stub",
+    "Could not connect to MusicBrainz.",
+    "MusicBrainz query failed:",
+    "Please specify which release to use by adding the -R argument with an index or ID.",
+  ].some((message) => input.outputTail.includes(message))
+
+export const spawnCyanrip = async (input: {
   invocation: {
     command: string
     args: string[]
@@ -1784,7 +1850,14 @@ const spawnCyanrip = async (input: {
   cyanrip: CyanripCommand
   devPath: string
   signal: AbortSignal
-}): Promise<number | null> => {
+  log: { write: (line: string) => void }
+}): Promise<CyanripProcessResult> => {
+  if (input.signal.aborted)
+    return {
+      exitCode: null,
+      outputTail: "Cancelled before start",
+    }
+  let outputTail = ""
   const child = spawn(
     input.invocation.command,
     input.invocation.args,
@@ -1793,9 +1866,17 @@ const spawnCyanrip = async (input: {
       // stdin CLOSED, matching `ripJob`: a ripper that decides to
       // ask a question must fail fast rather than sit holding the
       // drive forever.
-      stdio: ["ignore", "ignore", "ignore"],
+      stdio: ["ignore", "pipe", "pipe"],
     },
   )
+
+  const capture = (chunk: Buffer) => {
+    const text = chunk.toString("utf8")
+    input.log.write(text)
+    outputTail = (outputTail + text).slice(-16384)
+  }
+  child.stdout?.on("data", capture)
+  child.stderr?.on("data", capture)
 
   const onAbort = () => {
     child.kill("SIGTERM")
@@ -1826,10 +1907,19 @@ const spawnCyanrip = async (input: {
   })
 
   try {
-    return await new Promise<number | null>((resolve) => {
-      child.once("error", () => resolve(null))
-      child.once("close", (code) => resolve(code))
-    })
+    return await new Promise<CyanripProcessResult>(
+      (resolve) => {
+        child.once("error", (error) =>
+          resolve({
+            exitCode: null,
+            outputTail: error.message,
+          }),
+        )
+        child.once("close", (code) =>
+          resolve({ exitCode: code, outputTail }),
+        )
+      },
+    )
   } finally {
     input.signal.removeEventListener("abort", onAbort)
   }
@@ -1948,11 +2038,8 @@ const publishAlbum = async (input: {
  *     repository exists because of.
  *  2. **There is no identify step.** `makemkvcon` cannot read a
  *     data disc, so the two name sources are the operator and
- *     udev's volume label, and a disc with neither is held
- *     rather than named. That is B3 unchanged, and it is not a
- *     rare path: a sampler library with no ISO 9660 filesystem
- *     has no volume label to read, so those discs always want a
- *     name typed on the card.
+ *     udev's volume label. Headless mode supplies a unique
+ *     Unknown title when both are absent; otherwise it holds.
  *  3. **It publishes a DIRECTORY holding two files.** The image
  *     is worth little without the mapfile that says which
  *     sectors are in it, so they travel together —
@@ -1960,7 +2047,7 @@ const publishAlbum = async (input: {
  *     directory, which also gets the collision, ownership and
  *     EXDEV rules for free.
  */
-const ripDataDisc = async (context: {
+export const ripDataDisc = async (context: {
   input: BayRipInput
   capacityBytes: number
   /** The disc's volume label as udev recorded it, or null. */
@@ -1986,12 +2073,11 @@ const ripDataDisc = async (context: {
     volumeLabel: context.volumeLabel,
   })
 
-  if (nameSource.kind === "identify") {
-    // The one branch `ripWithMakemkv` answers with a drive read
-    // and this one cannot: `makemkvcon` does not handle data
-    // discs at all, so there is no third source to fall back
-    // to. Refusing beats inventing (B3) — a disc filed under a
-    // made-up name is a disc nobody finds again.
+  if (
+    nameSource.kind === "identify" &&
+    !config.isUnnamedDiscRippingEnabled
+  ) {
+    // Preserve the original naming requirement unless opted in.
     return {
       kind: "needs_attention",
       detail:
@@ -2003,7 +2089,10 @@ const ripDataDisc = async (context: {
     }
   }
 
-  const title = nameSource.discName
+  const title =
+    nameSource.kind === "identify"
+      ? unknownDiscName(input.jobUuid)
+      : nameSource.discName
 
   if (nameSource.kind === "volume_label") {
     input.note(
