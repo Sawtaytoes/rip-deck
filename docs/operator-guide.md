@@ -21,11 +21,13 @@ Rip Deck reads a data CD-ROM with GNU ddrescue and publishes a folder named
 
 Three operator points:
 
-1. **A data disc usually needs you to type its name.** Rip Deck reads a name
+1. **A data disc needs a name unless headless naming is enabled.** Rip Deck reads a name
    from the disc's volume label when there is one. Many data CD-ROMs — sampler
    libraries especially — carry no filesystem and therefore no label, and
    nothing else can read a name off one. The card asks. Type the name from the
-   sleeve and press Rip.
+   sleeve and press Rip. Set `RIP_DECK_ALLOW_UNNAMED_DISCS=true` to use
+   `Unknown <job UUID>` automatically instead. The UUID links the folder to
+   history, so identification can happen after ripping.
 2. **Keep the mapfile.** It records every sector the drive could not read. A
    later ddrescue run resumes from it and tries only those sectors again.
    Deleting it makes a partial image unrepairable.
@@ -61,3 +63,15 @@ The leftovers panel lists incomplete and duplicate output. A live rip remains vi
 ## Review older rips
 
 Open `/history` to search and filter the permanent rip log. See [Rip history](history.md) for API queries and data limits.
+
+## Audio metadata and headless ripping
+
+With `RIP_DECK_ALLOW_UNNAMED_DISCS=true`, audio CDs first try MusicBrainz.
+If cyanrip refuses because no release metadata was found, Rip Deck retries
+without MusicBrainz using `Unknown <job UUID>`. FLAC, AccurateRip, drive
+offsets, and read-error checking remain enabled. An operator-supplied audio
+name is used as manual album metadata without a lookup.
+
+Audio stdout and stderr are saved with the job logs. Missing metadata does
+not imply a damaged disc. Blank media and uncertain disc types remain held;
+the headless option changes naming, not disc-type detection.
