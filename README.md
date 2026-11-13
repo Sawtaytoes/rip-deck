@@ -44,6 +44,14 @@ Open `http://localhost:3007`. The [setup guide](docs/setup.md) explains device a
 | `packages/daemon` | Drive discovery, ripping, health analysis, MQTT, and HTTP. |
 | `packages/web` | React dashboard served by the daemon. |
 
+## MakeMKV in the image
+
+The [Dockerfile](Dockerfile) copies MakeMKV out of `ghcr.io/jlesage/makemkv`. It also copies the musl loader and two libraries that MakeMKV's `mmgplsrv` helper needs for DVDs. [Mux Magic](https://github.com/Sawtaytoes/mux-magic) has the same block in its Dockerfile, copied from this one.
+
+The two copies are deliberate. Docker cannot include one Dockerfile in another, and a shared base image would be a third private image to build, publish, and update for about ten lines. When you change this block, make the same change in Mux Magic, or write down why the two differ. Mux Magic bumps its MakeMKV tag with a workflow. This repository bumps its tag by hand.
+
+The parser for MakeMKV's robot-mode output is not duplicated. Both apps import it from [`@mux-magic/tools`](https://www.npmjs.com/package/@mux-magic/tools).
+
 ## License
 
 [MIT](LICENSE). The image also contains MakeMKV under [GuinpinSoft's terms](https://www.makemkv.com/); the MIT license applies only to this repository's source.

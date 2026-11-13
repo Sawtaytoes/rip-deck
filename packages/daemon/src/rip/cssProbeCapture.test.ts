@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { parseMakemkvLine } from "@mux-magic/tools"
 import { describe, expect, it } from "vitest"
-import { parseMakemkvLine } from "../makemkv/parseLine.ts"
 import {
   createRipObservations,
   observeOutcomeEvent,

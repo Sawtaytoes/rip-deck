@@ -1,5 +1,5 @@
+import { parseMakemkvLine } from "@mux-magic/tools"
 import { describe, expect, it } from "vitest"
-import { parseMakemkvLine } from "../makemkv/parseLine.ts"
 import {
   createProgressTracker,
   observeEvent,

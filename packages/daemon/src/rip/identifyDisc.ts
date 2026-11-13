@@ -1,7 +1,9 @@
 import { spawn } from "node:child_process"
 import { createInterface } from "node:readline"
-import type { MakemkvEvent } from "@rip-deck/contracts"
-import { parseMakemkvLine } from "../makemkv/parseLine.ts"
+import {
+  type MakemkvEvent,
+  parseMakemkvLine,
+} from "@mux-magic/tools"
 import type { MakemkvCommand } from "./ripCommand.ts"
 
 /**
@@ -409,7 +411,7 @@ export const extractDiscName = (
   for (const event of events) {
     if (
       event.type === "CINFO" &&
-      event.id === CINFO_DISC_NAME &&
+      event.attributeId === CINFO_DISC_NAME &&
       event.value.trim() !== ""
     ) {
       return event.value.trim()

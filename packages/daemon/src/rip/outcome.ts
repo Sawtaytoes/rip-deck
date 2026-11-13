@@ -1,14 +1,18 @@
 import {
-  type FailureReason,
-  isBackupCompleteMessage,
-  isBackupFailureMessage,
-  isHashCheckFailureMessage,
-  isMakemkvPrompt,
-  isRipSuccessful,
-  isScrambledSectorError,
+  getIsMakemkvBackupCompleteMessage,
+  getIsMakemkvBackupFailureMessage,
+  getIsMakemkvHashCheckFailureMessage,
+  getIsMakemkvPrompt,
+  getIsMakemkvScrambledSectorError,
+  getMakemkvTitlesSavedFromMessage,
   type MakemkvEvent,
-  MakemkvMsgCode,
-  parseTitlesSaved,
+  makemkvKeyFailureMessageCodes,
+  makemkvMessageCode,
+  makemkvTitlesSavedMessageCodes,
+} from "@mux-magic/tools"
+import {
+  type FailureReason,
+  isRipSuccessful,
   type RipMode,
   type RipWarning,
 } from "@rip-deck/contracts"
@@ -70,7 +74,7 @@ export type RipObservations = {
   /**
    * MakeMKV's own hash check reported corrupt files.
    *
-   * Matched by text; see `isHashCheckFailureMessage` for why the
+   * Matched by text; see `getIsMakemkvHashCheckFailureMessage` for why the
    * code is not known yet.
    */
   hasHashCheckFailure: boolean
@@ -140,12 +144,6 @@ export const parseReadErrorLba = (
     : Math.floor(best / SECTOR_BYTES)
 }
 
-const KEY_PROBLEM_CODES: readonly number[] = [
-  MakemkvMsgCode.KEY_EXPIRED,
-  MakemkvMsgCode.KEY_INVALID,
-  MakemkvMsgCode.KEY_BETA_EXPIRED,
-]
-
 /** Fold one parsed event into the observations. */
 export const observeOutcomeEvent = (input: {
   observations: RipObservations
@@ -166,7 +164,7 @@ export const observeOutcomeEvent = (input: {
   // Checked before the code switch: the prompt is identified by
   // its flags, and it can arrive on any message code.
   if (
-    isMakemkvPrompt(event) &&
+    getIsMakemkvPrompt(event) &&
     observations.interactivePrompt === null
   ) {
     return {
@@ -175,7 +173,7 @@ export const observeOutcomeEvent = (input: {
     }
   }
 
-  if (KEY_PROBLEM_CODES.includes(event.code)) {
+  if (makemkvKeyFailureMessageCodes.includes(event.code)) {
     return { ...observations, hasKeyExpired: true }
   }
 
@@ -183,20 +181,21 @@ export const observeOutcomeEvent = (input: {
   // so a read error carried on the same line as the divider
   // could never be mistaken for a pre-backup one — MakeMKV does
   // not do that, and the ordering costs nothing.
-  if (event.code === MakemkvMsgCode.BACKUP_STARTED) {
+  if (event.code === makemkvMessageCode.BACKUP_STARTED) {
     return { ...observations, hasBackupStarted: true }
   }
 
-  if (isBackupCompleteMessage(event)) {
+  if (getIsMakemkvBackupCompleteMessage(event)) {
     return { ...observations, hasBackupCompleted: true }
   }
 
-  if (isBackupFailureMessage(event)) {
+  if (getIsMakemkvBackupFailureMessage(event)) {
     return { ...observations, hasFailureMessage: true }
   }
 
   if (
-    event.code === MakemkvMsgCode.BACKUP_HASH_TABLE_LOADED
+    event.code ===
+    makemkvMessageCode.BACKUP_HASH_TABLE_LOADED
   ) {
     return { ...observations, hasContentHashTable: true }
   }
@@ -205,19 +204,19 @@ export const observeOutcomeEvent = (input: {
   // are matched by text and their codes are unknown — one of
   // them could turn out to BE 2003's neighbour, and a corrupt
   // file is a stronger fact than a sector that would not read.
-  if (isHashCheckFailureMessage(event)) {
+  if (getIsMakemkvHashCheckFailureMessage(event)) {
     return { ...observations, hasHashCheckFailure: true }
   }
 
-  if (event.code === MakemkvMsgCode.READ_ERROR) {
+  if (event.code === makemkvMessageCode.READ_ERROR) {
     // The CSS handshake artefact: a scrambled-sector complaint
     // raised before the copy started. Every protected DVD makes
     // one and every one of them is benign, so it is recorded
     // and NOT counted. Both halves of the test must hold — see
-    // `isScrambledSectorError`.
+    // `getIsMakemkvScrambledSectorError`.
     if (
       !observations.hasBackupStarted &&
-      isScrambledSectorError(event)
+      getIsMakemkvScrambledSectorError(event)
     ) {
       return {
         ...observations,
@@ -238,10 +237,12 @@ export const observeOutcomeEvent = (input: {
     }
   }
 
-  if (event.code === MakemkvMsgCode.COPY_COMPLETE) {
+  // `mkv` mode reports its count on 5036 and 5005 (captured) or on
+  // 5004 (documented). `backup` emits none of them.
+  if (makemkvTitlesSavedMessageCodes.includes(event.code)) {
     return {
       ...observations,
-      titlesSaved: parseTitlesSaved(event),
+      titlesSaved: getMakemkvTitlesSavedFromMessage(event),
     }
   }
 

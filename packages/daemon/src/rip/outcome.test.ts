@@ -1,6 +1,8 @@
-import type { MakemkvEvent } from "@rip-deck/contracts"
+import {
+  type MakemkvEvent,
+  parseMakemkvLine,
+} from "@mux-magic/tools"
 import { describe, expect, it } from "vitest"
-import { parseMakemkvLine } from "../makemkv/parseLine.ts"
 import {
   buildRipWarnings,
   createRipObservations,
@@ -96,6 +98,27 @@ const READ_ERROR =
   '"2097152"'
 
 describe("the silent-success trap (ARM #1298)", () => {
+  it("reads the count from the 5036 and 5005 a real mkv extraction emits", () => {
+    // MakeMKV v1.18.4 emits 5036 and 5005 at the end of an `mkv`
+    // run, not the 5004 the docs name. Reading only 5004 would
+    // leave a zero-title extraction looking like no report at all.
+    const observations = fold([
+      'MSG:5036,260,1,"Copy complete. 0 titles saved.",' +
+        '"Copy complete. %1 titles saved.","0"',
+      'MSG:5005,0,1,"0 titles saved","%1 titles saved","0"',
+    ])
+
+    expect(observations.titlesSaved).toBe(0)
+    expect(
+      summariseRip({
+        observations,
+        exitCode: 0,
+        termination: "exited",
+        mode: "mkv",
+      }).failureReason,
+    ).toBe("no_titles_saved")
+  })
+
   it("fails a rip that saved zero titles despite exit 0", () => {
     const summary = summariseRip({
       observations: fold([COPY_COMPLETE_ZERO]),
