@@ -1,11 +1,16 @@
 import {
   chown,
   lchown,
+  lstat,
+  mkdir,
+  open,
   readdir,
   rename,
   rm,
+  rmdir,
   stat,
   statfs,
+  unlink,
 } from "node:fs/promises"
 import { join } from "node:path"
 import {
@@ -529,17 +534,15 @@ export const finaliseDestination = async (
     : ""
 
   const finalPath = `${prepared.finalPath}${suffix}`
-  const hasCollision = await pathExists(finalPath)
 
   // The marker goes BEFORE the extension, not after it: a file
   // called `… .iso (rip-deck-duplicate-01234567)` is not an ISO
   // to anything that reads extensions, which is the one property
   // the collision copy has to keep.
-  const path = hasCollision
-    ? `${prepared.finalPath} ` +
-      `(rip-deck-duplicate-${prepared.jobUuid.slice(0, 8)})` +
-      suffix
-    : finalPath
+  const duplicatePath =
+    `${prepared.finalPath} ` +
+    `(rip-deck-duplicate-${prepared.jobUuid.slice(0, 8)})` +
+    suffix
 
   const ownershipFailure =
     ownership === null
@@ -549,13 +552,18 @@ export const finaliseDestination = async (
           ownership,
         })
 
+  let landing: { path: string; candidateIndex: number }
+
   try {
-    await rename(prepared.incompletePath, path)
+    landing = await renameIntoFreeName({
+      source: prepared.incompletePath,
+      candidates: [finalPath, duplicatePath],
+    })
   } catch (error) {
     if (isExdev(error)) {
       throw new Error(
         `Refusing to finish this rip by copying. ` +
-          `${prepared.incompletePath} and ${path} are on ` +
+          `${prepared.incompletePath} and ${finalPath} are on ` +
           `different filesystems, so the atomic rename failed. ` +
           `The incomplete directory MUST live on the ` +
           `destination dataset — copying would silently double ` +
@@ -566,6 +574,9 @@ export const finaliseDestination = async (
 
     throw error
   }
+
+  const { path } = landing
+  const hasCollision = landing.candidateIndex > 0
 
   return {
     path,
@@ -627,9 +638,110 @@ export const pathExists = async (
   try {
     await stat(path)
     return true
-  } catch {
-    return false
+  } catch (error) {
+    // Only ENOENT means "not there". EACCES, EIO, or a stale
+    // mount say nothing about whether the path exists, and
+    // reading them as absent is how a caller decides a taken
+    // name is free.
+    if (hasErrorCode(error, "ENOENT")) return false
+    throw error
   }
+}
+
+/**
+ * Rename `source` to `destination`, but never over anything.
+ *
+ * Returns `false`, having moved nothing, when the name is taken.
+ *
+ * ⚠️ **A plain `stat` followed by `rename` is a race**, and
+ * `rename` itself does not refuse: over a FILE it silently
+ * replaces it, and over an EMPTY directory it replaces that too.
+ * Two bays finishing discs with the same label at the same moment
+ * could both see "free", and the second DVD image would replace
+ * the first.
+ * Node has no `renameat2(RENAME_NOREPLACE)`, so the name is
+ * CLAIMED first with an operation that does refuse atomically —
+ * `mkdir` for a directory, an exclusive create (`wx`) for a file
+ * — and the rip is then renamed over its own empty placeholder,
+ * which `rename` is allowed to replace. Whoever loses the claim
+ * gets EEXIST and never touches the winner's name.
+ *
+ * Only EEXIST means taken. Any other failure throws, and a claim
+ * whose rename then fails is removed again, so a failed publish
+ * never leaves an empty folder or a zero-byte image behind
+ * under the real name.
+ */
+export const renameWithoutReplacing = async (input: {
+  source: string
+  destination: string
+}): Promise<boolean> => {
+  const isDirectory = (
+    await lstat(input.source)
+  ).isDirectory()
+
+  try {
+    if (isDirectory) {
+      await mkdir(input.destination)
+    } else {
+      await (await open(input.destination, "wx")).close()
+    }
+  } catch (error) {
+    if (hasErrorCode(error, "EEXIST")) return false
+    throw error
+  }
+
+  try {
+    await rename(input.source, input.destination)
+  } catch (error) {
+    // `rmdir` and a size-checked `unlink`, never `rm -r`: if
+    // anything other than our own empty placeholder is there now,
+    // it is left alone.
+    await (isDirectory
+      ? rmdir(input.destination)
+      : stat(input.destination).then((info) =>
+          info.size === 0
+            ? unlink(input.destination)
+            : undefined,
+        )
+    ).catch(() => {})
+
+    throw error
+  }
+
+  return true
+}
+
+/**
+ * Rename `source` to the first of `candidates` that is free.
+ *
+ * Throws when every candidate is taken, leaving `source` where
+ * it is: a rip that cannot land without replacing something stays
+ * in its incomplete directory for a person to resolve.
+ */
+export const renameIntoFreeName = async (input: {
+  source: string
+  candidates: readonly string[]
+}): Promise<{ path: string; candidateIndex: number }> => {
+  for (const [
+    candidateIndex,
+    path,
+  ] of input.candidates.entries()) {
+    if (
+      await renameWithoutReplacing({
+        source: input.source,
+        destination: path,
+      })
+    ) {
+      return { path, candidateIndex }
+    }
+  }
+
+  throw new Error(
+    `Refusing to publish ${input.source}: every name it could ` +
+      `land under is already taken ` +
+      `(${input.candidates.join(", ")}), and Rip Deck never ` +
+      "replaces an existing rip. The output is KEPT where it is.",
+  )
 }
 
 /** Is this path a regular file — i.e. a DVD image? */
@@ -641,8 +753,14 @@ const isFile = async (path: string): Promise<boolean> => {
   }
 }
 
-const isExdev = (error: unknown): boolean =>
+const hasErrorCode = (
+  error: unknown,
+  code: string,
+): boolean =>
   typeof error === "object" &&
   error !== null &&
   "code" in error &&
-  (error as { code?: unknown }).code === "EXDEV"
+  (error as { code?: unknown }).code === code
+
+const isExdev = (error: unknown): boolean =>
+  hasErrorCode(error, "EXDEV")

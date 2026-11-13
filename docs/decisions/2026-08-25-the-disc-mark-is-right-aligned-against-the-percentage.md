@@ -4,7 +4,7 @@ Status: Accepted
 Date: 2026-08-25
 Type: UI / layout
 Supersedes: —
-Superseded by: —
+Superseded by: [Progress-focused rip cards](2026-09-23-rip-cards-emphasize-progress-and-only-show-relevant-controls.md) for the redesigned rip-card layout.
 
 ## Decision
 

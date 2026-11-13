@@ -1,15 +1,9 @@
-import {
-  open,
-  readdir,
-  rename,
-  rm,
-  stat,
-} from "node:fs/promises"
+import { open, readdir, rm, stat } from "node:fs/promises"
 import { basename, join, resolve, sep } from "node:path"
 import {
   ISO_SUFFIX,
   incompleteDirName,
-  pathExists,
+  renameWithoutReplacing,
 } from "./destination.ts"
 import type { LiveRips } from "./liveRips.ts"
 
@@ -713,12 +707,11 @@ export const renamedLeftoverName = (input: {
  * rip path and for the same reason — a rip that lands on a taken
  * name goes beside it, marked, and a human chooses.
  *
- * The exists-check and the `rename` are two syscalls, so a rip
- * finalising into that exact name in between would still be
- * clobbered. The window is microseconds against a control a
- * person presses, `finaliseDestination` refuses the same
- * collision from its side, and Node exposes no atomic
- * `RENAME_NOREPLACE`. Stated rather than hidden.
+ * The name is CLAIMED, not checked: `renameWithoutReplacing`
+ * takes it with an operation that refuses atomically and only
+ * then renames, so a rip finalising into that exact name at the
+ * same moment loses the claim instead of being clobbered. Node
+ * exposes no `RENAME_NOREPLACE`; the claim is the substitute.
  */
 export const renameLeftover = async (input: {
   rootPath: string
@@ -768,19 +761,22 @@ export const renameLeftover = async (input: {
     }
   }
 
-  if (await pathExists(destination)) {
-    return {
-      isRenamed: false,
-      message:
-        `Refused to rename: "${name}" is already taken. Rip ` +
-        "Deck never overwrites a rip, so pick a name nothing " +
-        "in the destination root is using.",
-      path: null,
-    }
-  }
-
   try {
-    await rename(source, destination)
+    const isRenamed = await renameWithoutReplacing({
+      source,
+      destination,
+    })
+
+    if (!isRenamed) {
+      return {
+        isRenamed: false,
+        message:
+          `Refused to rename: "${name}" is already taken. Rip ` +
+          "Deck never overwrites a rip, so pick a name nothing " +
+          "in the destination root is using.",
+        path: null,
+      }
+    }
   } catch (error) {
     return {
       isRenamed: false,

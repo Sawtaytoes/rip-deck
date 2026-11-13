@@ -134,3 +134,65 @@ export const assessLiveness = (input: {
 
 const seconds = (ms: number): string =>
   `${Math.round(ms / 1000)}s`
+
+/** How often a running rip's liveness is re-assessed. */
+export const LIVENESS_INTERVAL_MS = 5_000
+
+/** The two timestamps `assessLiveness` judges a rip by. */
+export type LivenessActivity = {
+  lastForwardProgressAtMs: number
+  lastEventAtMs: number
+}
+
+/**
+ * The wall-clock watchdog every ripper runs under.
+ *
+ * Shared by the MakeMKV path (`runRipJob`) and the audio-CD path
+ * (`runCyanripJob`), so a stalled drive is judged by the same
+ * thresholds whichever tool is reading it. The ripper owns its
+ * own parsing and supplies the two timestamps through
+ * `readActivity`, a pull closure, so the watchdog never needs to
+ * know what the tool prints.
+ *
+ * `onAbandon` is called on every tick that says "abandon". The
+ * caller's stop function must therefore be idempotent, which both
+ * rippers' already are.
+ *
+ * `assess` and `intervalMs` exist for tests only: the real
+ * thresholds are minutes long, and a test that waited for them
+ * would never be run.
+ *
+ * Returns the function that stops the watchdog.
+ */
+export const startLivenessWatchdog = (input: {
+  startedAtMs: number
+  readActivity: () => LivenessActivity
+  isKeepTryingRequested?: () => boolean
+  onLiveness?: (liveness: Liveness) => void
+  onAbandon: (liveness: Liveness) => void
+  assess?: typeof assessLiveness
+  intervalMs?: number
+}): (() => void) => {
+  const assess = input.assess ?? assessLiveness
+
+  const timer = setInterval(() => {
+    const liveness = assess({
+      startedAtMs: input.startedAtMs,
+      ...input.readActivity(),
+      nowMs: Date.now(),
+      isKeepTryingRequested:
+        input.isKeepTryingRequested?.() ?? false,
+    })
+
+    input.onLiveness?.(liveness)
+
+    if (liveness.action === "abandon") {
+      input.onAbandon(liveness)
+    }
+  }, input.intervalMs ?? LIVENESS_INTERVAL_MS)
+
+  // Never the reason a finished CLI rip fails to exit.
+  timer.unref()
+
+  return () => clearInterval(timer)
+}

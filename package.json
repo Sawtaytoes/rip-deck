@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.2",
+    "@charcuterie/biome-config": "^1.3.0",
     "@charcuterie/tsconfig": "^1.0.0",
     "@types/node": "^26.1.0",
     "@vitest/eslint-plugin": "^1.6.20",

@@ -1,6 +1,8 @@
+import { SegmentedControl } from "@charcuterie/ui"
 import { useState } from "react"
-
+import { isMock } from "../env"
 import {
+  FIXTURE_NAMES,
   type FixtureName,
   readFixtureName,
 } from "../fixture"
@@ -17,6 +19,7 @@ import { ColumnPicker } from "./ColumnPicker"
 import { HostSection } from "./HostSection"
 import { LeftoverRips } from "./LeftoverRips"
 import { LogModal, type LogTarget } from "./LogModal"
+import type { RipCardLayout } from "./RipCard"
 import { RipSortModeControl } from "./RipSortModeControl"
 import { TrayControls } from "./TrayControls"
 
@@ -52,6 +55,15 @@ export function Dashboard({
   fixture?: FixtureName | null
   now?: number
 }) {
+  const [cardLayout, setCardLayout] =
+    useState<RipCardLayout>(() =>
+      isMock &&
+      new URLSearchParams(window.location.search).get(
+        "layout",
+      ) === "hierarchy"
+        ? "hierarchy"
+        : "band",
+    )
   const requested =
     fixture === undefined
       ? readFixtureName(window.location.search)
@@ -119,6 +131,50 @@ export function Dashboard({
         </div>
       )}
 
+      {isMock && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-border-default bg-surface-raised p-3">
+          <SegmentedControl
+            label="Card layout"
+            size="sm"
+            selectedValue={cardLayout}
+            items={[
+              {
+                value: "hierarchy",
+                label: "A · Clear hierarchy",
+              },
+              { value: "band", label: "B · Progress band" },
+            ]}
+            onChange={(value) => {
+              if (value !== "hierarchy" && value !== "band")
+                return
+              setCardLayout(value)
+              const url = new URL(window.location.href)
+              url.searchParams.set("layout", value)
+              window.history.replaceState(null, "", url)
+            }}
+          />
+          <div className="flex flex-wrap gap-3 text-sm">
+            {FIXTURE_NAMES.filter((name) =>
+              [
+                "showcase",
+                "nine-rips",
+                "verdicts",
+                "unmeasured",
+                "hub-fault",
+              ].includes(name),
+            ).map((name) => (
+              <a
+                key={name}
+                className="underline"
+                href={`?fake=${name}&layout=${cardLayout}`}
+              >
+                {name.replaceAll("-", " ")}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
       {isError && !data && (
         <div className="text-intent-danger-content">
           Rip Deck unreachable
@@ -142,6 +198,7 @@ export function Dashboard({
           actionFor={actionFor}
           columns={columns}
           sortMode={ripSortMode}
+          cardLayout={cardLayout}
           now={now}
         />
       ))}

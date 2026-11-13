@@ -55,12 +55,15 @@ import {
 } from "./bayLedger.ts"
 import {
   buildCyanripInvocation,
-  buildCyanripKillArgs,
   type CyanripCommand,
   type CyanripInvocation,
   resolveCyanripAlbumDir,
   resolveCyanripCommand,
 } from "./cyanripCommand.ts"
+import {
+  type CyanripProcessResult,
+  runCyanripJob,
+} from "./cyanripJob.ts"
 import {
   buildDdrescueInvocation,
   buildDdrescueKillArgs,
@@ -78,6 +81,7 @@ import {
   finaliseDestination,
   incompleteDirName,
   prepareDestination,
+  renameIntoFreeName,
 } from "./destination.ts"
 import { enumerateDrives } from "./discIndex.ts"
 import {
@@ -1655,16 +1659,14 @@ export const buildBayCyanripInvocation = (input: {
  * missing-metadata refusal is retried offline with a unique name.
  * Read errors and all other failures remain failures.
  *
- * ## Why it is a spawn here rather than a `runCyanripJob`
+ * ## Supervision lives in `runCyanripJob`
  *
- * It ought to be its own module beside `ripJob.ts`, and it should
- * become one. It is not, because the file allocation for this
- * change gave `rip/ripJob.ts` and its neighbours to other units
- * and this watcher had to route audio CDs somewhere real rather
- * than to a stub. What it deliberately does NOT do, and what a
- * proper module would: no health sampling, no progress parsing, no
- * liveness watchdog, no heartbeat. cyanrip's output is not
- * robot-mode and nothing in this repo parses it.
+ * Each cyanrip run goes through `runCyanripJob` (`cyanripJob.ts`),
+ * which parses cyanrip's status line into progress, writes the
+ * heartbeat, and runs the same liveness watchdog as the MakeMKV
+ * path. A stalled drive is abandoned as `stall_timeout` and is
+ * never retried offline. What it still does not do is health
+ * sampling: the health engine's features are MakeMKV's.
  *
  * ## The output layout differs from backup mode, and it matters
  *
@@ -1681,6 +1683,8 @@ export const unknownDiscName = (jobUuid: string): string =>
 export const ripAudioCd = async (context: {
   input: BayRipInput
   capacityBytes: number
+  /** Tests only. See `startLivenessWatchdog`. */
+  watchdog?: Parameters<typeof runCyanripJob>[0]["watchdog"]
 }): Promise<BayOutcome> => {
   const { input } = context
   const { config } = input
@@ -1728,19 +1732,31 @@ export const ripAudioCd = async (context: {
         })
   let result: CyanripProcessResult
   try {
-    result = await spawnCyanrip({
-      invocation,
+    const supervision = {
       cyanrip: config.cyanrip,
       devPath: input.devPath,
+      jobUuid: input.jobUuid,
+      stateDir: config.stateDir,
       signal: input.signal,
       log,
+      isKeepTryingRequested: input.isKeepTryingRequested,
+      onProgress: input.onProgress,
+      watchdog: context.watchdog,
+    }
+    result = await runCyanripJob({
+      ...supervision,
+      invocation,
     })
     if (
       shouldRetryAudioWithoutMetadata({
         ...result,
         isEnabled:
           config.isUnnamedDiscRippingEnabled === true,
-        isAborted: input.signal.aborted,
+        // A run the watchdog or the operator stopped is never
+        // retried, whatever its output says.
+        isAborted:
+          input.signal.aborted ||
+          result.termination !== "exited",
       })
     ) {
       const title = unknownDiscName(input.jobUuid)
@@ -1748,22 +1764,32 @@ export const ripAudioCd = async (context: {
         `No audio metadata found; ripping as "${title}".`,
       )
       input.onIdentified?.({ title, discType: "cd" })
-      result = await spawnCyanrip({
+      result = await runCyanripJob({
+        ...supervision,
         invocation: buildBayCyanripInvocation({
           cyanrip: config.cyanrip,
           incompletePath,
           rip: input,
           fallbackName: title,
         }),
-        cyanrip: config.cyanrip,
-        devPath: input.devPath,
-        signal: input.signal,
-        log,
       })
     }
   } finally {
     await log.close()
   }
+  if (result.termination === "stall_timeout") {
+    return {
+      kind: "failed",
+      failureReason: "stall_timeout",
+      detail:
+        "cyanrip stopped making progress and was abandoned" +
+        (result.stallReason === null
+          ? ""
+          : `: ${result.stallReason}`) +
+        `. Partial output KEPT at ${incompletePath}`,
+    }
+  }
+
   const exitCode = result.exitCode
 
   if (exitCode !== 0) {
@@ -1818,14 +1844,11 @@ export const ripAudioCd = async (context: {
   })
 }
 
-/** Run cyanrip, and make sure a cancel actually lands (E5). */
-export type CyanripProcessResult = {
-  exitCode: number | null
-  outputTail: string
-}
-
 export const shouldRetryAudioWithoutMetadata = (
-  input: CyanripProcessResult & {
+  input: Pick<
+    CyanripProcessResult,
+    "exitCode" | "outputTail"
+  > & {
     isEnabled: boolean
     isAborted: boolean
   },
@@ -1840,90 +1863,6 @@ export const shouldRetryAudioWithoutMetadata = (
     "MusicBrainz query failed:",
     "Please specify which release to use by adding the -R argument with an index or ID.",
   ].some((message) => input.outputTail.includes(message))
-
-export const spawnCyanrip = async (input: {
-  invocation: {
-    command: string
-    args: string[]
-    cwd: string
-  }
-  cyanrip: CyanripCommand
-  devPath: string
-  signal: AbortSignal
-  log: { write: (line: string) => void }
-}): Promise<CyanripProcessResult> => {
-  if (input.signal.aborted)
-    return {
-      exitCode: null,
-      outputTail: "Cancelled before start",
-    }
-  let outputTail = ""
-  const child = spawn(
-    input.invocation.command,
-    input.invocation.args,
-    {
-      cwd: input.invocation.cwd,
-      // stdin CLOSED, matching `ripJob`: a ripper that decides to
-      // ask a question must fail fast rather than sit holding the
-      // drive forever.
-      stdio: ["ignore", "pipe", "pipe"],
-    },
-  )
-
-  const capture = (chunk: Buffer) => {
-    const text = chunk.toString("utf8")
-    input.log.write(text)
-    outputTail = (outputTail + text).slice(-16384)
-  }
-  child.stdout?.on("data", capture)
-  child.stderr?.on("data", capture)
-
-  const onAbort = () => {
-    child.kill("SIGTERM")
-
-    // A wrapper (`docker exec …`, `ssh … cyanrip`) does not
-    // forward signals, so killing our handle would leave a cyanrip
-    // inside the container still holding the drive. Measured for
-    // the makemkvcon twin on Tower 2026-07-25.
-    if (input.cyanrip.wrapperArgs === null) return
-
-    try {
-      spawn(
-        input.cyanrip.command,
-        buildCyanripKillArgs({
-          wrapperArgs: input.cyanrip.wrapperArgs,
-          devPath: input.devPath,
-          signal: "TERM",
-        }),
-        { stdio: "ignore" },
-      ).on("error", () => {})
-    } catch {
-      // The outer signal has already gone; nothing else to do.
-    }
-  }
-
-  input.signal.addEventListener("abort", onAbort, {
-    once: true,
-  })
-
-  try {
-    return await new Promise<CyanripProcessResult>(
-      (resolve) => {
-        child.once("error", (error) =>
-          resolve({
-            exitCode: null,
-            outputTail: error.message,
-          }),
-        )
-        child.once("close", (code) =>
-          resolve({ exitCode: code, outputTail }),
-        )
-      },
-    )
-  } finally {
-    input.signal.removeEventListener("abort", onAbort)
-  }
-}
 
 /**
  * Move a finished album out of the incomplete directory.
@@ -1945,12 +1884,6 @@ const publishAlbum = async (input: {
     input.destinationRoot,
     input.albumDirName,
   )
-
-  const hasCollision = await pathExists(intendedPath)
-  const finalPath = hasCollision
-    ? `${intendedPath} ` +
-      `(rip-deck-duplicate-${input.jobUuid.slice(0, 8)})`
-    : intendedPath
 
   const albumPath = join(
     input.incompletePath,
@@ -1977,7 +1910,19 @@ const publishAlbum = async (input: {
               : String(error),
         )
 
-  await rename(albumPath, finalPath)
+  // Claimed, not checked: two bays finishing the same album at
+  // once must not both decide the name is free. See
+  // `renameWithoutReplacing`.
+  const landing = await renameIntoFreeName({
+    source: albumPath,
+    candidates: [
+      intendedPath,
+      `${intendedPath} ` +
+        `(rip-deck-duplicate-${input.jobUuid.slice(0, 8)})`,
+    ],
+  })
+  const finalPath = landing.path
+  const hasCollision = landing.candidateIndex > 0
 
   // The rip log lives beside the album, not inside it. Carry it
   // over, then take the empty directory away — `rmdir` and not
@@ -2401,17 +2346,6 @@ const spawnDdrescue = async (input: {
     })
   } finally {
     input.signal.removeEventListener("abort", onAbort)
-  }
-}
-
-const pathExists = async (
-  path: string,
-): Promise<boolean> => {
-  try {
-    await stat(path)
-    return true
-  } catch {
-    return false
   }
 }
 

@@ -50,6 +50,19 @@ Every web test runs in four windows — `web-narrow` 384x824, `web-tall` 1080x19
 
 Do not change the repository's Playwright version to match a browser in the agent image. `pnpm install-playwright-browser` is the CI command and includes `--with-deps`, which can need root package installation.
 
+## Compare rip-card layouts with fake data
+
+Run `VITE_MOCK=1 pnpm --filter @rip-deck/web dev`. Open
+`/?fake=showcase&layout=hierarchy` for A or `/?fake=showcase&layout=band` for B.
+The mock-only toolbar switches layouts without replacing the fixture data. The
+showcase includes poster/no-poster cards, a stall, a completed warning, a failure,
+and an idle drive. Bay chips open drive details. Mock actions never call the real
+daemon. Production builds ignore `VITE_MOCK` and do not show this toolbar.
+
+Both layouts use Charcuterie's `ProgressCard`. Change the shared band, metric layout,
+or responsive typography in that library first. `RipCard` supplies the rip state,
+formatted values, media, and actions.
+
 ## Pull request gates
 
 ```sh

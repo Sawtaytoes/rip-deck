@@ -217,6 +217,9 @@ importers:
       "@biomejs/biome":
         specifier: ^2.5.2
         version: 2.5.5
+      "@charcuterie/biome-config":
+        specifier: ^1.3.0
+        version: 1.3.0
       "@charcuterie/tsconfig":
         specifier: ^1.0.0
         version: 1.0.0
@@ -541,6 +544,9 @@ packages:
   "@blazediff/core@1.9.1":
     resolution:
       integrity: sha512-ehg3jIkYKulZh+8om/O25vkvSsXXwC+skXmyA87FFx6A/45eqOkZsBltMw/TVteb0mloiGT8oGRTcjRAz66zaA==
+  "@charcuterie/biome-config@1.3.0":
+    resolution:
+      integrity: sha512-aMus/8v7VJrtvtNYeud3qW7zUTPP1dYtYAi5zUZHr0XONm4DDCJsPVx/Aio/dTh1k1m+KPv9ZBLWcMhLky1EFQ==
   "@charcuterie/logic@2.4.0":
     resolution:
       integrity: sha512-DfHDWCRggHSmoPA+dUsN5mjVGOXLORiCvOBkYzgUlnHYJNhz2bSC4UCPspHK0Nv1ZSLKVv5Iyot3BmHze9Ndpg==
@@ -3773,6 +3779,7 @@ snapshots:
   "@biomejs/cli-win32-x64@2.5.5":
     optional: true
   "@blazediff/core@1.9.1": {}
+  "@charcuterie/biome-config@1.3.0": {}
   "@charcuterie/logic@2.4.0(@tanstack/react-query@5.101.4(react@19.2.8))(react@19.2.8)":
     optionalDependencies:
       "@tanstack/react-query": 5.101.4(react@19.2.8)
