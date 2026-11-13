@@ -49,6 +49,13 @@ import { TERMINATION_GRACE_MS } from "./ripJob.ts"
  * silence threshold. A drive slower than that is the case the
  * threshold exists for, and "Keep trying" still suppresses the
  * abandon exactly as it does for MakeMKV.
+ *
+ * Before the first track, cyanrip looks up MusicBrainz,
+ * AccurateRip, and cover art. Those lookups fall inside the
+ * five-minute startup grace. The grace only postpones judgment,
+ * though: a run that has printed nothing at all is abandoned soon
+ * after the grace ends, because its silence is measured from the
+ * start.
  */
 
 export type CyanripTermination =
@@ -365,28 +372,60 @@ export const runCyanripJob = async (input: {
 
   let isStopping = false
 
-  const signalCyanrip = (signal: "TERM" | "KILL") => {
+  /**
+   * Signal cyanrip, through the wrapper as well when there is one.
+   *
+   * Resolves once the wrapper's kill command has exited, failed to
+   * start, or run out of `TERMINATION_GRACE_MS`, so a caller can
+   * wait for the signal to reach the inner process rather than
+   * only for it to be sent.
+   */
+  const signalCyanrip = (
+    signal: "TERM" | "KILL",
+  ): Promise<void> => {
     child.kill(signal === "TERM" ? "SIGTERM" : "SIGKILL")
 
     // A wrapper (`docker exec …`, `ssh … cyanrip`) does not
     // forward signals, so killing our handle would leave a
     // cyanrip inside the container still holding the drive.
     // Measured for the makemkvcon twin on Tower 2026-07-25.
-    if (input.cyanrip.wrapperArgs === null) return
-
-    try {
-      spawn(
-        input.cyanrip.command,
-        buildCyanripKillArgs({
-          wrapperArgs: input.cyanrip.wrapperArgs,
-          devPath: input.devPath,
-          signal,
-        }),
-        { stdio: "ignore" },
-      ).on("error", () => {})
-    } catch {
-      // The outer signal has already gone; nothing else to do.
+    if (input.cyanrip.wrapperArgs === null) {
+      return Promise.resolve()
     }
+
+    const { wrapperArgs } = input.cyanrip
+
+    return new Promise<void>((resolve) => {
+      // Bounded: an `ssh` that never connects must not hold the
+      // run open forever.
+      const timer = setTimeout(
+        resolve,
+        TERMINATION_GRACE_MS,
+      )
+      timer.unref()
+
+      const done = () => {
+        clearTimeout(timer)
+        resolve()
+      }
+
+      try {
+        spawn(
+          input.cyanrip.command,
+          buildCyanripKillArgs({
+            wrapperArgs,
+            devPath: input.devPath,
+            signal,
+          }),
+          { stdio: "ignore" },
+        )
+          .once("error", done)
+          .once("close", done)
+      } catch {
+        // The outer signal has already gone; nothing else to do.
+        done()
+      }
+    })
   }
 
   /** Stop cyanrip once, attributing the real cause. */
@@ -395,14 +434,13 @@ export const runCyanripJob = async (input: {
     isStopping = true
     termination = reason
 
-    signalCyanrip("TERM")
+    void signalCyanrip("TERM")
 
     // A cyanrip blocked in a device read will not answer
     // SIGTERM, and a cancel that does not land leaves the drive
     // held — so the escalation is not optional.
     const killTimer = setTimeout(() => {
-      signalCyanrip("KILL")
-      resolveEscalation()
+      void signalCyanrip("KILL").then(resolveEscalation)
     }, TERMINATION_GRACE_MS)
     killTimer.unref()
 
@@ -419,8 +457,8 @@ export const runCyanripJob = async (input: {
   }
 
   // Settled once a stop has done everything it can to the drive:
-  // at once for a direct child, after the inner SIGKILL for a
-  // wrapped one. A run nobody stopped never waits on it.
+  // at once for a direct child, and for a wrapped one once the
+  // wrapper's SIGKILL command has finished. A run nobody stopped never waits on it.
   let resolveEscalation = (): void => {}
   const escalation = new Promise<void>((resolve) => {
     resolveEscalation = resolve
@@ -461,8 +499,8 @@ export const runCyanripJob = async (input: {
       },
     )
 
-    // A stopped wrapped run is not over until the inner cyanrip
-    // has been sent SIGKILL. Returning earlier would release the
+    // A stopped wrapped run is not over until the wrapper's
+    // SIGKILL command has finished. Returning earlier would release the
     // bay, and a cancel would open the tray, while cyanrip could
     // still hold the drive.
     if (isStopping && input.cyanrip.wrapperArgs !== null) {

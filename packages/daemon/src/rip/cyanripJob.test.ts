@@ -325,8 +325,12 @@ for (const track of [1, 2]) {
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 if (args[0] === 'pkill') {
-  fs.appendFileSync(__dirname + '/kills', args[1] + '\n');
-  process.exit(0);
+  // A slow ssh or docker exec: the signal lands late.
+  setTimeout(() => {
+    fs.appendFileSync(__dirname + '/kills', args[1] + '\n');
+    process.exit(0);
+  }, 500);
+  return;
 }
 setInterval(() => {}, 1000);
 `)
@@ -354,15 +358,13 @@ setInterval(() => {}, 1000);
     })
 
     expect(result.termination).toBe("cancelled_by_operator")
-    // The KILL is spawned just before the run returns; give the
-    // tiny `pkill` stand-in a moment to write its line.
-    await vi.waitFor(async () => {
-      expect(
-        (await readFile(join(fake.root, "kills"), "utf8"))
-          .trim()
-          .split("\n"),
-      ).toEqual(["-TERM", "-KILL"])
-    })
+    // Read at once, with no waiting: the run must not have
+    // returned before the slow KILL command finished.
+    expect(
+      (await readFile(join(fake.root, "kills"), "utf8"))
+        .trim()
+        .split("\n"),
+    ).toEqual(["-TERM", "-KILL"])
   })
 
   it("records an operator cancel as a cancel", async () => {
