@@ -430,13 +430,20 @@ export const runCyanripJob = async (input: {
     isStopping = true
     termination = reason
 
-    void signalCyanrip("TERM")
+    const termSent = signalCyanrip("TERM")
 
     // A cyanrip blocked in a device read will not answer
     // SIGTERM, and a cancel that does not land leaves the drive
     // held — so the escalation is not optional.
+    //
+    // Both wrapper commands are awaited, not only the KILL. Each
+    // targets the DEVICE, not this job, so a TERM still in flight
+    // after the run returned could stop the next rip in this bay.
     const killTimer = setTimeout(() => {
-      void signalCyanrip("KILL").then(resolveEscalation)
+      void Promise.all([
+        termSent,
+        signalCyanrip("KILL"),
+      ]).then(resolveEscalation)
     }, TERMINATION_GRACE_MS)
     killTimer.unref()
 

@@ -314,59 +314,68 @@ for (const track of [1, 2]) {
     )
   })
 
-  it("⚠️ holds a wrapped run until a slow SIGKILL command finishes", {
-    timeout: 45_000,
-  }, async () => {
-    // A `docker exec` client exits on SIGTERM while the cyanrip
-    // inside keeps the drive. The run must not report itself
-    // over, which releases the bay, until the inner SIGKILL has
-    // gone out. The fake is both the wrapper and its `pkill`.
-    const fake = await fakeCyanrip(String.raw`
+  it.each([{ slow: "-KILL" }, { slow: "-TERM" }])(
+    "⚠️ holds a wrapped run until a slow $slow command finishes",
+    {
+      timeout: 45_000,
+    },
+    async ({ slow }) => {
+      // A `docker exec` client exits on SIGTERM while the cyanrip
+      // inside keeps the drive. The run must not report itself
+      // over, which releases the bay, until the inner SIGKILL has
+      // gone out. The fake is both the wrapper and its `pkill`.
+      const fake = await fakeCyanrip(String.raw`
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 if (args[0] === 'pkill') {
-  // A slow ssh or docker exec: the KILL lands later than the
+  // A slow ssh or docker exec: one signal lands later than the
   // whole termination grace, which must not release the run.
   setTimeout(() => {
     fs.appendFileSync(__dirname + '/kills', args[1] + '\n');
     process.exit(0);
-  }, args[1] === '-KILL' ? 12000 : 0);
+  }, args[1] === process.env.SLOW_SIGNAL ? 12000 : 0);
   return;
 }
 setInterval(() => {}, 1000);
 `)
-    const wrapper = fake.cyanrip.prefixArgs[0]
-    const controller = new AbortController()
+      const wrapper = fake.cyanrip.prefixArgs[0]
+      const controller = new AbortController()
 
-    setTimeout(() => controller.abort(), 100)
+      vi.stubEnv("SLOW_SIGNAL", slow)
+      setTimeout(() => controller.abort(), 100)
 
-    const result = await runCyanripJob({
-      invocation: {
-        command: fake.cyanrip.command,
-        args: [wrapper, "cyanrip"],
-        cwd: fake.root,
-      },
-      cyanrip: {
-        command: fake.cyanrip.command,
-        prefixArgs: [wrapper, "cyanrip"],
-        wrapperArgs: [wrapper],
-      },
-      devPath: "/dev/sr0",
-      jobUuid: randomUUID(),
-      stateDir: fake.stateDir,
-      signal: controller.signal,
-      log: { write: () => {} },
-    })
+      const result = await runCyanripJob({
+        invocation: {
+          command: fake.cyanrip.command,
+          args: [wrapper, "cyanrip"],
+          cwd: fake.root,
+        },
+        cyanrip: {
+          command: fake.cyanrip.command,
+          prefixArgs: [wrapper, "cyanrip"],
+          wrapperArgs: [wrapper],
+        },
+        devPath: "/dev/sr0",
+        jobUuid: randomUUID(),
+        stateDir: fake.stateDir,
+        signal: controller.signal,
+        log: { write: () => {} },
+      })
 
-    expect(result.termination).toBe("cancelled_by_operator")
-    // Read at once, with no waiting: the run must not have
-    // returned before the slow KILL command finished.
-    expect(
-      (await readFile(join(fake.root, "kills"), "utf8"))
-        .trim()
-        .split("\n"),
-    ).toEqual(["-TERM", "-KILL"])
-  })
+      expect(result.termination).toBe(
+        "cancelled_by_operator",
+      )
+      // Read at once, with no waiting: the run must not have
+      // returned before both wrapper commands finished.
+      expect(
+        (await readFile(join(fake.root, "kills"), "utf8"))
+          .trim()
+          .split("\n")
+          .sort(),
+      ).toEqual(["-KILL", "-TERM"])
+      vi.unstubAllEnvs()
+    },
+  )
 
   it("records an operator cancel as a cancel", async () => {
     const fake = await fakeCyanrip(
