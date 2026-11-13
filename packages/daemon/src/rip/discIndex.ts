@@ -1,7 +1,9 @@
 import { spawn } from "node:child_process"
 import { createInterface } from "node:readline"
-import type { DrvEvent } from "@rip-deck/contracts"
-import { parseMakemkvLine } from "../makemkv/parseLine.ts"
+import {
+  type MakemkvDriveEvent,
+  parseMakemkvLine,
+} from "@mux-magic/tools"
 import type { MakemkvCommand } from "./ripCommand.ts"
 
 /**
@@ -44,7 +46,7 @@ const ENUMERATE_TIMEOUT_MS = 120_000
 export type DriveEnumeration = {
   /** Disc index keyed by device path, e.g. `/dev/sr0` -> 5. */
   indexByDevPath: Map<string, number>
-  drives: DrvEvent[]
+  drives: MakemkvDriveEvent[]
 }
 
 /**
@@ -80,9 +82,9 @@ export const enumerateDrives = async (input: {
     "disc:9999",
   ]
 
-  const drives = await new Promise<DrvEvent[]>(
+  const drives = await new Promise<MakemkvDriveEvent[]>(
     (resolve) => {
-      const collected: DrvEvent[] = []
+      const collected: MakemkvDriveEvent[] = []
       const child = spawn(input.makemkv.command, args, {
         stdio: ["ignore", "pipe", "ignore"],
       })
@@ -123,7 +125,7 @@ export const enumerateDrives = async (input: {
  * a drive attached.
  */
 export const buildIndexByDevPath = (
-  drives: DrvEvent[],
+  drives: MakemkvDriveEvent[],
 ): Map<string, number> => {
   const indexByDevPath = new Map<string, number>()
 
@@ -170,7 +172,7 @@ export const buildIndexByDevPath = (
  * rows.
  */
 export const verifyDiscIndex = (input: {
-  drives: DrvEvent[]
+  drives: MakemkvDriveEvent[]
   discIndex: number
   expectedDevPath: string
 }): { isMatch: boolean; actualDevPath: string } | null => {

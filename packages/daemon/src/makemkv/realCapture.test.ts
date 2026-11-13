@@ -1,8 +1,11 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { MakemkvMsgCode } from "@rip-deck/contracts"
+import {
+  makemkvMessageCode,
+  makemkvTitlesSavedMessageCodes,
+  parseMakemkvLine,
+} from "@mux-magic/tools"
 import { describe, expect, it } from "vitest"
-import { parseMakemkvLine } from "./parseLine.ts"
 
 /**
  * The whole robot-mode stream of one real Blu-ray backup.
@@ -54,20 +57,21 @@ describe("a real Blu-ray backup, replayed", () => {
     const readErrors = events.filter(
       (event) =>
         event.type === "MSG" &&
-        event.code === MakemkvMsgCode.READ_ERROR,
+        event.code === makemkvMessageCode.READ_ERROR,
     )
 
     expect(readErrors).toHaveLength(0)
   })
 
   it("emits no title count, which is why backup needs its own success test", () => {
-    // The §2.3 defect, pinned. `backup` never emits MSG:5004, so
-    // requiring `titlesSaved > 0` failed this perfect rip. If a
-    // future refactor reinstates that requirement, this fails.
+    // The §2.3 defect, pinned. `backup` emits none of the
+    // titles-saved messages (5004, 5005, or 5036), so requiring
+    // `titlesSaved > 0` failed this perfect rip. If a future
+    // refactor reinstates that requirement, this fails.
     const copyComplete = events.filter(
       (event) =>
         event.type === "MSG" &&
-        event.code === MakemkvMsgCode.COPY_COMPLETE,
+        makemkvTitlesSavedMessageCodes.includes(event.code),
     )
 
     expect(copyComplete).toHaveLength(0)
@@ -78,9 +82,9 @@ describe("a real Blu-ray backup, replayed", () => {
       .filter((event) => event.type === "MSG")
       .map((event) => event.code)
 
-    expect(codes).toContain(MakemkvMsgCode.BACKUP_DONE)
+    expect(codes).toContain(makemkvMessageCode.BACKUP_DONE)
     expect(codes).toContain(
-      MakemkvMsgCode.BACKUP_DONE_FINAL,
+      makemkvMessageCode.BACKUP_DONE_FINAL,
     )
   })
 

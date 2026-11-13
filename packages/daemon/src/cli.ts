@@ -1,7 +1,10 @@
 import { spawn } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { createInterface } from "node:readline"
-import type { MakemkvEvent } from "@rip-deck/contracts"
+import {
+  type MakemkvEvent,
+  parseMakemkvLine,
+} from "@mux-magic/tools"
 import {
   isAttachedDrive,
   parseDriveName,
@@ -14,7 +17,6 @@ import {
   probeAllDrives,
   readScsiGenericPath,
 } from "./drives/sysfs.ts"
-import { parseMakemkvLine } from "./makemkv/parseLine.ts"
 import {
   buildFolderName,
   checkFreeSpace,

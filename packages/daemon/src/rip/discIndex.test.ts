@@ -1,6 +1,8 @@
-import type { DrvEvent } from "@rip-deck/contracts"
+import {
+  type MakemkvDriveEvent,
+  parseMakemkvLine,
+} from "@mux-magic/tools"
 import { describe, expect, it } from "vitest"
-import { parseMakemkvLine } from "../makemkv/parseLine.ts"
 import {
   buildIndexByDevPath,
   verifyDiscIndex,
@@ -28,9 +30,10 @@ const REAL_DRV_LINES = [
   'DRV:10,256,999,0,"","",""',
 ]
 
-const realDrives = (): DrvEvent[] =>
+const realDrives = (): MakemkvDriveEvent[] =>
   REAL_DRV_LINES.map(parseMakemkvLine).filter(
-    (event): event is DrvEvent => event.type === "DRV",
+    (event): event is MakemkvDriveEvent =>
+      event.type === "DRV",
   )
 
 describe("mapping a device to MakeMKV's disc index", () => {
@@ -128,7 +131,8 @@ describe("verifying an isolated rip", () => {
   const drives = ISOLATED_DRV_LINES.map(
     parseMakemkvLine,
   ).filter(
-    (event): event is DrvEvent => event.type === "DRV",
+    (event): event is MakemkvDriveEvent =>
+      event.type === "DRV",
   )
 
   it("finds one drive, and it is disc:0", () => {
@@ -176,7 +180,8 @@ describe("verifying an isolated rip", () => {
     ]
       .map(parseMakemkvLine)
       .filter(
-        (event): event is DrvEvent => event.type === "DRV",
+        (event): event is MakemkvDriveEvent =>
+          event.type === "DRV",
       )
 
     expect(

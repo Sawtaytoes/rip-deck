@@ -1,6 +1,8 @@
-import type { MakemkvEvent } from "@rip-deck/contracts"
+import {
+  type MakemkvEvent,
+  parseMakemkvLine,
+} from "@mux-magic/tools"
 import { describe, expect, it } from "vitest"
-import { parseMakemkvLine } from "../makemkv/parseLine.ts"
 import {
   chooseDiscNameSource,
   extractDiscName,

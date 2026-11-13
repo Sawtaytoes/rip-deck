@@ -1,8 +1,10 @@
 import {
+  type MakemkvEvent,
+  makemkvMessageCode,
+} from "@mux-magic/tools"
+import {
   EMPTY_PROGRESS,
   type JobProgress,
-  type MakemkvEvent,
-  MakemkvMsgCode,
 } from "@rip-deck/contracts"
 
 /**
@@ -289,7 +291,7 @@ export const observeEvent = (input: {
       // FILE_ADDED is the only per-title completion signal robot
       // mode gives us in backup mode, so it is what drives the
       // "file N of M" readout.
-      return event.code === MakemkvMsgCode.FILE_ADDED
+      return event.code === makemkvMessageCode.TITLE_ADDED
         ? {
             ...base,
             filesAdded: base.filesAdded + 1,

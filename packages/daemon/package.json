@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@mux-magic/tools": "^1.4.0",
     "@rip-deck/contracts": "workspace:*",
     "mqtt": "^5.15.1",
     "rxjs": "^7.8.2"

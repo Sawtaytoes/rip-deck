@@ -2,17 +2,17 @@ import { spawn } from "node:child_process"
 import { readFile } from "node:fs/promises"
 import { basename } from "node:path"
 import { createInterface } from "node:readline"
-import type {
-  DrvEvent,
-  JobProgress,
-  MakemkvEvent,
-} from "@rip-deck/contracts"
+import {
+  type MakemkvDriveEvent,
+  type MakemkvEvent,
+  parseMakemkvLine,
+} from "@mux-magic/tools"
+import type { JobProgress } from "@rip-deck/contracts"
 import { readScsiGenericPath } from "../drives/sysfs.ts"
 import { copyStageIoErrorDelta } from "../health/featureVector.ts"
 import { evaluateJobHealth } from "../health/jobVerdict.ts"
 import { refreshHealthGate } from "../health/publish.ts"
 import { createSampleStore } from "../health/sampleStore.ts"
-import { parseMakemkvLine } from "../makemkv/parseLine.ts"
 import {
   checkFreeSpace,
   finaliseDestination,
@@ -443,7 +443,7 @@ const superviseChild = async (
   // against is unrecoverable by inspection. A rip of the wrong
   // bay into the right folder name looks exactly like a good rip
   // forever after.
-  const drvRows: DrvEvent[] = []
+  const drvRows: MakemkvDriveEvent[] = []
   let isDriveVerified = false
   let wrongDriveDevPath: string | null = null
 
