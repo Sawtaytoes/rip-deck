@@ -614,7 +614,7 @@ describe("the tower view", () => {
       const bay = view({
         bays: [
           buildBay({
-            slot: 2,
+            bay: 2,
             job: buildJob({
               verdict: makeVerdict(kind, "suspected", []),
             }),

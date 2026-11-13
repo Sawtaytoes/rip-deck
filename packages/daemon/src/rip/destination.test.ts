@@ -748,21 +748,19 @@ describe("claiming a name instead of checking it", () => {
   })
 
   it("removes its placeholder when the rename fails", async () => {
-    // A missing source fails the rename after the claim. A
-    // zero-byte file left under the real name would look like a
-    // finished but empty rip.
+    // A directory cannot be renamed into itself, so the claim
+    // succeeds and the rename then fails with EINVAL. An empty
+    // folder left under the real name would look like a finished
+    // but empty rip.
     const root = await makeRoot()
-    const source = join(root, "source.iso")
+    const source = join(root, "Album")
+    const destination = join(source, "Album")
 
-    await writeFile(source, "iso", "utf8")
-    await rm(source)
+    await mkdir(source)
     await expect(
-      renameWithoutReplacing({
-        source,
-        destination: join(root, "Film.iso"),
-      }),
-    ).rejects.toThrow()
-    expect(await readdir(root)).toEqual([])
+      renameWithoutReplacing({ source, destination }),
+    ).rejects.toThrow(/EINVAL/)
+    expect(await readdir(source)).toEqual([])
   })
 
   it("throws, keeping the source, when every candidate is taken", async () => {

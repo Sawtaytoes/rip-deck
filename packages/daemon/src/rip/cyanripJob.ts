@@ -283,6 +283,12 @@ export const runCyanripJob = async (input: {
     intervalMs?: number
   }
 }): Promise<CyanripProcessResult> => {
+  // BEFORE the abort check, not after it: an abort that arrives
+  // during this await would otherwise be missed, because the
+  // listener below is not attached yet, and cyanrip would start
+  // against a signal that has already fired.
+  await ensureStateDir(input.stateDir)
+
   const startedAtMs = Date.now()
   let state = createCyanripProgressState(startedAtMs)
 
@@ -295,8 +301,6 @@ export const runCyanripJob = async (input: {
       progress: state.progress,
     }
   }
-
-  await ensureStateDir(input.stateDir)
 
   let heartbeat = createHeartbeat({
     stateDir: input.stateDir,
@@ -396,13 +400,31 @@ export const runCyanripJob = async (input: {
     // A cyanrip blocked in a device read will not answer
     // SIGTERM, and a cancel that does not land leaves the drive
     // held — so the escalation is not optional.
-    const killTimer = setTimeout(
-      () => signalCyanrip("KILL"),
-      TERMINATION_GRACE_MS,
-    )
+    const killTimer = setTimeout(() => {
+      signalCyanrip("KILL")
+      resolveEscalation()
+    }, TERMINATION_GRACE_MS)
     killTimer.unref()
-    child.once("close", () => clearTimeout(killTimer))
+
+    // Without a wrapper, the child closing IS cyanrip exiting, so
+    // there is nothing left to escalate. With one, the client can
+    // exit on SIGTERM while cyanrip inside the container keeps
+    // the drive, so the inner SIGKILL still has to be sent.
+    if (input.cyanrip.wrapperArgs === null) {
+      child.once("close", () => {
+        clearTimeout(killTimer)
+        resolveEscalation()
+      })
+    }
   }
+
+  // Settled once a stop has done everything it can to the drive:
+  // at once for a direct child, after the inner SIGKILL for a
+  // wrapped one. A run nobody stopped never waits on it.
+  let resolveEscalation = (): void => {}
+  const escalation = new Promise<void>((resolve) => {
+    resolveEscalation = resolve
+  })
 
   const onAbort = () => stop("cancelled_by_operator")
 
@@ -438,6 +460,14 @@ export const runCyanripJob = async (input: {
         child.once("close", (code) => resolve(code))
       },
     )
+
+    // A stopped wrapped run is not over until the inner cyanrip
+    // has been sent SIGKILL. Returning earlier would release the
+    // bay, and a cancel would open the tray, while cyanrip could
+    // still hold the drive.
+    if (isStopping && input.cyanrip.wrapperArgs !== null) {
+      await escalation
+    }
 
     return {
       exitCode,

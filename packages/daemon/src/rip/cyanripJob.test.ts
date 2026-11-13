@@ -281,6 +281,90 @@ for (const track of [1, 2]) {
     expect(result.exitCode).toBe(0)
   })
 
+  it("⚠️ does not start cyanrip when the cancel lands during setup", async () => {
+    // The abort fires while the state directory is being
+    // prepared, before any listener exists. It must still stop
+    // the run before a process is spawned.
+    const fake = await fakeCyanrip(
+      "require('node:fs').writeFileSync('started', '')",
+    )
+    const controller = new AbortController()
+
+    const running = runCyanripJob({
+      invocation: {
+        command: fake.cyanrip.command,
+        args: fake.cyanrip.prefixArgs,
+        cwd: fake.root,
+      },
+      cyanrip: fake.cyanrip,
+      devPath: "/dev/sr0",
+      jobUuid: randomUUID(),
+      stateDir: fake.stateDir,
+      signal: controller.signal,
+      log: { write: () => {} },
+    })
+
+    controller.abort()
+
+    expect((await running).termination).toBe(
+      "cancelled_by_operator",
+    )
+    expect(await readdir(fake.root)).not.toContain(
+      "started",
+    )
+  })
+
+  it("⚠️ sends the inner SIGKILL before a wrapped run returns", {
+    timeout: 30_000,
+  }, async () => {
+    // A `docker exec` client exits on SIGTERM while the cyanrip
+    // inside keeps the drive. The run must not report itself
+    // over, which releases the bay, until the inner SIGKILL has
+    // gone out. The fake is both the wrapper and its `pkill`.
+    const fake = await fakeCyanrip(String.raw`
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+if (args[0] === 'pkill') {
+  fs.appendFileSync(__dirname + '/kills', args[1] + '\n');
+  process.exit(0);
+}
+setInterval(() => {}, 1000);
+`)
+    const wrapper = fake.cyanrip.prefixArgs[0]
+    const controller = new AbortController()
+
+    setTimeout(() => controller.abort(), 100)
+
+    const result = await runCyanripJob({
+      invocation: {
+        command: fake.cyanrip.command,
+        args: [wrapper, "cyanrip"],
+        cwd: fake.root,
+      },
+      cyanrip: {
+        command: fake.cyanrip.command,
+        prefixArgs: [wrapper, "cyanrip"],
+        wrapperArgs: [wrapper],
+      },
+      devPath: "/dev/sr0",
+      jobUuid: randomUUID(),
+      stateDir: fake.stateDir,
+      signal: controller.signal,
+      log: { write: () => {} },
+    })
+
+    expect(result.termination).toBe("cancelled_by_operator")
+    // The KILL is spawned just before the run returns; give the
+    // tiny `pkill` stand-in a moment to write its line.
+    await vi.waitFor(async () => {
+      expect(
+        (await readFile(join(fake.root, "kills"), "utf8"))
+          .trim()
+          .split("\n"),
+      ).toEqual(["-TERM", "-KILL"])
+    })
+  })
+
   it("records an operator cancel as a cancel", async () => {
     const fake = await fakeCyanrip(
       "setInterval(() => {}, 1000)",
