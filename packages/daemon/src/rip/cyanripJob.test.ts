@@ -314,8 +314,8 @@ for (const track of [1, 2]) {
     )
   })
 
-  it("⚠️ sends the inner SIGKILL before a wrapped run returns", {
-    timeout: 30_000,
+  it("⚠️ holds a wrapped run until a slow SIGKILL command finishes", {
+    timeout: 45_000,
   }, async () => {
     // A `docker exec` client exits on SIGTERM while the cyanrip
     // inside keeps the drive. The run must not report itself
@@ -325,11 +325,12 @@ for (const track of [1, 2]) {
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 if (args[0] === 'pkill') {
-  // A slow ssh or docker exec: the signal lands late.
+  // A slow ssh or docker exec: the KILL lands later than the
+  // whole termination grace, which must not release the run.
   setTimeout(() => {
     fs.appendFileSync(__dirname + '/kills', args[1] + '\n');
     process.exit(0);
-  }, 500);
+  }, args[1] === '-KILL' ? 12000 : 0);
   return;
 }
 setInterval(() => {}, 1000);

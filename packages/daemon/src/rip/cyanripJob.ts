@@ -375,10 +375,17 @@ export const runCyanripJob = async (input: {
   /**
    * Signal cyanrip, through the wrapper as well when there is one.
    *
-   * Resolves once the wrapper's kill command has exited, failed to
-   * start, or run out of `TERMINATION_GRACE_MS`, so a caller can
-   * wait for the signal to reach the inner process rather than
-   * only for it to be sent.
+   * Resolves once the wrapper's kill command has exited or failed
+   * to start, so a caller can wait for the signal to reach the
+   * inner process rather than only for it to be sent.
+   *
+   * Deliberately unbounded. A kill command that hangs (an `ssh`
+   * that never connects) leaves it unknown whether cyanrip still
+   * holds the drive, and a stopped run waits on this before it
+   * releases the bay. Holding the bay is the safe side of that
+   * unknown: a timeout would release it, let Cancel open the tray,
+   * and leave a late `pkill` for this device able to kill the next
+   * rip in the same bay.
    */
   const signalCyanrip = (
     signal: "TERM" | "KILL",
@@ -396,18 +403,7 @@ export const runCyanripJob = async (input: {
     const { wrapperArgs } = input.cyanrip
 
     return new Promise<void>((resolve) => {
-      // Bounded: an `ssh` that never connects must not hold the
-      // run open forever.
-      const timer = setTimeout(
-        resolve,
-        TERMINATION_GRACE_MS,
-      )
-      timer.unref()
-
-      const done = () => {
-        clearTimeout(timer)
-        resolve()
-      }
+      const done = () => resolve()
 
       try {
         spawn(
@@ -458,7 +454,8 @@ export const runCyanripJob = async (input: {
 
   // Settled once a stop has done everything it can to the drive:
   // at once for a direct child, and for a wrapped one once the
-  // wrapper's SIGKILL command has finished. A run nobody stopped never waits on it.
+  // wrapper's SIGKILL command has finished. A run nobody stopped
+  // never waits on it.
   let resolveEscalation = (): void => {}
   const escalation = new Promise<void>((resolve) => {
     resolveEscalation = resolve
