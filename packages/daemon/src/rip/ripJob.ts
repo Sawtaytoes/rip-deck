@@ -32,8 +32,8 @@ import {
   flushHeartbeat,
 } from "./heartbeat.ts"
 import {
-  assessLiveness,
   type Liveness,
+  startLivenessWatchdog,
 } from "./liveness.ts"
 import { parseProcStartTime } from "./orphan.ts"
 import {
@@ -74,10 +74,7 @@ import { verifyBackupStructure } from "./verifyBackup.ts"
  */
 
 /** How long a killed child gets to exit before SIGKILL. */
-const TERMINATION_GRACE_MS = 10_000
-
-/** How often liveness is re-assessed. */
-const LIVENESS_INTERVAL_MS = 5_000
+export const TERMINATION_GRACE_MS = 10_000
 
 export type RipJobInput = {
   driveId: string
@@ -416,23 +413,17 @@ const superviseChild = async (
   // --- Liveness, on wall clock, independent of messages. ---
   // Requirement D3: the `sr` layer retries long before MakeMKV's
   // error counter moves, so a timer is the only honest detector.
-  const livenessTimer = setInterval(() => {
-    const liveness = assessLiveness({
-      startedAtMs,
+  const stopWatchdog = startLivenessWatchdog({
+    startedAtMs,
+    readActivity: () => ({
       lastForwardProgressAtMs:
         tracker.lastForwardProgressAtMs,
       lastEventAtMs: tracker.lastEventAtMs,
-      nowMs: Date.now(),
-      isKeepTryingRequested:
-        input.isKeepTryingRequested?.() ?? false,
-    })
-
-    handlers.onLiveness?.(liveness)
-
-    if (liveness.action === "abandon") stop("stall_timeout")
-  }, LIVENESS_INTERVAL_MS)
-
-  livenessTimer.unref()
+    }),
+    isKeepTryingRequested: input.isKeepTryingRequested,
+    onLiveness: handlers.onLiveness,
+    onAbandon: () => stop("stall_timeout"),
+  })
 
   // --- Parse stdout. ---------------------------------------
   const stdout = createInterface({ input: child.stdout })
@@ -530,7 +521,7 @@ const superviseChild = async (
     },
   )
 
-  clearInterval(livenessTimer)
+  stopWatchdog()
   input.signal?.removeEventListener("abort", onAbort)
   stdout.close()
 

@@ -41,7 +41,11 @@ The mapfile is not a debug artifact. It records every sector the drive could not
 
 ⚠️ A data image is never required to carry an ISO 9660 signature. Many data CD-ROMs hold no filesystem at all, so a missing signature is recorded and reported, never treated as a failure.
 
-Rip Deck writes into an incomplete destination and finalizes the name only after verification. Duplicate destinations receive a marker instead of overwriting an existing copy.
+Rip Deck writes into an incomplete destination and finalizes the name only after verification. Duplicate destinations receive a marker instead of overwriting an existing copy. The final name is claimed atomically before the rename, so two bays that finish discs with the same name at the same moment both keep their output.
+
+## Supervision
+
+MakeMKV and cyanrip runs share one liveness watchdog. It judges a rip by two timestamps: when output last arrived and when the position last advanced. A rip that stays silent or stops advancing past the thresholds in `HEALTH_THRESHOLDS` is stopped and reported as `stall_timeout`, unless the operator asked to keep trying. Each run also writes `<uuid>.heartbeat` to the state directory. cyanrip's progress comes from its own status line.
 
 ## Persistent state
 
@@ -49,7 +53,8 @@ The state directory contains:
 
 - `bays.json` for the current per-bay memory.
 - `history.jsonl` for append-only terminal history.
-- `<uuid>.robot.log` for MakeMKV robot output.
+- `<uuid>.robot.log` for MakeMKV robot output and cyanrip output.
+- `<uuid>.heartbeat` for the time and line count of the latest output.
 - `<uuid>.features.json` and `<uuid>.verdict.json` for health evidence.
 - `posters.json` for cached OMDb responses.
 

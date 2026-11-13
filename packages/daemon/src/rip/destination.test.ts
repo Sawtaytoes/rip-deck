@@ -1,5 +1,8 @@
 import {
   mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
   rm,
   stat,
   writeFile,
@@ -21,6 +24,8 @@ import {
   incompleteDirName,
   pathExists,
   prepareDestination,
+  renameIntoFreeName,
+  renameWithoutReplacing,
   SPACE_HEADROOM_FRACTION,
   sanitiseFolderName,
 } from "./destination.ts"
@@ -652,5 +657,195 @@ describe("naming a data-disc image (A4)", () => {
       mapfilePath:
         "/media/Disc-Rips/.rip-deck-incomplete-a/Vintage Keys.iso.map",
     })
+  })
+})
+
+describe("claiming a name instead of checking it", () => {
+  const roots: string[] = []
+
+  afterAll(async () => {
+    for (const root of roots) {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  const makeRoot = async () => {
+    const root = await mkdtemp(
+      join(tmpdir(), "rip-deck-claim-"),
+    )
+    roots.push(root)
+    return root
+  }
+
+  it("⚠️ never replaces an existing image file", async () => {
+    // `rename` over a file replaces it without a word, so a
+    // second DVD with the same label would have overwritten the
+    // first if anything raced the exists-check.
+    const root = await makeRoot()
+    const source = join(root, "new.iso")
+    const destination = join(root, "Film.iso")
+
+    await writeFile(source, "second", "utf8")
+    await writeFile(destination, "first", "utf8")
+
+    expect(
+      await renameWithoutReplacing({ source, destination }),
+    ).toBe(false)
+    expect(await readFile(destination, "utf8")).toBe(
+      "first",
+    )
+    expect(await readFile(source, "utf8")).toBe("second")
+  })
+
+  it("⚠️ never replaces an existing EMPTY directory", async () => {
+    // `rename` onto an empty directory succeeds on Linux, so
+    // this is the case a bare rename does not refuse.
+    const root = await makeRoot()
+    const source = join(root, "incoming")
+    const destination = join(root, "Album")
+
+    await mkdir(join(source, "disc"), { recursive: true })
+    await mkdir(destination)
+
+    expect(
+      await renameWithoutReplacing({ source, destination }),
+    ).toBe(false)
+    expect(await readdir(destination)).toEqual([])
+    expect(await readdir(source)).toEqual(["disc"])
+  })
+
+  it("moves a directory and a file when the name is free", async () => {
+    const root = await makeRoot()
+
+    await mkdir(join(root, "dir-source", "BDMV"), {
+      recursive: true,
+    })
+    await writeFile(
+      join(root, "file-source"),
+      "iso",
+      "utf8",
+    )
+
+    expect(
+      await renameWithoutReplacing({
+        source: join(root, "dir-source"),
+        destination: join(root, "Disc"),
+      }),
+    ).toBe(true)
+    expect(
+      await renameWithoutReplacing({
+        source: join(root, "file-source"),
+        destination: join(root, "Disc.iso"),
+      }),
+    ).toBe(true)
+    expect((await readdir(root)).sort()).toEqual([
+      "Disc",
+      "Disc.iso",
+    ])
+    expect(await readdir(join(root, "Disc"))).toEqual([
+      "BDMV",
+    ])
+  })
+
+  it("removes its placeholder when the rename fails", async () => {
+    // A missing source fails the rename after the claim. A
+    // zero-byte file left under the real name would look like a
+    // finished but empty rip.
+    const root = await makeRoot()
+    const source = join(root, "source.iso")
+
+    await writeFile(source, "iso", "utf8")
+    await rm(source)
+    await expect(
+      renameWithoutReplacing({
+        source,
+        destination: join(root, "Film.iso"),
+      }),
+    ).rejects.toThrow()
+    expect(await readdir(root)).toEqual([])
+  })
+
+  it("throws, keeping the source, when every candidate is taken", async () => {
+    const root = await makeRoot()
+    const source = join(root, "source.iso")
+
+    await writeFile(source, "third", "utf8")
+    await writeFile(join(root, "A.iso"), "first", "utf8")
+    await writeFile(join(root, "B.iso"), "second", "utf8")
+
+    await expect(
+      renameIntoFreeName({
+        source,
+        candidates: [
+          join(root, "A.iso"),
+          join(root, "B.iso"),
+        ],
+      }),
+    ).rejects.toThrow(/already taken/)
+    expect(await readFile(source, "utf8")).toBe("third")
+    expect(
+      await readFile(join(root, "B.iso"), "utf8"),
+    ).toBe("second")
+  })
+
+  it("⚠️ lands two same-label DVDs finishing at once as two files", async () => {
+    // The race this exists for: both bays finalise the same
+    // name in the same tick, and both images must survive.
+    const root = await makeRoot()
+    const folderName = "[BACKUP] Same Label - DVD"
+    const prepared = await Promise.all(
+      ["aaaaaaaa-1", "bbbbbbbb-2"].map(async (jobUuid) => {
+        const destination = prepareDestination({
+          rootPath: root,
+          folderName,
+          jobUuid,
+        })
+
+        await writeFile(
+          destination.incompletePath,
+          jobUuid,
+          "utf8",
+        )
+
+        return destination
+      }),
+    )
+
+    const finalised = await Promise.all(
+      prepared.map((destination) =>
+        finaliseDestination(destination, null),
+      ),
+    )
+
+    expect(
+      finalised
+        .map((landing) => landing.hasCollision)
+        .sort(),
+    ).toEqual([false, true])
+    expect(
+      (
+        await Promise.all(
+          finalised.map((landing) =>
+            readFile(landing.path, "utf8"),
+          ),
+        )
+      ).sort(),
+    ).toEqual(["aaaaaaaa-1", "bbbbbbbb-2"])
+  })
+
+  it("treats only ENOENT as absent", async () => {
+    // ENOTDIR stands in for EACCES and EIO here, because a test
+    // that runs as root cannot be denied access.
+    const root = await makeRoot()
+    const file = join(root, "file")
+
+    await writeFile(file, "", "utf8")
+
+    expect(await pathExists(join(root, "missing"))).toBe(
+      false,
+    )
+    await expect(
+      pathExists(join(file, "child")),
+    ).rejects.toThrow(/ENOTDIR/)
   })
 })
