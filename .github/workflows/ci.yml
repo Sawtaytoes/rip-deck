@@ -123,8 +123,9 @@ jobs:
       contents: read
       statuses: write
       pull-requests: write
-    uses: Sawtaytoes/charcuterie/.github/workflows/shared-vrt.yml@workflows-v1
+    uses: Sawtaytoes/charcuterie/.github/workflows/shared-vrt.yml@fix/vrt-tool-cache-prune
     with:
+      charcuterieRef: fix/vrt-tool-cache-prune
       buildCommand: pnpm --filter @rip-deck/web build-storybook
       storybookStaticDirs: storybook=packages/web/storybook-static
       storybookSchemeGlobal: scheme

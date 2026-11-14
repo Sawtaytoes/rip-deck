@@ -1,4 +1,5 @@
-import { resolve } from "node:path"
+import { join, resolve } from "node:path"
+import { pathToFileURL } from "node:url"
 
 import { playwright } from "@vitest/browser-playwright"
 import { searchForWorkspaceRoot } from "vite"
@@ -25,6 +26,59 @@ import baseConfig from "./vitest.config.ts"
 const actualDirectory =
   process.env.VRT_ACTUAL_DIR ??
   resolve(import.meta.dirname, "../../.vrt-actual")
+
+interface SharedMemoryChoice {
+  ignoreDefaultArgs: string[]
+  message: string
+}
+
+interface SharedMemoryModule {
+  chooseSharedMemory: (
+    availableBytes: number | null,
+  ) => SharedMemoryChoice
+  readAvailableSharedMemory: () => Promise<number | null>
+}
+
+/**
+ * Where Chromium keeps its shared memory. Playwright's default launch flag,
+ * `--disable-dev-shm-usage`, puts it in deleted files under `/tmp`, which on
+ * the VRT runner is the container's overlay on a ZFS pool, so every frame
+ * was written to disk. The shared workflow's tools (`$VRT_TOOLS`) have a
+ * `sharedMemory.js` that drops the flag when `/dev/shm` has at least
+ * 512 MiB free (the runner has a 2 GiB tmpfs) and says which one it chose;
+ * the pixels do not change. Outside CI, Playwright's default stays.
+ */
+const chooseVrtSharedMemory = async (): Promise<
+  string[]
+> => {
+  const tools = process.env.VRT_TOOLS
+
+  if (!tools) {
+    return []
+  }
+
+  let sharedMemory: SharedMemoryModule
+
+  try {
+    sharedMemory = (await import(
+      pathToFileURL(join(tools, "sharedMemory.js")).href
+    )) as SharedMemoryModule
+  } catch {
+    console.log(
+      "[vrt] Chromium shared memory: temp files, because the shared tools have no sharedMemory.js.",
+    )
+
+    return []
+  }
+
+  const choice = sharedMemory.chooseSharedMemory(
+    await sharedMemory.readAvailableSharedMemory(),
+  )
+
+  console.log(choice.message)
+
+  return choice.ignoreDefaultArgs
+}
 
 // Spread, not `mergeConfig`: `mergeConfig` CONCATENATES arrays, so
 // the suite's `include` would survive beside ours and every capture
@@ -60,6 +114,9 @@ export default defineConfig({
       // grows the iframe to the page's full height (see `shoot`). `deviceScaleFactor` and the locale
       // are pinned so a runner's defaults cannot move a pixel.
       provider: playwright({
+        launchOptions: {
+          ignoreDefaultArgs: await chooseVrtSharedMemory(),
+        },
         contextOptions: {
           viewport: { width: 1400, height: 8000 },
           deviceScaleFactor: 1,
