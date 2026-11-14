@@ -1,5 +1,11 @@
 # Rip Deck contributor instructions
 
+## Lint
+
+CI runs `pnpm exec biome check . --error-on-warnings` and `pnpm exec eslint . --max-warnings 0`,
+so a Biome or ESLint warning fails CI the same as an error. `pnpm lint` applies Biome and
+ESLint fixes with the same flags; it is for local use, not for CI.
+
 ## Independent adversarial review
 
 Before integrating any change in this repository, including an authorized direct push
