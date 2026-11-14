@@ -6,6 +6,7 @@ import {
   it,
   vi,
 } from "vitest"
+import { toJobState } from "../api/towerFeed.ts"
 import type { DriveRegistry } from "../drives/registry.ts"
 import { EMPTY_LOADED_DISCS } from "../rip/loadedDiscs.ts"
 import { STABLE_USB } from "../rip/usbStability.ts"
@@ -258,6 +259,38 @@ describe("jobStateForBay", () => {
         outcome: null,
       }),
     ).toBeNull()
+  })
+
+  // Parity with `/json`: the retained drive state must not keep
+  // saying `ripping` while the dashboard says `stalled`.
+  it("agrees with the tower feed about a flagged rip", () => {
+    const stall = {
+      kind: "hung" as const,
+      isAbandoning: false,
+      reason:
+        "Still running but no forward progress for 180s.",
+    }
+
+    for (const flag of [stall, null]) {
+      const ripping = bay({ phase: "ripping", stall: flag })
+
+      expect(
+        jobStateForBay({ bay: ripping, outcome: null }),
+      ).toBe(
+        toJobState({
+          phase: ripping.phase,
+          outcome: null,
+          hasSeenProgress: true,
+          stall: ripping.stall,
+        }),
+      )
+    }
+    expect(
+      jobStateForBay({
+        bay: bay({ phase: "ripping", stall }),
+        outcome: null,
+      }),
+    ).toBe("stalled")
   })
 })
 

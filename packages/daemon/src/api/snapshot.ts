@@ -5,6 +5,7 @@ import {
   type Verdict,
 } from "@rip-deck/contracts"
 import type { BayDiscFacts } from "../mqtt/driveState.ts"
+import type { BayStall } from "../rip/liveness.ts"
 import type { LoadedDiscSummary } from "../rip/loadedDiscs.ts"
 import {
   STABLE_USB,
@@ -64,6 +65,14 @@ export type BaySnapshot = {
   discSizeSectors: number | null
   /** Null when the bay is idle or merely holding a disc. */
   job: Job | null
+  /**
+   * The liveness watchdog's flag on the running rip, or null.
+   *
+   * Beside `job` rather than in it: it is a timing reading, not a
+   * health verdict, and `buildBayActions` needs its kind to
+   * decide whether Keep trying can still help.
+   */
+  stall: BayStall | null
   supervision: DriveSupervisionState
   /**
    * The tray, exactly as the MQTT publisher describes it.
@@ -143,6 +152,7 @@ export const createBaySnapshot = (input: {
   serial?: string | null
   discSizeSectors?: number | null
   job?: Job | null
+  stall?: BayStall | null
   supervision?: DriveSupervisionState
   disc?: BayDiscFacts | null
 }): BaySnapshot => ({
@@ -156,6 +166,7 @@ export const createBaySnapshot = (input: {
   serial: input.serial ?? null,
   discSizeSectors: input.discSizeSectors ?? null,
   job: input.job ?? null,
+  stall: input.stall ?? null,
   supervision:
     input.supervision ??
     createSupervisionState(input.driveId),

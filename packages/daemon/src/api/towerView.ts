@@ -23,6 +23,7 @@ import {
   driveSlug,
   type TopicConfig,
 } from "../mqtt/topics.ts"
+import { isKeepTryingSensibleForStall } from "../rip/liveness.ts"
 import {
   buildLoadedDiscsPayload,
   type LoadedDiscsPayload,
@@ -234,10 +235,18 @@ const buildBayActions = (bay: BaySnapshot): BayAction[] => {
   const isTroubled =
     job.verdict.kind !== "ok" &&
     job.verdict.kind !== "unknown"
+  // The watchdog's flag is a known problem too, even though the
+  // verdict stays `unknown` until the rip ends. Without this a
+  // stalled rip showed no Keep trying until the watchdog had
+  // already abandoned it.
+  const isStallKeepTryingSensible =
+    job.state === "stalled" &&
+    bay.stall !== null &&
+    isKeepTryingSensibleForStall(bay.stall)
 
   if (
     isActive &&
-    isTroubled &&
+    (isTroubled || isStallKeepTryingSensible) &&
     job.verdict.isKeepTryingSensible &&
     !job.isKeepTryingRequested
   ) {

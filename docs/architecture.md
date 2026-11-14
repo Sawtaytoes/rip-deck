@@ -45,7 +45,7 @@ Rip Deck writes into an incomplete destination and finalizes the name only after
 
 ## Supervision
 
-MakeMKV and cyanrip runs share one liveness watchdog. It judges a rip by two timestamps: when output last arrived and when the position last advanced. A rip that stays silent or stops advancing past the thresholds in `HEALTH_THRESHOLDS` is stopped and reported as `stall_timeout`, unless the operator asked to keep trying. Each run also writes `<uuid>.heartbeat` to the state directory. cyanrip's progress comes from its own status line.
+MakeMKV and cyanrip runs share one liveness watchdog. It judges a rip by two timestamps: when output last arrived and when the position last advanced. A rip that stays silent or stops advancing past the thresholds in `HEALTH_THRESHOLDS` is stopped and reported as `stall_timeout`, unless the operator asked to keep trying. Each reading that is not "continue" goes onto the bay table, so the dashboard shows the rip as `stalled` and offers Keep trying while the rip is retrying and has not yet been abandoned. Each run also writes `<uuid>.heartbeat` to the state directory. cyanrip's progress comes from its own status line.
 
 ## Persistent state
 
