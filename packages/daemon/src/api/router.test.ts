@@ -11,6 +11,7 @@ import {
   type ApiResponse,
   type ApiRouter,
   createApiRouter,
+  SERVER_PATH_PREFIXES,
   SERVER_PATHNAMES,
 } from "./router.ts"
 import {
@@ -362,13 +363,14 @@ describe("the rest of the surface", () => {
    * This used to assert that `/nope` was a JSON 404. It is the dashboard now:
    * the app gained a client router on 2026-08-16, and `router.ts` said what to
    * do when one arrived — widen the index fallback, keeping the API paths above
-   * it. An extension-less path is a deep link rather than a typo from here on.
+   * it. A path the server does not own is a deep link rather than a typo from
+   * here on.
    *
-   * The half worth keeping is the OTHER half, and it is the reason the widened
-   * rule is extension-less-only: a missing bundle must still fail as a 404 the
-   * browser reports. Answer `/assets/index-abc123.js` with 200 + HTML and the
-   * browser tries to execute HTML as JavaScript, which fails in a way that says
-   * nothing at all about the real problem.
+   * The half worth keeping is the OTHER half: a missing bundle must still fail
+   * as a 404 the browser reports. Answer `/assets/index-abc123.js` with 200 +
+   * HTML and the browser tries to execute HTML as JavaScript, which fails in a
+   * way that says nothing at all about the real problem. Since 2026-11-14 that
+   * rests on `/assets/` being the server's, not on the dot.
    */
   it("serves the dashboard for an extension-less path — it is a client route", () => {
     const response = handleSync(
@@ -399,8 +401,8 @@ describe("the rest of the surface", () => {
   })
 
   /**
-   * The extension test alone would hand these to the client router, and
-   * both are namespaces the dashboard does not route in.
+   * The shared fallback would hand these to the client router if the
+   * namespaces were not declared, and the dashboard routes in neither.
    *
    * `/api/` matters most: every API path that EXISTS is matched above the
    * fallback, so what lands here is a typo or an endpoint that has not
@@ -476,9 +478,127 @@ describe("the dashboard", () => {
     expect(
       handleSync(router, {
         method: "GET",
-        url: "/kiosk/missing.json",
+        url: "/assets/missing.json",
       }).status,
     ).toBe(404)
+  })
+
+  /**
+   * The shared rule's regression set, the same one every fleet app that
+   * adopted Charcuterie's fallback carries. A client route gets the shell;
+   * a missing hashed asset, a missing API route, and any write do not.
+   */
+  describe("follows Charcuterie's shared SPA fallback", () => {
+    it.each([
+      "/bay/3",
+      "/kiosk/slots/usb-0000.00.14.0-2.1",
+      "/settings/advanced",
+      "/notes/readme.md",
+    ])(
+      "serves the shell, uncached, for the client route %s",
+      (url) => {
+        const response = handleSync(
+          buildRouter(buildWebAssets()),
+          { method: "GET", url },
+        )
+
+        expect(response.status).toBe(200)
+        expect(response.contentType).toBe(
+          "text/html; charset=utf-8",
+        )
+        expect(String(response.body)).toBe(INDEX_HTML)
+        expect(response.cachePolicy).toBe("no-store")
+      },
+    )
+
+    it("answers HEAD for a client route with the shell's headers", () => {
+      const response = handleSync(
+        buildRouter(buildWebAssets()),
+        { method: "HEAD", url: "/bay/3" },
+      )
+
+      expect(response.status).toBe(200)
+      expect(response.contentType).toBe(
+        "text/html; charset=utf-8",
+      )
+    })
+
+    it.each([
+      "/assets/definitely-missing-abc123.js",
+      "/assets/index-deadbeef.css",
+    ])(
+      "404s in JSON, not the shell, for the missing asset %s",
+      (url) => {
+        const response = handleSync(
+          buildRouter(buildWebAssets()),
+          { method: "GET", url },
+        )
+
+        expect(response.status).toBe(404)
+        expect(response.contentType).toBe(
+          "application/json; charset=utf-8",
+        )
+      },
+    )
+
+    it.each(["/api/rips", "/json/extra", "/health/deep"])(
+      "keeps the app's JSON 404 for the missing server route %s",
+      (url) => {
+        const response = handleSync(
+          buildRouter(buildWebAssets()),
+          { method: "GET", url },
+        )
+
+        expect(response.status).toBe(404)
+        expect(response.contentType).toBe(
+          "application/json; charset=utf-8",
+        )
+      },
+    )
+
+    it.each([
+      "/definitely-unknown",
+      "/bay/3",
+      "/index.html",
+    ])(
+      "does not answer a POST to %s with the shell",
+      (url) => {
+        const response = handleSync(
+          buildRouter(buildWebAssets()),
+          { method: "POST", url },
+        )
+
+        expect(response.status).toBe(404)
+        expect(response.contentType).toBe(
+          "application/json; charset=utf-8",
+        )
+      },
+    )
+
+    it("serves a built asset as itself, cacheable forever", () => {
+      const response = handleSync(
+        buildRouter(buildWebAssets()),
+        { method: "GET", url: "/assets/index-abc123.js" },
+      )
+
+      expect(response.status).toBe(200)
+      expect(response.contentType).toBe(
+        "text/javascript; charset=utf-8",
+      )
+      expect(response.cachePolicy).toBe("immutable")
+    })
+
+    it("says the dashboard is not built for a client route, too", () => {
+      const response = handleSync(buildRouter(), {
+        method: "GET",
+        url: "/kiosk/bays/2-2.3.2",
+      })
+
+      expect(response.status).toBe(503)
+      expect(response.contentType).toBe(
+        "text/plain; charset=utf-8",
+      )
+    })
   })
 
   it("keeps the query string out of the lookup", () => {
@@ -551,10 +671,9 @@ describe("the dashboard", () => {
   })
 
   it("404s an unknown path rather than falling back to HTML", () => {
-    // The app has no client-side router, so an extension-less
-    // path is a typo, not a deep link — and an API client that
-    // mistypes `/json` must get a status it can act on, not a
-    // 200 with a page in it.
+    // A stale bundle hash is under `/assets/`, which the server
+    // owns, so it is a 404 the browser reports and never a page
+    // it would try to run as JavaScript.
     const response = handleSync(
       buildRouter(buildWebAssets()),
       {
@@ -1024,11 +1143,6 @@ describe("the server's own surface", () => {
       ].map((match) => match[1]),
     )
 
-    // The dashboard's own index, which is the client's by definition.
-    comparedNames.delete("INDEX_PATHNAMES")
-    // The declaration list itself, consulted by `isServerRoutePathname`.
-    comparedNames.delete("SERVER_PATHNAMES")
-
     expect([...comparedNames].sort()).toEqual([
       "BAY_ACTION_PATHNAME",
       "FIXTURES_PATHNAME",
@@ -1039,6 +1153,16 @@ describe("the server's own surface", () => {
       "LOGS_PATHNAME",
       "TRAY_PATHNAME",
       "UNIMPLEMENTED_ACTION_PATHS",
+    ])
+  })
+
+  it("passes every declared pathname and namespace to the shared fallback", () => {
+    // `SERVER_PATH_PREFIXES` is the one list `getIsShellPath` reads. A
+    // pathname left out of it would be handed the dashboard.
+    expect(SERVER_PATH_PREFIXES).toEqual([
+      ...SERVER_PATHNAMES,
+      "/api",
+      "/assets",
     ])
   })
 

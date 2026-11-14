@@ -262,6 +262,9 @@ importers:
 
   packages/daemon:
     dependencies:
+      '@charcuterie/server':
+        specifier: ^0.9.0
+        version: 0.9.0(mqtt@5.15.2)
       '@mux-magic/tools':
         specifier: ^1.4.0
         version: 1.4.0
@@ -536,6 +539,16 @@ packages:
       preact:
         optional: true
       react:
+        optional: true
+
+  '@charcuterie/server@0.9.0':
+    resolution: {integrity: sha512-KjMFsWte81rOKm3nrjcB+ZmBGW6HtyroikiRjJtcQgiPB3KqO3jRRJkr7Hw5zgnAP0T8foIG2RjW7/aRqqIF1Q==}
+    peerDependencies:
+      '@hono/node-server': '>=1.13'
+      hono: '>=4'
+      mqtt: '>=5'
+    peerDependenciesMeta:
+      mqtt:
         optional: true
 
   '@charcuterie/storybook-config@0.4.3':
@@ -3235,6 +3248,10 @@ snapshots:
     optionalDependencies:
       '@tanstack/react-query': 5.101.4(react@19.2.8)
       react: 19.2.8
+
+  '@charcuterie/server@0.9.0(mqtt@5.15.2)':
+    optionalDependencies:
+      mqtt: 5.15.2
 
   '@charcuterie/storybook-config@0.4.3(7264f794ff9cc9b1126ef73c1ca9ed47)':
     dependencies:

@@ -9,6 +9,7 @@ default instinct.
 
 | Date | Decision |
 | --- | --- |
+| 2026-11-14 | [The SPA fallback is Charcuterie's shared rule](2026-11-14-the-spa-fallback-is-charcuteries-shared-rule.md) — the daemon calls `getIsShellPath` from the framework-free `@charcuterie/server/paths` instead of its own rule. A GET or HEAD miss gets the shell unless it is under `SERVER_PATH_PREFIXES` or `/assets/`. In-memory serving, HEAD, the 503 page, and the JSON 404 stay. **Supersedes in part** the 2026-08-16 dot clause: a dotted kiosk ID needs no special case now, and a missing dotted file outside `/assets/` gets the shell. |
 | 2026-11-02 | [Headless ripping can use unknown job names](2026-11-02-headless-ripping-can-use-unknown-job-names.md) — opt-in unique names and audio metadata fallback. |
 | 2026-09-29 | [Drive compartments are bays throughout Rip Deck](2026-09-29-drive-compartments-are-bays-throughout-rip-deck.md) — the internal model and operator wording use bay; old external fields and IDs remain compatible. |
 | 2026-09-25 | [Visual regression shoots the Storybook and the real routes](2026-09-25-visual-regression-shoots-the-storybook-and-the-real-routes.md) — the shared `vrt` workflow compares 28 Storybook shots (every story, dark and light) and 42 route shots written by `yarn vrt:capture` (the dashboard in the Wide and Narrow Views, the 480x320 kiosk, the history), all on fixture data, with the clock, drift, time zone and page size pinned. |

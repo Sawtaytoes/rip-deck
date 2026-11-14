@@ -5,7 +5,9 @@
 **Type:** Architecture / frontend + API surface
 **Supersedes:** the "these two paths and nothing else" index rule in
 `packages/daemon/src/api/router.ts`
-**Superseded by:** —
+**Superseded by:** in part, [The SPA fallback is Charcuterie's shared rule](2026-11-14-the-spa-fallback-is-charcuteries-shared-rule.md)
+(2026-11-14): only the "a path whose last segment contains a dot does not" clause.
+The fallback now uses Charcuterie's `getIsShellPath`; the reserved namespaces stand.
 
 ## Decision
 
@@ -26,6 +28,14 @@ That is now done, on the narrowest rule that works: **a path the server owns —
 `SERVER_PATHNAMES`, or anything under the `/api` or `/assets` namespace including the
 bare segment — is never a client route; otherwise any extension-less path serves the
 dashboard, and a path whose last segment contains a dot does not.**
+
+## Context
+
+Added on 2026-11-14 so that this record passes the decision-record lint. It restates
+the context above and changes no meaning. Before this change, `router.ts` served the
+dashboard's HTML for exactly `/` and `/index.html`, because the app had no client
+router. The fleet decision `2026-08-16-owned-web-apps-use-react-router-with-path-urls`
+asked every owned web app for a client router with path URLs.
 
 ## Why extension-less, and not "anything that isn't an API path"
 
