@@ -3114,6 +3114,14 @@ export const startWatcher = (
                 return
               }
 
+              // Once the watchdog has started stopping this rip,
+              // nothing can take that back: TERM has been sent and
+              // KILL is scheduled. A later reading, such as output
+              // during the termination grace, must not make Keep
+              // trying look possible again.
+              if (current.stall?.isAbandoning === true)
+                return
+
               const stall = toBayStall(liveness)
 
               // The watchdog ticks every few seconds and the
@@ -4599,6 +4607,13 @@ export const startWatcher = (
     }
 
     if (params.action === "keep_trying") {
+      if (bay.stall?.isAbandoning === true) {
+        return {
+          ok: false,
+          msg: "The stall watchdog is already stopping this rip. It cannot be kept going.",
+        }
+      }
+
       bays.set(params.driveId, {
         ...bay,
         isKeepTryingRequested: true,

@@ -189,8 +189,12 @@ export const jobStateForBay = (input: {
       return null
     case "starting":
       return "identifying"
+    // Same rule as `towerFeed.toJobState`, so the retained
+    // drive state and `/json` agree on a flagged rip.
     case "ripping":
-      return "ripping"
+      return (input.bay.stall ?? null) === null
+        ? "ripping"
+        : "stalled"
     case "quarantined":
       return "needs_attention"
     case "done":

@@ -3968,11 +3968,6 @@ describe("startWatcher stall watchdog", () => {
     onLiveness?.(hung("alert"))
     expect(onBayTableChanged).toHaveBeenCalledTimes(1)
 
-    onLiveness?.(hung("abandon"))
-    expect(watcher.getBays()[0].stall?.isAbandoning).toBe(
-      true,
-    )
-
     // Reading normally again clears the flag.
     onLiveness?.({
       kind: "working",
@@ -3983,7 +3978,37 @@ describe("startWatcher stall watchdog", () => {
     })
     expect(watcher.getBays()[0].stall).toBeNull()
 
+    onLiveness?.(hung("abandon"))
+    expect(watcher.getBays()[0].stall?.isAbandoning).toBe(
+      true,
+    )
+
+    // The ripper is stopping now. Output during the termination
+    // grace reads as `hung/alert` again, and must not make Keep
+    // trying look possible.
     onLiveness?.(hung("alert"))
+    expect(watcher.getBays()[0].stall?.isAbandoning).toBe(
+      true,
+    )
+    onLiveness?.({
+      kind: "working",
+      action: "continue",
+      msSinceProgress: 0,
+      msSinceEvent: 0,
+      reason: "Reading normally.",
+    })
+    expect(watcher.getBays()[0].stall?.isAbandoning).toBe(
+      true,
+    )
+
+    const press = await watcher.runBayAction?.({
+      driveId: SLOT_9,
+      action: "keep_trying",
+    })
+    expect(press?.ok).toBe(false)
+    expect(watcher.getBays()[0].isKeepTryingRequested).toBe(
+      false,
+    )
     ripper.finish(SLOT_9, {
       kind: "failed",
       detail: "stall_timeout",
