@@ -29,7 +29,7 @@ Everything else about serving the dashboard stays the same:
 - A write never gets the shell. Only GET and HEAD reach the fallback.
 - The shell is still sent `no-store`.
 
-## Why the shared rule
+## Context
 
 On 2026-11-14 the owner said *"Ah, we can fix these. Go ahead."* about the
 2026-11-12 fleet audit. The audit found that each app's SPA fallback was hand-written
@@ -39,9 +39,14 @@ carries the fleet's rule as `serverPathPrefixes`, and every Hono app uses it.
 The daemon cannot use `createStaticHandler` itself. It is Hono middleware that
 streams each file from disk, and the daemon is plain `node:http`. Its router promises
 that every asset path is a synchronous read of memory, so that a wedged drive can never
-freeze the dashboard. Charcuterie therefore gained a framework-free entry,
-`@charcuterie/server/paths` (0.9.0), that exports the rule alone. The handler and
-this daemon now call the same function.
+freeze the dashboard.
+
+## Why the shared rule, through a framework-free entry
+
+Charcuterie gained a framework-free entry, `@charcuterie/server/paths` (0.9.0), that
+exports the rule alone. The handler and this daemon now call the same function, so the
+two cannot drift again. The daemon keeps its own in-memory serving, and the entry loads
+no Hono.
 
 ## Why the dot rule goes
 

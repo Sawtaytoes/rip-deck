@@ -29,6 +29,14 @@ That is now done, on the narrowest rule that works: **a path the server owns —
 bare segment — is never a client route; otherwise any extension-less path serves the
 dashboard, and a path whose last segment contains a dot does not.**
 
+## Context
+
+Added on 2026-11-14 so that this record passes the decision-record lint. It restates
+the context above and changes no meaning. Before this change, `router.ts` served the
+dashboard's HTML for exactly `/` and `/index.html`, because the app had no client
+router. The fleet decision `2026-08-16-owned-web-apps-use-react-router-with-path-urls`
+asked every owned web app for a client router with path URLs.
+
 ## Why extension-less, and not "anything that isn't an API path"
 
 Because of the one failure the old comment was really protecting against, which has
