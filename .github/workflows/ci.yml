@@ -68,11 +68,11 @@ jobs:
       - name: Lint — formatting and syntax
         # `check .`, not the repo's `lint:biome` (which passes
         # --write --unsafe and would have CI rewriting the tree).
-        run: pnpm exec biome check .
+        run: pnpm exec biome check . --error-on-warnings
 
       - name: Lint — type-aware
         # Same reason the biome step drops --write: `lint:eslint` --fix.
-        run: pnpm exec eslint .
+        run: pnpm exec eslint . --max-warnings 0
 
       - name: Tests
         # `vitest run`, not the repo's bare `vitest`, which would sit in
