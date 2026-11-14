@@ -3905,6 +3905,146 @@ describe("startWatcher reset_bay", () => {
   })
 })
 
+describe("startWatcher stall watchdog", () => {
+  const hung = (action: "alert" | "abandon") => ({
+    kind: "hung" as const,
+    action,
+    msSinceProgress: 180_000,
+    msSinceEvent: 1_000,
+    reason:
+      "Still running but no forward progress for 180s.",
+  })
+
+  it("puts the watchdog's flag on the bay table and clears it when the rip ends", async () => {
+    const ripper = controllableRipper({
+      reportsRipStarted: true,
+    })
+    const onBayTableChanged = vi.fn()
+    const onBayNote = vi.fn()
+    const watcher = startWatcher(
+      {
+        config: noopConfig,
+        governor: createGovernor({ maxConcurrentRips: 1 }),
+        handlers: { onBayTableChanged, onBayNote },
+      },
+      watcherDeps({
+        probeDrives: async () => [
+          probedDrive({
+            driveId: SLOT_9,
+            kernelName: "sr7",
+            sizeSectors: BLURAY_SECTORS,
+          }),
+        ],
+        runBayRip: ripper.runBayRip,
+      }),
+    )
+
+    await watcher.tickNow()
+    await flush()
+
+    const { onLiveness } = ripper.started[0]
+    expect(onLiveness).toBeDefined()
+    expect(watcher.getBays()[0].phase).toBe("ripping")
+    expect(watcher.getBays()[0].stall ?? null).toBeNull()
+
+    onLiveness?.(hung("alert"))
+
+    expect(watcher.getBays()[0].stall).toEqual({
+      kind: "hung",
+      isAbandoning: false,
+      reason:
+        "Still running but no forward progress for 180s.",
+    })
+    expect(onBayTableChanged).toHaveBeenCalledTimes(1)
+    expect(onBayNote).toHaveBeenCalledWith({
+      driveId: SLOT_9,
+      bay: ripper.started[0].bay,
+      name: ripper.started[0].name,
+      message:
+        "stall watchdog: Still running but no forward progress for 180s.",
+    })
+
+    // The same reading again is not news for the dashboard.
+    onLiveness?.(hung("alert"))
+    expect(onBayTableChanged).toHaveBeenCalledTimes(1)
+
+    onLiveness?.(hung("abandon"))
+    expect(watcher.getBays()[0].stall?.isAbandoning).toBe(
+      true,
+    )
+
+    // Reading normally again clears the flag.
+    onLiveness?.({
+      kind: "working",
+      action: "continue",
+      msSinceProgress: 0,
+      msSinceEvent: 0,
+      reason: "Reading normally.",
+    })
+    expect(watcher.getBays()[0].stall).toBeNull()
+
+    onLiveness?.(hung("alert"))
+    ripper.finish(SLOT_9, {
+      kind: "failed",
+      detail: "stall_timeout",
+    })
+    await flush()
+
+    expect(watcher.getBays()[0].phase).toBe("done")
+    expect(watcher.getBays()[0].stall).toBeNull()
+
+    // A reading that lands after the outcome describes a rip
+    // that is over, so it must not bring the flag back.
+    onLiveness?.(hung("alert"))
+    expect(watcher.getBays()[0].stall).toBeNull()
+
+    await watcher.stop()
+  })
+
+  it("records Keep trying on a stalled rip", async () => {
+    const ripper = controllableRipper({
+      reportsRipStarted: true,
+    })
+    const watcher = startWatcher(
+      {
+        config: noopConfig,
+        governor: createGovernor({ maxConcurrentRips: 1 }),
+      },
+      watcherDeps({
+        probeDrives: async () => [
+          probedDrive({
+            driveId: SLOT_9,
+            kernelName: "sr7",
+            sizeSectors: BLURAY_SECTORS,
+          }),
+        ],
+        runBayRip: ripper.runBayRip,
+      }),
+    )
+
+    await watcher.tickNow()
+    await flush()
+    ripper.started[0].onLiveness?.(hung("alert"))
+
+    const result = await watcher.runBayAction?.({
+      driveId: SLOT_9,
+      action: "keep_trying",
+    })
+
+    expect(result?.ok).toBe(true)
+    expect(watcher.getBays()[0].isKeepTryingRequested).toBe(
+      true,
+    )
+    // The ripper's watchdog reads the press through this.
+    expect(
+      ripper.started[0].isKeepTryingRequested?.(),
+    ).toBe(true)
+
+    ripper.finish(SLOT_9)
+    await watcher.stop()
+  })
+})
+
 /**
  * `rip_bay` — the operator ripping a held bay from the dashboard.
  *

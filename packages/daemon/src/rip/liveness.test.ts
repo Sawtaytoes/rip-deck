@@ -1,6 +1,12 @@
 import { HEALTH_THRESHOLDS } from "@rip-deck/contracts"
 import { describe, expect, it } from "vitest"
-import { assessLiveness } from "./liveness.ts"
+import {
+  assessLiveness,
+  isKeepTryingSensibleForStall,
+  isSameBayStall,
+  type Liveness,
+  toBayStall,
+} from "./liveness.ts"
 
 /**
  * Requirement D3: detect a stall on wall clock, independent of
@@ -143,5 +149,81 @@ describe("silent — the process is wedged, not slow", () => {
     })
 
     expect(liveness.kind).toBe("hung")
+  })
+})
+
+describe("toBayStall", () => {
+  const reading = (
+    kind: Liveness["kind"],
+    action: Liveness["action"],
+  ): Liveness => ({
+    kind,
+    action,
+    msSinceProgress: 180_000,
+    msSinceEvent: 1_000,
+    reason: `${kind} ${action}`,
+  })
+
+  it("flags only a reading that is not continue", () => {
+    expect(
+      toBayStall(reading("working", "continue")),
+    ).toBeNull()
+    expect(
+      toBayStall(reading("starting", "continue")),
+    ).toBeNull()
+    expect(toBayStall(reading("hung", "alert"))).toEqual({
+      kind: "hung",
+      isAbandoning: false,
+      reason: "hung alert",
+    })
+    expect(
+      toBayStall(reading("silent", "abandon")),
+    ).toEqual({
+      kind: "silent",
+      isAbandoning: true,
+      reason: "silent abandon",
+    })
+  })
+
+  it("offers Keep trying only while a hung rip is still alive", () => {
+    const stallOf = (
+      kind: Liveness["kind"],
+      action: Liveness["action"],
+    ) => {
+      const stall = toBayStall(reading(kind, action))
+      if (stall === null) throw new Error("no stall")
+      return stall
+    }
+
+    expect(
+      isKeepTryingSensibleForStall(
+        stallOf("hung", "alert"),
+      ),
+    ).toBe(true)
+    expect(
+      isKeepTryingSensibleForStall(
+        stallOf("hung", "abandon"),
+      ),
+    ).toBe(false)
+    expect(
+      isKeepTryingSensibleForStall(
+        stallOf("silent", "alert"),
+      ),
+    ).toBe(false)
+  })
+
+  it("treats a moving reason as the same stall", () => {
+    const first = toBayStall(reading("hung", "alert"))
+    const later = first && { ...first, reason: "later" }
+
+    expect(isSameBayStall(first, later)).toBe(true)
+    expect(isSameBayStall(null, null)).toBe(true)
+    expect(isSameBayStall(first, null)).toBe(false)
+    expect(
+      isSameBayStall(
+        first,
+        toBayStall(reading("hung", "abandon")),
+      ),
+    ).toBe(false)
   })
 })

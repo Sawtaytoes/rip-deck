@@ -590,10 +590,13 @@ const projectBay = (
 
   const isTroubled =
     verdict.kind !== "ok" && verdict.kind !== "unknown"
+  // A mock `stalled` bay is the watchdog's alert: still
+  // retrying, not yet abandoned, so Keep trying can still help.
+  const isStalled = state === "stalled"
 
   if (
     isActive &&
-    isTroubled &&
+    (isTroubled || isStalled) &&
     verdict.isKeepTryingSensible &&
     !isKeepTryingRequested
   ) {

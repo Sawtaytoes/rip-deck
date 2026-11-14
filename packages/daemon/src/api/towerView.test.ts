@@ -22,6 +22,7 @@ import {
   createBayState,
 } from "../rip/watcher.ts"
 import {
+  type BaySnapshot,
   createBaySnapshot,
   createTowerSnapshot,
 } from "./snapshot.ts"
@@ -623,6 +624,78 @@ describe("the tower view", () => {
       }).bays[0]
       expect(bay.actions).toEqual(["cancel"])
     }
+  })
+
+  it("offers keep-trying when the stall watchdog flags a rip", () => {
+    const stalledBay = (input: {
+      stall: BaySnapshot["stall"]
+      job?: Partial<Job>
+    }) =>
+      view({
+        bays: [
+          {
+            ...buildBay({
+              bay: 4,
+              job: buildJob({
+                state: "stalled",
+                ...input.job,
+              }),
+            }),
+            stall: input.stall,
+          },
+        ],
+      }).bays[0]
+    const hung = {
+      kind: "hung" as const,
+      isAbandoning: false,
+      reason:
+        "Still running but no forward progress for 180s.",
+    }
+
+    // The verdict stays `unknown` for the whole rip, so the
+    // watchdog's flag is the only known problem a live rip has.
+    expect(
+      stalledBay({
+        stall: hung,
+        job: {
+          verdict: makeVerdict("unknown", "suspected", []),
+        },
+      }).actions,
+    ).toEqual(["keep_trying", "cancel"])
+    // Spent once pressed.
+    expect(
+      stalledBay({
+        stall: hung,
+        job: { isKeepTryingRequested: true },
+      }).actions,
+    ).toEqual(["cancel"])
+    // A rip the watchdog is already stopping, a drive that has
+    // stopped answering, and a verdict that says continuing is
+    // pointless get no Keep trying.
+    for (const stall of [
+      { ...hung, isAbandoning: true },
+      { ...hung, kind: "silent" as const },
+    ]) {
+      expect(stalledBay({ stall }).actions).toEqual([
+        "cancel",
+      ])
+    }
+    expect(
+      stalledBay({
+        stall: hung,
+        job: {
+          verdict: makeVerdict(
+            "hub_fault",
+            "confirmed",
+            [],
+          ),
+        },
+      }).actions,
+    ).toEqual(["cancel"])
+    // A `stalled` state with no watchdog reading behind it.
+    expect(stalledBay({ stall: null }).actions).toEqual([
+      "cancel",
+    ])
   })
 
   it("labels a fixture response as fake", () => {

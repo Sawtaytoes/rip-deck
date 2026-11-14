@@ -42,7 +42,7 @@ audio CD, and its data session is not imaged. The bay card says so.
 
 The dashboard can cancel a running rip. Cancellation waits for that job to stop before it opens only the matching tray.
 
-Normal rips show Cancel. Keep trying appears only for a known issue that permits continued reading. Hover over or focus a control for its explanation. Select a bay chip to open its drive details. Use the action on the affected bay instead of power-cycling the tower during other rips.
+Normal rips show Cancel. Keep trying appears only for a known issue that permits continued reading. A rip that stops advancing is one: the card turns amber and reads Stalled, and Keep trying stops the watchdog from abandoning it. A drive that stops answering, or a rip the watchdog is already stopping, gets no Keep trying. Hover over or focus a control for its explanation. Select a bay chip to open its drive details. Use the action on the affected bay instead of power-cycling the tower during other rips.
 
 ## Use tray controls safely
 

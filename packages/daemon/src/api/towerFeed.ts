@@ -3,6 +3,7 @@ import {
   type DiscIdentity,
   type DiscType,
   EMPTY_PROGRESS,
+  isJobActive,
   type Job,
   type JobProgress,
   type JobState,
@@ -22,6 +23,7 @@ import {
   createPosterStoreFromEnv,
   type PosterStore,
 } from "../metadata/posterStore.ts"
+import type { BayStall } from "../rip/liveness.ts"
 import {
   STABLE_USB,
   type UsbStability,
@@ -299,6 +301,8 @@ export const toJobState = (input: {
   phase: BayPhase | null
   outcome: BayOutcome | null
   hasSeenProgress: boolean
+  /** What the liveness watchdog says about the running rip. */
+  stall?: BayStall | null
 }): JobState | null => {
   const { outcome } = input
 
@@ -325,8 +329,13 @@ export const toJobState = (input: {
   }
 
   switch (input.phase) {
+    // The watchdog has flagged this rip. It is still running,
+    // and `stalled` is what lets the card say so and offer Keep
+    // trying before the watchdog gives up on it.
     case "ripping":
-      return "ripping"
+      return (input.stall ?? null) === null
+        ? "ripping"
+        : "stalled"
     case "starting":
       return "settling"
     case "quarantined":
@@ -368,6 +377,10 @@ type BayFacts = {
   latchedAtMs: number | null
   /** The operator said this disc has been taken out. */
   isLoadedDismissed: boolean
+  /** The liveness watchdog's flag on the running rip, if any. */
+  stall: BayStall | null
+  /** The operator pressed Keep trying on the running rip. */
+  isKeepTryingRequested: boolean
 }
 
 const readBayFacts = (input: {
@@ -392,6 +405,9 @@ const readBayFacts = (input: {
       isAdopted: false,
       latchedAtMs: null,
       isLoadedDismissed: false,
+      // Both live only in the bay table.
+      stall: null,
+      isKeepTryingRequested: false,
     }
   }
 
@@ -410,6 +426,9 @@ const readBayFacts = (input: {
     isAdopted: bay.isAdopted,
     latchedAtMs: bay.latchedAtMs,
     isLoadedDismissed: bay.isLoadedDismissed,
+    stall: bay.stall ?? null,
+    isKeepTryingRequested:
+      bay.isKeepTryingRequested ?? false,
   }
 }
 
@@ -600,6 +619,7 @@ const buildJob = (input: {
     phase: facts.phase,
     outcome: facts.outcome,
     hasSeenProgress: record.hasSeenProgress,
+    stall: facts.stall,
   })
 
   if (state === null) return null
@@ -651,10 +671,11 @@ const buildJob = (input: {
     // recorded it. Not inferrable here: an adopted bay emits a
     // "held on startup" note that looks like any other event.
     isAdopted: facts.isAdopted,
-    // There is no operator control path in `watch` yet — drive
-    // commands are MQTT's (`cmd/drive`), and nothing consumes
-    // them.
-    isKeepTryingRequested: false,
+    // Off the bay table, where `POST /api/bay-action` wrote the
+    // press. Only a running rip can still be kept going, so a
+    // finished card never says Keep trying is on.
+    isKeepTryingRequested:
+      isJobActive(state) && facts.isKeepTryingRequested,
   }
 }
 
@@ -788,6 +809,7 @@ export const createTowerFeed = ({
                   sighting?.isDrivePresent ?? true,
               },
         job: buildJob({ record, facts, poster, verdicts }),
+        stall: facts.stall,
         supervision:
           facts.phase === "quarantined"
             ? {

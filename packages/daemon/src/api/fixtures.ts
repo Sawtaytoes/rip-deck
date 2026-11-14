@@ -192,6 +192,17 @@ const buildFixtureBay = (input: {
     model: "BD-RW BDR-211M",
     serial: `FIXTURE00${input.bay}`,
     job: input.job ?? null,
+    // A stalled fixture is what the watchdog's alert looks like
+    // on a live bay: still retrying, not yet abandoned.
+    stall:
+      input.job?.state === "stalled"
+        ? {
+            kind: "hung",
+            isAbandoning: false,
+            reason:
+              "Still running but no forward progress for 180s.",
+          }
+        : null,
     supervision: input.isQuarantined
       ? {
           ...supervision,

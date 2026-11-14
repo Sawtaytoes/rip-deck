@@ -33,6 +33,25 @@ const TRAY_WORDS: ReadonlySet<BayAction> = new Set([
   "close_bay",
 ])
 
+/**
+ * Keep trying answers a known problem, and only two are known
+ * while a rip runs: a diagnosis that says continuing is sensible,
+ * and the stall watchdog's flag. For a `stalled` bay the daemon
+ * puts Keep trying in `bay.actions` only while a press can still
+ * help, so the state is enough here.
+ */
+function isKeepTryingOffered(
+  bay: BayView | undefined,
+): boolean {
+  if (bay?.state.state === "stalled") return true
+
+  return (
+    bay?.state.verdict !== "unknown" &&
+    bay?.state.verdict !== "ok" &&
+    bay?.alert?.is_keep_trying_sensible === true
+  )
+}
+
 /** The bay's controls, minus the tray pair the ⏏ toggle owns. */
 export function jobActionsFor(
   bay: BayView | undefined,
@@ -42,9 +61,7 @@ export function jobActionsFor(
       !TRAY_WORDS.has(action) &&
       action !== "give_up" &&
       (action !== "keep_trying" ||
-        (bay?.state.verdict !== "unknown" &&
-          bay?.state.verdict !== "ok" &&
-          bay?.alert?.is_keep_trying_sensible === true)),
+        isKeepTryingOffered(bay)),
   )
 }
 

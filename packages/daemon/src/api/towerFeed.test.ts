@@ -226,6 +226,41 @@ const outcome = (
     : { kind, detail, warnings }
 
 describe("the bay-phase to job-state mapping", () => {
+  it("reads a rip the watchdog has flagged as stalled", () => {
+    const stall = {
+      kind: "hung" as const,
+      isAbandoning: false,
+      reason:
+        "Still running but no forward progress for 180s.",
+    }
+
+    expect(
+      toJobState({
+        phase: "ripping",
+        outcome: null,
+        hasSeenProgress: true,
+        stall,
+      }),
+    ).toBe("stalled")
+    expect(
+      toJobState({
+        phase: "ripping",
+        outcome: null,
+        hasSeenProgress: true,
+        stall: null,
+      }),
+    ).toBe("ripping")
+    // The outcome wins: a finished rip is not stalled.
+    expect(
+      toJobState({
+        phase: "done",
+        outcome: outcome("failed", "stall_timeout"),
+        hasSeenProgress: true,
+        stall,
+      }),
+    ).toBe("failed")
+  })
+
   it("resolves an ambiguous phase downwards", () => {
     // `starting` is settle AND type AND identify. Claiming the
     // last of those would put a disc in a step it has not
@@ -1729,6 +1764,68 @@ describe("the fed store, served", () => {
     expect(rip.drive_name).toBe("02 - Pioneer BDR-211M")
     expect(rip.verdict).toBe("unknown")
     expect(document.ripDeck.bays).toHaveLength(1)
+  })
+
+  it("carries the watchdog's stall and the Keep trying press to the bay", () => {
+    const stall = {
+      kind: "hung" as const,
+      isAbandoning: false,
+      reason:
+        "Still running but no forward progress for 180s.",
+    }
+    const harness = createHarness({
+      bays: fakeBays([{ phase: "ripping" }]).map((bay) => ({
+        ...bay,
+        stall,
+      })),
+    })
+
+    harness.handlers.onBayProgress?.({
+      ...bayEvent,
+      progress: { ...EMPTY_PROGRESS, totalFraction: 0.43 },
+    })
+
+    expect(harness.readBay()?.job?.state).toBe("stalled")
+    expect(harness.readBay()?.stall).toEqual(stall)
+    expect(
+      harness.readBay()?.job?.isKeepTryingRequested,
+    ).toBe(false)
+
+    harness.setBays(
+      fakeBays([{ phase: "ripping" }]).map((bay) => ({
+        ...bay,
+        stall,
+        isKeepTryingRequested: true,
+      })),
+    )
+    harness.handlers.onBayTableChanged?.()
+
+    expect(
+      harness.readBay()?.job?.isKeepTryingRequested,
+    ).toBe(true)
+
+    // A finished card never says Keep trying is still on.
+    harness.setBays(
+      fakeBays([
+        {
+          phase: "done",
+          outcome: outcome("failed", "stall_timeout"),
+        },
+      ]).map((bay) => ({
+        ...bay,
+        isKeepTryingRequested: true,
+      })),
+    )
+    harness.handlers.onBayOutcome?.({
+      ...bayEvent,
+      outcome: outcome("failed", "stall_timeout"),
+    })
+
+    expect(harness.readBay()?.job?.state).toBe("failed")
+    expect(harness.readBay()?.stall).toBeNull()
+    expect(
+      harness.readBay()?.job?.isKeepTryingRequested,
+    ).toBe(false)
   })
 
   it("serves an adopted disc's name and folder", async () => {

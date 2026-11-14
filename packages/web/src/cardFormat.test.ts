@@ -64,6 +64,28 @@ describe("jobActionsFor", () => {
 
     expect(actions).toEqual(["cancel"])
   })
+
+  // The watchdog's flag is a known problem even though the
+  // verdict stays `unknown` until the rip ends.
+  it("keeps Keep trying for a rip the stall watchdog flagged", () => {
+    const bay = (state: "stalled" | "ripping") =>
+      buildBayView({
+        actions: ["keep_trying", "cancel"],
+        state: {
+          ...buildBayView().state,
+          state,
+          verdict: "unknown",
+        },
+      })
+
+    expect(jobActionsFor(bay("stalled"))).toEqual([
+      "keep_trying",
+      "cancel",
+    ])
+    expect(jobActionsFor(bay("ripping"))).toEqual([
+      "cancel",
+    ])
+  })
 })
 
 describe("isTrayOffered", () => {

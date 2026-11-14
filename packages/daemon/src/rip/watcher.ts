@@ -98,6 +98,12 @@ import {
   identifyDisc,
 } from "./identifyDisc.ts"
 import {
+  type BayStall,
+  isSameBayStall,
+  type Liveness,
+  toBayStall,
+} from "./liveness.ts"
+import {
   type LoadedDiscSummary,
   phantomLoadedBays,
   summariseLoadedDiscs,
@@ -591,6 +597,18 @@ export type BayState = {
   isLoadedDismissed: boolean
   /** A human told the liveness watchdog to continue this rip. */
   isKeepTryingRequested?: boolean
+  /**
+   * What the liveness watchdog last said about the running rip,
+   * or null while it reads normally.
+   *
+   * A live reading and never persisted: the ledger writes its own
+   * fields, and a restarted daemon has no rip to judge. Cleared
+   * when a rip starts and when it finishes, so it can only ever
+   * describe the rip in the tray now. It is what makes the card
+   * read `stalled` and offer Keep trying before the watchdog
+   * abandons the rip.
+   */
+  stall?: BayStall | null
   updatedAtMs: number
 }
 
@@ -685,6 +703,7 @@ export const createBayState = (input: {
   // dismissal die with the disc it was about.
   isLoadedDismissed: false,
   isKeepTryingRequested: false,
+  stall: null,
   updatedAtMs: input.atMs,
 })
 
@@ -874,6 +893,7 @@ export const applyBayDecision = (input: {
         // the last one is spent.
         isLoadedDismissed: false,
         isKeepTryingRequested: false,
+        stall: null,
         updatedAtMs: atMs,
       }
 
@@ -1016,6 +1036,8 @@ export const applyBayOutcome = (input: {
         // The disc left before anything could be done with it, so
         // there is nothing left to have been dismissed.
         isLoadedDismissed: false,
+        // The rip is over, so nothing is stalling any more.
+        stall: null,
         updatedAtMs: input.atMs,
       }
     : {
@@ -1052,6 +1074,8 @@ export const applyBayOutcome = (input: {
         // operator said about the bay before this latch was about
         // an earlier disc.
         isLoadedDismissed: false,
+        // The rip is over, so nothing is stalling any more.
+        stall: null,
         updatedAtMs: input.atMs,
       }
 
@@ -1136,6 +1160,15 @@ export type BayRipInput = {
   config: WatcherConfig
   signal: AbortSignal
   isKeepTryingRequested?: () => boolean
+  /**
+   * Every liveness reading the ripper's watchdog takes.
+   *
+   * Both rippers run under `startLivenessWatchdog`, and this is
+   * how its "this rip has stopped moving" reaches the bay table
+   * and the dashboard while there is still time to press Keep
+   * trying.
+   */
+  onLiveness?: (liveness: Liveness) => void
   /** Progress narration, for the console. */
   note: (message: string) => void
   /** Called the instant a ripper child exists. */
@@ -1488,7 +1521,10 @@ const ripWithMakemkv = async (context: {
       signal: input.signal,
       isKeepTryingRequested: input.isKeepTryingRequested,
     },
-    { onProgress: input.onProgress },
+    {
+      onProgress: input.onProgress,
+      onLiveness: input.onLiveness,
+    },
   )
 
   if (result.isSuccessful) {
@@ -1740,6 +1776,7 @@ export const ripAudioCd = async (context: {
       signal: input.signal,
       log,
       isKeepTryingRequested: input.isKeepTryingRequested,
+      onLiveness: input.onLiveness,
       onProgress: input.onProgress,
       watchdog: context.watchdog,
     }
@@ -3064,6 +3101,47 @@ export const startWatcher = (
                 ...bay,
                 destinationPath,
               })),
+            onLiveness: (liveness) => {
+              const current = bays.get(driveId)
+
+              // Only the rip in the tray now. A reading that
+              // lands after the outcome latched describes a rip
+              // that is already over.
+              if (
+                current === undefined ||
+                current.phase !== "ripping"
+              ) {
+                return
+              }
+
+              const stall = toBayStall(liveness)
+
+              // The watchdog ticks every few seconds and the
+              // reason's seconds move on each one. Only a change
+              // the dashboard can show is worth a roster sync.
+              if (
+                isSameBayStall(current.stall ?? null, stall)
+              ) {
+                return
+              }
+
+              bays.set(driveId, {
+                ...current,
+                stall,
+                updatedAtMs: deps.now(),
+              })
+
+              if (stall !== null) {
+                handlers.onBayNote?.({
+                  driveId,
+                  bay,
+                  name,
+                  message: `stall watchdog: ${stall.reason}`,
+                })
+              }
+
+              handlers.onBayTableChanged?.()
+            },
             onProgress: (progress) =>
               handlers.onBayProgress?.({
                 driveId,

@@ -196,3 +196,55 @@ export const startLivenessWatchdog = (input: {
 
   return () => clearInterval(timer)
 }
+
+/**
+ * What the dashboard needs to know about a flagged rip.
+ *
+ * The bay table keeps this while the watchdog says anything but
+ * "continue", so a rip that stops moving reads as `stalled` and
+ * can be offered Keep trying before the watchdog abandons it.
+ * It is a reading, not a health verdict: it names what the clock
+ * saw, never a cause.
+ */
+export type BayStall = {
+  kind: Extract<LivenessKind, "hung" | "silent">
+  /** The watchdog is stopping this rip on this tick. */
+  isAbandoning: boolean
+  /** `Liveness.reason`, for the console and the logs. */
+  reason: string
+}
+
+/** The stall a liveness reading reports, or null for none. */
+export const toBayStall = (
+  liveness: Liveness,
+): BayStall | null =>
+  liveness.action === "continue" ||
+  (liveness.kind !== "hung" && liveness.kind !== "silent")
+    ? null
+    : {
+        kind: liveness.kind,
+        isAbandoning: liveness.action === "abandon",
+        reason: liveness.reason,
+      }
+
+/** Two readings that say the same thing to the dashboard. */
+export const isSameBayStall = (
+  left: BayStall | null,
+  right: BayStall | null,
+): boolean =>
+  left === null || right === null
+    ? left === right
+    : left.kind === right.kind &&
+      left.isAbandoning === right.isAbandoning
+
+/**
+ * Keep trying can still change what happens to this rip.
+ *
+ * `hung` means the ripper is alive and retrying, which sometimes
+ * recovers, so it matches `buildLivenessAlertPayload`'s answer.
+ * `silent` means the drive stopped answering, and a rip the
+ * watchdog is already stopping cannot be kept going by a press.
+ */
+export const isKeepTryingSensibleForStall = (
+  stall: BayStall,
+): boolean => stall.kind === "hung" && !stall.isAbandoning
