@@ -1,3 +1,5 @@
+import { getIsShellPath } from "@charcuterie/server/paths"
+
 import type { TopicConfig } from "../mqtt/topics.ts"
 import {
   type LiveRipsReader,
@@ -31,7 +33,6 @@ import {
 import {
   EMPTY_WEB_ASSETS,
   HASHED_PREFIX,
-  WEB_INDEX_PATHNAME,
   type WebAsset,
   type WebAssets,
 } from "./webAssets.ts"
@@ -200,11 +201,6 @@ const UNIMPLEMENTED_ACTION_PATHS = [
 ]
 
 /**
- * The paths the dashboard's HTML answers outright.
- */
-const INDEX_PATHNAMES = ["/", WEB_INDEX_PATHNAME]
-
-/**
  * Every exact pathname this server answers itself.
  *
  * Built from the same constants the dispatch chain matches on, so
@@ -229,16 +225,10 @@ export const SERVER_PATHNAMES = [
  * Namespaces the server owns whole, bare segment included.
  *
  * `/api` is the API's and `/assets` is Vite's content-hashed
- * output. Stored WITHOUT the trailing slash and matched as
- * "equals, or starts with the slash", because both boundaries
- * bite:
- *
- * - `startsWith("/api/")` alone lets bare `/api` fall through to
- *   the extension test, which sees no dot and serves the
- *   dashboard — 200 HTML where the API answered a JSON 404
- *   before the router existed.
- * - `startsWith("/api")` alone over-matches and would swallow a
- *   real client route like `/apiary`.
+ * output. Each one owns its bare segment and everything below it,
+ * but not a sibling that merely starts with the same letters:
+ * `/api` and `/api/rips` are the server's, `/apiary` is a client
+ * route. `getIsShellPath` matches on that segment boundary.
  */
 const SERVER_PREFIXES = [
   "/api",
@@ -246,80 +236,48 @@ const SERVER_PREFIXES = [
 ]
 
 /**
- * Is this path the SERVER's rather than the client router's?
+ * Every path the SERVER owns, which is the one list the SPA
+ * fallback reads.
  *
- * The fallback consults this instead of testing prefixes inline,
- * so a new top-level route has one obvious place to be declared.
- * Everything the dispatch chain matches above the fallback is
- * here, which matters for the paths it does NOT match: a typo or
- * an endpoint that has not shipped under a namespace the server
- * owns still wants the JSON 404 its caller can act on, rather
- * than a page it will fail to parse.
- *
- * This is the same failure the extension test guards, one client
- * along: `GET /api/rips` answering 200 + HTML every day until
- * that endpoint ships is a JSON client being handed a document,
- * exactly as a moved bundle hash is the browser's script loader
- * being handed one.
+ * The exact pathnames go in as prefixes too, so `/json/extra` is
+ * the server's JSON 404 rather than a page. A new top-level route
+ * joins `SERVER_PATHNAMES` and is covered here automatically;
+ * `router.test.ts` fails if the two drift.
  */
-const isServerRoutePathname = (pathname: string): boolean =>
-  SERVER_PATHNAMES.includes(pathname) ||
-  SERVER_PREFIXES.some(
-    (prefix) =>
-      pathname === prefix ||
-      pathname.startsWith(`${prefix}/`),
-  )
+export const SERVER_PATH_PREFIXES = [
+  ...SERVER_PATHNAMES,
+  ...SERVER_PREFIXES,
+]
 
 /**
- * Does this path belong to the dashboard's client router?
+ * Does a GET or HEAD that matched no file get the dashboard?
  *
- * The previous rule was "these two paths and nothing else", because the app had
- * no client-side router — every bit of its state was in the query string
- * (`?fake=`) — so an extension-less `/bay/3` was a mistake rather than a deep
- * link. It has a router as of 2026-08-16 (fleet decision
- * `2026-08-16-owned-web-apps-use-react-router-with-path-urls`), and that comment
- * said what to do when one arrived: widen the fallback HERE, keeping every API
- * path above it.
+ * The rule is Charcuterie's, the same one `createStaticHandler`
+ * applies to every Hono app in the fleet: a miss gets the shell
+ * unless it falls under `SERVER_PATH_PREFIXES` or under Vite's
+ * hashed `/assets/`. It is imported from the framework-free
+ * `@charcuterie/server/paths` entry because this server is plain
+ * `node:http` and serves its bytes from memory, so it shares the
+ * rule and not the handler.
  *
- * Two guards, in order:
+ * - **A missing bundle is a 404, by where it is.** A moved hash
+ *   under `/assets/` never gets 200 + HTML, which the browser
+ *   would try to execute as JavaScript and fail on in a way that
+ *   says nothing about the real problem.
+ * - **A path with a dot is a client route too.** Drive IDs contain
+ *   dots, so `/kiosk/bays/2-2.3.2` is a deep link, not a file.
+ *   That needed a special case under the old extension rule.
  *
- * 1. **The server's own paths and namespaces win outright** —
- *    `isServerRoutePathname`. Anything the server owns keeps
- *    answering as the caller that asked expects, whether or not
- *    that exact path exists yet.
- * 2. **Extension-less only, for everything else.** A path with a
- *    dot in its last segment is asking for a FILE, so a missing
- *    `/assets/index-abc123.js` stays a 404 the browser reports —
- *    never 200 + HTML, which the browser would try to execute as
- *    JavaScript and fail on in a way that says nothing about the
- *    real problem.
- *
- * The residual cost is a mistyped `/jsonn` rendering the
- * dashboard instead of returning a JSON 404. That is the price of
- * a client router, and it is the same trade every other app in
- * the fleet makes.
- *
- * A real file still wins over both — `readAsset` is consulted
- * before this function is, so every asset that exists is served
- * as itself.
+ * A real file still wins: `readAsset` is consulted first, so every
+ * asset that exists is served as itself. See
+ * `docs/decisions/2026-11-14-the-spa-fallback-is-charcuteries-shared-rule.md`.
  */
-const isClientRoutePathname = (
-  pathname: string,
-): boolean => {
-  if (INDEX_PATHNAMES.includes(pathname)) return true
-
-  if (isServerRoutePathname(pathname)) return false
-
-  // Drive IDs contain dots. This explicit client route carries an ID, not a file.
-  if (/^\/kiosk\/(?:bays|slots)\/[^/]+$/.test(pathname))
-    return true
-
-  const lastSegment = pathname.slice(
-    pathname.lastIndexOf("/") + 1,
-  )
-
-  return !lastSegment.includes(".")
-}
+const isShellPathname = (pathname: string): boolean =>
+  getIsShellPath({
+    immutablePathPrefixes: [HASHED_PREFIX],
+    pathname,
+    serverPathPrefixes: SERVER_PATH_PREFIXES,
+  })
 
 /**
  * What `GET /` says when the dashboard is not in this image.
@@ -892,13 +850,13 @@ export const createApiRouter = ({
       // index path, and an asset that EXISTS should be served as itself.
       const asset =
         webAssets.readAsset({ pathname }) ??
-        (isClientRoutePathname(pathname)
+        (isShellPathname(pathname)
           ? webAssets.readIndexHtml()
           : null)
 
       if (asset !== null) return assetResponse(asset)
 
-      if (isClientRoutePathname(pathname)) {
+      if (isShellPathname(pathname)) {
         return {
           status: 503,
           contentType: "text/plain; charset=utf-8",

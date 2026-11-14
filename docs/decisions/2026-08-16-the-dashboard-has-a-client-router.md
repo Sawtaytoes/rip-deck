@@ -5,7 +5,9 @@
 **Type:** Architecture / frontend + API surface
 **Supersedes:** the "these two paths and nothing else" index rule in
 `packages/daemon/src/api/router.ts`
-**Superseded by:** —
+**Superseded by:** in part, [The SPA fallback is Charcuterie's shared rule](2026-11-14-the-spa-fallback-is-charcuteries-shared-rule.md)
+(2026-11-14): only the "a path whose last segment contains a dot does not" clause.
+The fallback now uses Charcuterie's `getIsShellPath`; the reserved namespaces stand.
 
 ## Decision
 
