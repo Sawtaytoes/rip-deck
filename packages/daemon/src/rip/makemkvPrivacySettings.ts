@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import {
   chmod,
   chown,
+  lstat,
   mkdir,
   readFile,
   realpath,
@@ -113,6 +114,11 @@ const readTextOrNull = async (
  * Follow a symlinked `settings.conf` to the file it names, so the
  * rename below replaces that file and not the link. A missing file
  * is written where MakeMKV looks for it.
+ *
+ * A symlink whose target does not exist is refused, and the link
+ * is left as it is. Writing at the link's path would replace the
+ * link with a plain file, and a key put at the intended target
+ * later would never reach MakeMKV.
  */
 const resolveSettingsFilePath = async (
   filePath: string,
@@ -120,10 +126,34 @@ const resolveSettingsFilePath = async (
   try {
     return await realpath(filePath)
   } catch (error) {
-    if (isMissingFileError(error)) return filePath
-    throw error
+    if (!isMissingFileError(error)) throw error
   }
+
+  const linkStats = await lstat(filePath).catch(
+    (error: unknown) => {
+      if (isMissingFileError(error)) return null
+      throw error
+    },
+  )
+
+  if (linkStats?.isSymbolicLink() === true) {
+    throw new Error(
+      `${filePath} is a symlink to a file that does not exist. ` +
+        "It was left as it is.",
+    )
+  }
+
+  return filePath
 }
+
+/**
+ * The settings file changed between the read and the rename, so
+ * the edit was made from old text. It is redone from the new text.
+ */
+class SettingsChangedError extends Error {}
+
+/** How many times an edit is redone before it gives up. */
+const MAX_EDIT_ATTEMPTS = 5
 
 /**
  * Replace a file without truncating it in place.
@@ -140,10 +170,18 @@ const resolveSettingsFilePath = async (
  * to a create is filtered by the process umask. A new file is
  * 0600, since it may soon hold a key. On any failure the temporary
  * file is removed and the original is untouched.
+ *
+ * Right before the rename, the original is read again. When it no
+ * longer holds the text the edit was made from (a new key, say),
+ * nothing is replaced and `SettingsChangedError` is thrown. Another
+ * process can still write in the instant between that read and the
+ * rename; only a lock that MakeMKV also honored would close it.
  */
 const replaceFileAtomically = async (input: {
   filePath: string
   text: string
+  /** The text the edit was made from; null for no file. */
+  expectedText: string | null
 }): Promise<void> => {
   const temporaryFilePath = `${input.filePath}.rip-deck-${randomUUID()}.tmp`
   const originalStats = await stat(input.filePath).catch(
@@ -174,6 +212,14 @@ const replaceFileAtomically = async (input: {
         ? 0o600
         : originalStats.mode & 0o7777,
     )
+
+    if (
+      (await readTextOrNull(input.filePath)) !==
+      input.expectedText
+    ) {
+      throw new SettingsChangedError()
+    }
+
     await rename(temporaryFilePath, input.filePath)
   } catch (error) {
     await rm(temporaryFilePath, { force: true })
@@ -186,6 +232,50 @@ export const makemkvSettingsFilePath = (
   makemkvHomePath: string,
 ): string =>
   join(makemkvHomePath, ".MakeMKV", "settings.conf")
+
+/** Read, edit, and replace; redo the edit when the file changed. */
+const editSettingsFile = async (
+  settingsFilePath: string,
+  attempt = 1,
+): Promise<void> => {
+  const targetFilePath = await resolveSettingsFilePath(
+    settingsFilePath,
+  )
+  const originalText = await readTextOrNull(targetFilePath)
+  const updatedText = setMakemkvSettingsInText({
+    settings: makemkvPrivacySettings,
+    settingsText: originalText ?? "",
+  })
+
+  if (updatedText === originalText) return
+
+  await mkdir(dirname(targetFilePath), {
+    recursive: true,
+  })
+
+  try {
+    await replaceFileAtomically({
+      filePath: targetFilePath,
+      text: updatedText,
+      expectedText: originalText,
+    })
+  } catch (error) {
+    if (!(error instanceof SettingsChangedError))
+      throw error
+
+    if (attempt >= MAX_EDIT_ATTEMPTS) {
+      throw new Error(
+        `The file changed during each of ${MAX_EDIT_ATTEMPTS} edits.`,
+      )
+    }
+
+    await editSettingsFile(settingsFilePath, attempt + 1)
+  }
+}
+
+// Calls in this process run one at a time. Each waits for the one
+// before it to settle, and a failure is never passed on to the next.
+let editQueue: Promise<void> = Promise.resolve()
 
 /**
  * Turn off MakeMKV's update check and dump submission.
@@ -202,41 +292,31 @@ export const makemkvSettingsFilePath = (
  * mounted at `/config`. A wrapper that runs makemkvcon on another
  * machine reads another file, which this cannot reach.
  *
+ * Calls in this process run one at a time, and an edit whose file
+ * changed under it is redone from the new text, so a key that was
+ * replaced in the meantime survives.
+ *
  * It fails closed. When the file cannot be read or written, it
  * throws, and the caller does not run makemkvcon.
  */
-export const applyMakemkvPrivacySettings = async (
+export const applyMakemkvPrivacySettings = (
   makemkvHomePath: string = homedir(),
 ): Promise<void> => {
   const settingsFilePath =
     makemkvSettingsFilePath(makemkvHomePath)
 
-  try {
-    const targetFilePath = await resolveSettingsFilePath(
-      settingsFilePath,
-    )
-    const originalText =
-      (await readTextOrNull(targetFilePath)) ?? ""
-    const updatedText = setMakemkvSettingsInText({
-      settings: makemkvPrivacySettings,
-      settingsText: originalText,
+  const run = editQueue
+    .then(() => editSettingsFile(settingsFilePath))
+    .catch((error: unknown) => {
+      throw new Error(
+        "Could not turn off MakeMKV's update check and dump " +
+          `submission in ${settingsFilePath}, so makemkvcon was ` +
+          `not run: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
+      )
     })
 
-    if (updatedText === originalText) return
+  editQueue = run.catch(() => undefined)
 
-    await mkdir(dirname(targetFilePath), {
-      recursive: true,
-    })
-    await replaceFileAtomically({
-      filePath: targetFilePath,
-      text: updatedText,
-    })
-  } catch (error) {
-    throw new Error(
-      "Could not turn off MakeMKV's update check and dump " +
-        `submission in ${settingsFilePath}, so makemkvcon was ` +
-        `not run: ${error instanceof Error ? error.message : String(error)}`,
-      { cause: error },
-    )
-  }
+  return run
 }

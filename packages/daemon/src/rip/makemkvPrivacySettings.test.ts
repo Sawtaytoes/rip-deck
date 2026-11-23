@@ -49,6 +49,13 @@ const renameFailure = vi.hoisted(() => ({
   error: null as Error | null,
 }))
 
+// Runs when the temporary file gets its mode: after the edit has
+// read the original and before it checks the original again. A
+// test uses it to change the file in the middle of an edit.
+const midEdit = vi.hoisted(() => ({
+  hook: null as (() => Promise<void>) | null,
+}))
+
 vi.mock("node:fs/promises", async (importOriginal) => {
   const original =
     await importOriginal<
@@ -57,6 +64,19 @@ vi.mock("node:fs/promises", async (importOriginal) => {
 
   return {
     ...original,
+    chmod: async (
+      path: Parameters<typeof original.chmod>[0],
+      mode: Parameters<typeof original.chmod>[1],
+    ) => {
+      if (
+        midEdit.hook !== null &&
+        String(path).includes(".rip-deck-")
+      ) {
+        await midEdit.hook()
+      }
+
+      return original.chmod(path, mode)
+    },
     rename: (from: string, to: string) => {
       const error = renameFailure.error
       renameFailure.error = null
@@ -111,6 +131,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   renameFailure.error = null
+  midEdit.hook = null
   process.umask(testState.originalUmask)
   await rm(testState.homePath, {
     recursive: true,
@@ -368,6 +389,124 @@ describe("applyMakemkvPrivacySettings", () => {
       realFilePath,
     )
     expect(await readFile(realFilePath, "utf8")).toBe(
+      settingsWrittenByMakemkv.concat(privacyLines),
+    )
+  })
+
+  it("refuses a settings.conf symlink whose target does not exist, and leaves the link", async () => {
+    // A key put at the intended target later must still reach
+    // MakeMKV, so the link must not become a plain file.
+    const targetFilePath = join(
+      testState.homePath,
+      "future.conf",
+    )
+    await mkdir(join(testState.homePath, ".MakeMKV"))
+    await symlink(targetFilePath, settingsFilePath())
+
+    await expect(
+      applyMakemkvPrivacySettings(testState.homePath),
+    ).rejects.toThrow(
+      /symlink to a file that does not exist/,
+    )
+    expect(
+      (await lstat(settingsFilePath())).isSymbolicLink(),
+    ).toBe(true)
+    expect(await readlink(settingsFilePath())).toBe(
+      targetFilePath,
+    )
+    await expect(stat(targetFilePath)).rejects.toThrow(
+      /ENOENT/,
+    )
+  })
+
+  it("keeps a key that was replaced in the middle of an edit", async () => {
+    await writeSettings(settingsWrittenByMakemkv)
+    const refreshedText = settingsWrittenByMakemkv.replace(
+      "T-placeholder-key",
+      "T-refreshed-placeholder-key",
+    )
+    midEdit.hook = async () => {
+      midEdit.hook = null
+      await writeFile(settingsFilePath(), refreshedText)
+    }
+
+    await applyMakemkvPrivacySettings(testState.homePath)
+
+    expect(await readFile(settingsFilePath(), "utf8")).toBe(
+      refreshedText.concat(privacyLines),
+    )
+    expect(
+      await readdir(join(testState.homePath, ".MakeMKV")),
+    ).toEqual(["settings.conf"])
+  })
+
+  it("makes a second call wait for the edit in progress", async () => {
+    await writeSettings(settingsWrittenByMakemkv)
+    const events: string[] = []
+    const secondCall: { promise: Promise<void> | null } = {
+      promise: null,
+    }
+    midEdit.hook = async () => {
+      midEdit.hook = null
+      secondCall.promise = applyMakemkvPrivacySettings(
+        testState.homePath,
+      ).then(() => {
+        events.push("second call done")
+      })
+      // Long enough for an unqueued second call to finish first.
+      await new Promise((resolve) =>
+        setTimeout(resolve, 50),
+      )
+      events.push("first call resumed")
+    }
+
+    await applyMakemkvPrivacySettings(testState.homePath)
+    await secondCall.promise
+
+    expect(events).toEqual([
+      "first call resumed",
+      "second call done",
+    ])
+    expect(await readFile(settingsFilePath(), "utf8")).toBe(
+      settingsWrittenByMakemkv.concat(privacyLines),
+    )
+  })
+
+  it("gives up, keeping the newest text, when the file changes during every edit", async () => {
+    await writeSettings(settingsWrittenByMakemkv)
+    const writes = { count: 0 }
+    midEdit.hook = async () => {
+      writes.count += 1
+      await writeFile(
+        settingsFilePath(),
+        `app_Key = "T-placeholder-key-${writes.count}"\n`,
+      )
+    }
+
+    await expect(
+      applyMakemkvPrivacySettings(testState.homePath),
+    ).rejects.toThrow(/changed during each of 5 edits/)
+    expect(writes.count).toBe(5)
+    expect(await readFile(settingsFilePath(), "utf8")).toBe(
+      'app_Key = "T-placeholder-key-5"\n',
+    )
+    expect(
+      await readdir(join(testState.homePath, ".MakeMKV")),
+    ).toEqual(["settings.conf"])
+  })
+
+  it("runs the next call after one that failed", async () => {
+    await writeSettings(settingsWrittenByMakemkv)
+    renameFailure.error = Object.assign(new Error("EIO"), {
+      code: "EIO",
+    })
+
+    await expect(
+      applyMakemkvPrivacySettings(testState.homePath),
+    ).rejects.toThrow(/EIO/)
+    await applyMakemkvPrivacySettings(testState.homePath)
+
+    expect(await readFile(settingsFilePath(), "utf8")).toBe(
       settingsWrittenByMakemkv.concat(privacyLines),
     )
   })
