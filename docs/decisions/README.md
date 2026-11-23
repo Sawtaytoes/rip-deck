@@ -9,6 +9,7 @@ default instinct.
 
 | Date | Decision |
 | --- | --- |
+| 2026-11-23 | [MakeMKV never phones home](2026-11-23-makemkv-never-phones-home.md) — before every `makemkvcon` spawn, and once when the daemon starts, `app_UpdateEnable` and `app_AutoSubmitEnabled` are set to `"0"` in `$HOME/.MakeMKV/settings.conf` by an atomic replace that keeps the key, owner, and mode. A failure to write them stops the spawn. The Dockerfile's build check runs with the same settings and fails on MSG:5074 or `update.conf`. |
 | 2026-11-14 | [The SPA fallback is Charcuterie's shared rule](2026-11-14-the-spa-fallback-is-charcuteries-shared-rule.md) — the daemon calls `getIsShellPath` from the framework-free `@charcuterie/server/paths` instead of its own rule. A GET or HEAD miss gets the shell unless it is under `SERVER_PATH_PREFIXES` or `/assets/`. In-memory serving, HEAD, the 503 page, and the JSON 404 stay. **Supersedes in part** the 2026-08-16 dot clause: a dotted kiosk ID needs no special case now, and a missing dotted file outside `/assets/` gets the shell. |
 | 2026-11-02 | [Headless ripping can use unknown job names](2026-11-02-headless-ripping-can-use-unknown-job-names.md) — opt-in unique names and audio metadata fallback. |
 | 2026-09-29 | [Drive compartments are bays throughout Rip Deck](2026-09-29-drive-compartments-are-bays-throughout-rip-deck.md) — the internal model and operator wording use bay; old external fields and IDs remain compatible. |

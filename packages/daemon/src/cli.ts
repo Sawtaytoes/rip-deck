@@ -27,6 +27,7 @@ import {
   createNullEventLog,
 } from "./rip/eventLog.ts"
 import { identifyDisc } from "./rip/identifyDisc.ts"
+import { applyMakemkvPrivacySettings } from "./rip/makemkvPrivacySettings.ts"
 import {
   buildRipArgs,
   buildRipInvocation,
@@ -65,6 +66,8 @@ const readMakemkvDrives = async (): Promise<
   Map<string, string>
 > => {
   const devPathToSerial = new Map<string, string>()
+
+  await applyMakemkvPrivacySettings()
 
   const events = await new Promise<MakemkvEvent[]>(
     (resolve) => {

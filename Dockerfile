@@ -235,8 +235,28 @@ RUN ! /opt/makemkv/bin/mmgplsrv --help 2>&1 | grep -q 'not found'
 # runtime surprise into a build failure. That is the whole reason
 # it is here: the bookworm→trixie move was defended for three
 # stages with "it should work" and nobody had checked.
-RUN makemkvcon -r --cache=1 info disc:9999 \
-  | grep -q 'MSG:1005.*started'
+#
+# This run uses a throwaway HOME whose settings.conf turns off the
+# update check and dump submission, the same two settings every
+# runtime spawn sets (`rip/makemkvPrivacySettings.ts`). Without
+# it, the build itself would check makemkv.com for updates. The
+# build fails if makemkvcon still announces the check (MSG:5074)
+# or writes `update.conf`.
+#
+# The exit status is checked only for a crash: 0, and 253 from
+# MakeMKV 1.18.4 with no key, pass. The key is mounted at runtime,
+# never baked in.
+# ([decision](docs/decisions/2026-11-23-makemkv-never-phones-home.md))
+RUN mkdir -p /tmp/makemkv-build-home/.MakeMKV \
+  && printf 'app_AutoSubmitEnabled = "0"\napp_UpdateEnable = "0"\n' \
+    > /tmp/makemkv-build-home/.MakeMKV/settings.conf \
+  && { HOME=/tmp/makemkv-build-home makemkvcon -r --cache=1 info disc:9999 \
+    > /tmp/makemkv-build-check.log; makemkvconStatus=$?; true; } \
+  && case "$makemkvconStatus" in 0|253) ;; *) false ;; esac \
+  && grep -q 'MSG:1005.*started' /tmp/makemkv-build-check.log \
+  && ! grep -q 'MSG:5074' /tmp/makemkv-build-check.log \
+  && test ! -e /tmp/makemkv-build-home/.MakeMKV/update.conf \
+  && rm -r -- /tmp/makemkv-build-home /tmp/makemkv-build-check.log
 
 # --- Tools the rip loop needs ---------------------------------
 # `eject` is the operator tray command (`rip/tray.ts`), and it
@@ -366,6 +386,13 @@ RUN printf '%s\n' \
 # carries a `.MakeMKV -> /config` symlink (jlesage's layout), so
 # pointing HOME at /config resolves the key, and app_DataDir's
 # "/config/data" lands inside the mount too.
+#
+# Before each makemkvcon spawn, and once at daemon start, the
+# daemon sets `app_UpdateEnable` and `app_AutoSubmitEnabled` to
+# "0" in that file, so MakeMKV neither checks for updates nor
+# submits dumps (`rip/makemkvPrivacySettings.ts`). Every per-rip
+# container mounts the same folder at /config, so it reads the
+# same file.
 ENV HOME=/config
 
 # The CONTAINER's view of the rips dataset, matching how

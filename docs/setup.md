@@ -23,6 +23,8 @@ The example expects these persistent locations:
 | `/var/lib/rip-deck` | Bay memory, history, job logs, verdicts, and poster cache. |
 | `/app/config/drives.json` | Operator-maintained bay and drive identity map. |
 
+Rip Deck sets `app_UpdateEnable` and `app_AutoSubmitEnabled` to `"0"` in `/config/.MakeMKV/settings.conf` before every MakeMKV run, so MakeMKV does not check for updates or submit dumps. It keeps the key and every other setting. If it cannot write the file, it does not run MakeMKV. See [MakeMKV never phones home](decisions/2026-11-23-makemkv-never-phones-home.md).
+
 Create the host directories and copy [`config/drives.json`](../config/drives.json) to a persistent host path. The checked-in file contains examples only.
 
 ## Build or pull the image

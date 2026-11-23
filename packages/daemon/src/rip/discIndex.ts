@@ -4,6 +4,7 @@ import {
   type MakemkvDriveEvent,
   parseMakemkvLine,
 } from "@mux-magic/tools"
+import { applyMakemkvPrivacySettings } from "./makemkvPrivacySettings.ts"
 import type { MakemkvCommand } from "./ripCommand.ts"
 
 /**
@@ -81,6 +82,8 @@ export const enumerateDrives = async (input: {
     "info",
     "disc:9999",
   ]
+
+  await applyMakemkvPrivacySettings()
 
   const drives = await new Promise<MakemkvDriveEvent[]>(
     (resolve) => {

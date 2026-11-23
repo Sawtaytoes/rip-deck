@@ -1,3 +1,4 @@
+import { homedir } from "node:os"
 import { basename, extname } from "node:path"
 import {
   type ApiServer,
@@ -19,6 +20,10 @@ import {
   resolveRipConcurrency,
 } from "./rip/governor.ts"
 import { createLiveRipsReader } from "./rip/liveRips.ts"
+import {
+  applyMakemkvPrivacySettings,
+  makemkvSettingsFilePath,
+} from "./rip/makemkvPrivacySettings.ts"
 import { backfillRipHistory } from "./rip/ripHistoryBackfill.ts"
 import {
   type BayOutcome,
@@ -212,6 +217,24 @@ export const runWatch = async (
   if (concurrency.clampReason !== null) {
     console.warn(`\n${concurrency.clampReason}\n`)
   }
+
+  // Once at start, so the settings file is right even while the
+  // tower is off and nothing spawns makemkvcon. Every spawn sets
+  // them again, and refuses to run makemkvcon if it cannot, so a
+  // failure here is reported and does not stop the daemon.
+  await applyMakemkvPrivacySettings().then(
+    () =>
+      console.log(
+        "MakeMKV update check and dump submission: OFF " +
+          `(${makemkvSettingsFilePath(homedir())})`,
+      ),
+    (error: unknown) =>
+      console.warn(
+        error instanceof Error
+          ? error.message
+          : String(error),
+      ),
+  )
 
   console.log(
     `Polling sysfs every ${pollIntervalMs}ms. Auto-rip never ` +

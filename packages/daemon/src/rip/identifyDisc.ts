@@ -4,6 +4,7 @@ import {
   type MakemkvEvent,
   parseMakemkvLine,
 } from "@mux-magic/tools"
+import { applyMakemkvPrivacySettings } from "./makemkvPrivacySettings.ts"
 import type { MakemkvCommand } from "./ripCommand.ts"
 
 /**
@@ -314,6 +315,22 @@ const identifyDiscOnce = async (input: {
     "info",
     `dev:${input.devPath}`,
   ]
+
+  // Not a fact about the disc, so it is reported the way a
+  // missing binary is: as a spawn failure the card names as a
+  // deployment fault. makemkvcon is not run.
+  try {
+    await applyMakemkvPrivacySettings()
+  } catch (error) {
+    return {
+      discName: null,
+      events: [],
+      spawnFailure:
+        error instanceof Error
+          ? error.message
+          : String(error),
+    }
+  }
 
   const outcome = await new Promise<{
     events: MakemkvEvent[]
