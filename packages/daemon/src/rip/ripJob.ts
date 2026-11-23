@@ -35,6 +35,7 @@ import {
   type Liveness,
   startLivenessWatchdog,
 } from "./liveness.ts"
+import { applyMakemkvPrivacySettings } from "./makemkvPrivacySettings.ts"
 import { parseProcStartTime } from "./orphan.ts"
 import {
   createRipObservations,
@@ -214,6 +215,11 @@ export const runRipJob = async (
   const observations = createRipObservations()
 
   // --- Preflight, before anything is spawned. --------------
+  // MakeMKV's update check and dump submission go off before
+  // anything else, and a failure to turn them off stops the rip
+  // here, before a folder is made or a drive is touched.
+  await applyMakemkvPrivacySettings()
+
   // Running out of room mid-rip wastes the entire read, and the
   // disc's size is known up front, so there is no excuse.
   const space = await checkFreeSpace({
